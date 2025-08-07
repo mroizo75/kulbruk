@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -73,9 +73,9 @@ function getStatusBadge(status: string) {
 }
 
 export default async function ModeratorReportsPage() {
-  const user = await currentUser()
+  const session = await auth()
   
-  if (!user) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/moderator/rapporter')
   }
 

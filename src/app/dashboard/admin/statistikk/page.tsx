@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { 
   BarChart3, 
@@ -20,15 +20,15 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 export default async function AdminStatisticsPage() {
-  const clerkUser = await currentUser()
+  const session = await auth()
   
-  if (!clerkUser) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/admin/statistikk')
   }
 
   // Sjekk at brukeren er admin
   const currentDbUser = await prisma.user.findUnique({
-    where: { clerkId: clerkUser.id }
+    where: { id: session.user?.id }
   })
 
   if (!currentDbUser || currentDbUser.role !== 'admin') {

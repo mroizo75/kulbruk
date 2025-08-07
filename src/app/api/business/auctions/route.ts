@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { estimateVehiclePrice } from '@/lib/ai-price-estimation'
 
@@ -8,10 +7,9 @@ const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    const user = await currentUser()
+    const session = await auth()
     
-    if (!userId && !user) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Ikke autentisert' },
         { status: 401 }
@@ -20,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     // Sjekk business tilgang
     const businessUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId || '' },
+      where: { id: session.user.id },
       select: { role: true, companyName: true, id: true }
     })
 

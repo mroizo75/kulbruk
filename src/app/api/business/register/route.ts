@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Clerk fjernet
+
 
     // Send notifikasjon til admin om ny bedriftsregistrering
     notifyNewUser({

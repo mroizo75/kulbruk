@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { PrismaClient } from '@prisma/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,15 +22,15 @@ import BusinessNotificationSettings from '@/components/business-notification-set
 const prisma = new PrismaClient()
 
 export default async function BusinessNotificationsPage() {
-  const user = await currentUser()
+  const session = await auth()
   
-  if (!user) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/business/varsler')
   }
 
   // Sjekk business tilgang
   const dbUser = await prisma.user.findUnique({
-    where: { clerkId: user.id },
+    where: { id: session.user?.id },
     select: { 
       role: true, 
       companyName: true,

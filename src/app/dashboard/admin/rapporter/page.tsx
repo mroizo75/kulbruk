@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { AlertTriangle, Eye, CheckCircle, XCircle, Clock, Flag, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
@@ -12,15 +12,15 @@ import ReportActions from '@/components/report-actions'
 const prisma = new PrismaClient()
 
 export default async function AdminReportsPage() {
-  const clerkUser = await currentUser()
+  const session = await auth()
   
-  if (!clerkUser) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/admin/rapporter')
   }
 
   // Sjekk at brukeren er admin
   const currentDbUser = await prisma.user.findUnique({
-    where: { clerkId: clerkUser.id }
+    where: { id: session.user?.id }
   })
 
   if (!currentDbUser || currentDbUser.role !== 'admin') {

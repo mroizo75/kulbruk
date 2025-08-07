@@ -64,7 +64,7 @@ export default function CompleteBusinessSetupPage() {
         // Pre-fill med brukerdata fra Clerk
         setFormData(prev => ({
           ...prev,
-          phone: session.user.phone || ''
+          phone: session.user?.phone || ''
         }))
 
         console.log('Business setup ikke komplett - viser form')
@@ -76,7 +76,7 @@ export default function CompleteBusinessSetupPage() {
         // Fortsett med å vise skjema selv om API feiler
         setFormData(prev => ({
           ...prev,
-          phone: session.user.phone || ''
+          phone: session.user?.phone || ''
         }))
       } finally {
         setIsCheckingUser(false)
@@ -125,8 +125,8 @@ export default function CompleteBusinessSetupPage() {
         credentials: 'include',
         body: JSON.stringify({
           ...formData,
-          contactPerson: `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
-          email: user?.emailAddresses[0]?.emailAddress || ''
+          contactPerson: `${session.user?.name?.split(' ')[0] || ''} ${session.user?.name?.split(' ')[1] || ''}`.trim(),
+          email: session.user?.email || ''
         })
       })
 

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe, PRICING } from '@/lib/stripe'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await auth()
     if (!session?.user) {
       return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
     }
@@ -59,15 +58,23 @@ export async function POST(request: NextRequest) {
         customerId = customers.data[0].id
       } else {
         // Opprett ny customer
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+        const createParams: any = {
           metadata: {
-            clerkId: userId,
-            userId: user.id,
+            sessionUserId: session.user.id,
+            appUserId: user.id,
             companyName: user.companyName || '',
+            role: user.role,
+            orgNumber: user.orgNumber || '',
+            phone: user.phone || '',
+            location: user.location || '',
+            website: user.website || '',
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
           },
-        })
+        }
+        if (user.email) createParams.email = user.email
+        if (user.firstName && user.lastName) createParams.name = `${user.firstName} ${user.lastName}`
+        const customer = await stripe.customers.create(createParams)
         customerId = customer.id
       }
     } catch (stripeError) {
@@ -87,7 +94,7 @@ export async function POST(request: NextRequest) {
       payment_settings: { save_default_payment_method: 'on_subscription' },
       expand: ['latest_invoice.payment_intent'],
       metadata: {
-        clerkId: userId,
+        sessionUserId: session.user.id ?? null,
         userId: user.id,
         plan,
       },

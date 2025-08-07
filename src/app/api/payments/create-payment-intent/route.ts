@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe, getListingPrice, PRICING } from '@/lib/stripe'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await auth()
     if (!session?.user) {
       return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
     }
@@ -72,7 +71,7 @@ export async function POST(request: NextRequest) {
       description,
       metadata: {
         userId: user.id,
-        clerkId: userId,
+        id: session.user.id,
         type: paymentType,
         categorySlug,
         ...(listingId && { listingId }),
@@ -93,10 +92,7 @@ export async function POST(request: NextRequest) {
         type: paymentType,
         listingId: listingId || null,
         status: 'PENDING',
-        metadata: {
-          categorySlug,
-          stripeClientSecret: paymentIntent.client_secret,
-        },
+        metadata: JSON.stringify({ categorySlug, stripeClientSecret: paymentIntent.client_secret }),
       },
     })
 

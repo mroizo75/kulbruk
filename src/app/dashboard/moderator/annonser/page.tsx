@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { PrismaClient } from '@prisma/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -76,15 +76,15 @@ async function rejectListing(listingId: string) {
 }
 
 export default async function ModeratorListingsPage() {
-  const user = await currentUser()
+  const session = await auth()
   
-  if (!user) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/moderator/annonser')
   }
 
   // Sjekk moderator tilgang
   const dbUser = await prisma.user.findUnique({
-    where: { clerkId: user.id },
+    where: { id: session.user?.id },
     select: { role: true }
   })
 

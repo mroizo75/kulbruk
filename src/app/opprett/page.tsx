@@ -1,12 +1,12 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import CreateListingForm from '@/components/create-listing-form'
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default async function CreateListingPage() {
-  const user = await currentUser()
+  const session = await auth()
   
-  if (!user) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/opprett')
   }
 

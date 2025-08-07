@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { CheckCircle, XCircle, Eye, Clock, User, MapPin, Calendar, Euro } from 'lucide-react'
 import Link from 'next/link'
@@ -13,9 +13,9 @@ import AdminAnnonserClient from '@/components/admin-annonser-client'
 const prisma = new PrismaClient()
 
 export default async function AdminListingsPage() {
-  const clerkUser = await currentUser()
+  const session = await auth()
   
-  if (!clerkUser) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/admin/annonser')
   }
 

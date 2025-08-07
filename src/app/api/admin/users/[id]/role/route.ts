@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
@@ -10,10 +9,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
-    const user = await currentUser()
+    const session = await auth()
     
-    if (!userId && !user) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Ikke autentisert' },
         { status: 401 }
@@ -22,7 +20,7 @@ export async function PATCH(
 
     // Sjekk at brukeren er admin
     const adminUser = await prisma.user.findUnique({
-      where: { clerkId: userId || user?.id }
+      where: { id: session.user.id }
     })
 
     if (!adminUser || adminUser.role !== 'admin') {

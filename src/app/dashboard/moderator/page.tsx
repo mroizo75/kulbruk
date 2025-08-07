@@ -1,24 +1,22 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Clock, AlertTriangle, CheckCircle, Users, ListIcon } from 'lucide-react'
 import DashboardLayout from '@/components/dashboard-layout'
 
-const prisma = new PrismaClient()
-
 export default async function ModeratorDashboard() {
-  const user = await currentUser()
+  const session = await auth()
   
-  if (!user) {
+  if (!session?.user) {
     redirect('/sign-in?redirectUrl=/dashboard/moderator')
   }
 
   // Sjekk at brukeren er moderator
   const dbUser = await prisma.user.findUnique({
-    where: { clerkId: user.id },
+    where: { email: session.user.email! },
     select: { role: true }
   })
 

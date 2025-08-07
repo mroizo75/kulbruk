@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { notifyNewUser } from '@/lib/notification-manager'
 
@@ -8,10 +7,9 @@ const prisma = new PrismaClient()
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    const user = await currentUser()
+    const session = await auth()
     
-    if (!userId && !user) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Ikke autentisert' },
         { status: 401 }
@@ -54,13 +52,13 @@ export async function POST(request: NextRequest) {
 
     // Sjekk om brukeren allerede eksisterer
     let dbUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId || '' }
+      where: { id: session.user.id }
     })
 
     if (dbUser) {
       // Oppdater eksisterende bruker med bedriftsinformasjon
       dbUser = await prisma.user.update({
-        where: { clerkId: user?.id || userId || '' },
+        where: { id: session.user.id },
         data: {
           role: 'business',
           companyName: data.companyName,
@@ -68,19 +66,19 @@ export async function POST(request: NextRequest) {
           phone: data.phone,
           location: `${data.address}, ${data.postalCode} ${data.city}`,
           website: data.website || null,
-          firstName: data.contactPerson.split(' ')[0] || user?.firstName || '',
-          lastName: data.contactPerson.split(' ').slice(1).join(' ') || user?.lastName || '',
-          email: data.email || user?.emailAddresses[0]?.emailAddress || ''
+          firstName: data.contactPerson.split(' ')[0] || session.user.name?.split(' ')[0] || '',
+          lastName: data.contactPerson.split(' ').slice(1).join(' ') || session.user.name?.split(' ')[1] || '',
+          email: data.email || session.user.email || ''
         }
       })
     } else {
       // Opprett ny bruker
       dbUser = await prisma.user.create({
         data: {
-          clerkId: user?.id || userId || '',
-          email: data.email || user?.emailAddresses[0]?.emailAddress || '',
-          firstName: data.contactPerson.split(' ')[0] || user?.firstName || '',
-          lastName: data.contactPerson.split(' ').slice(1).join(' ') || user?.lastName || '',
+          id: session.user.id,
+          email: data.email || session.user.email || '',
+          firstName: data.contactPerson.split(' ')[0] || session.user.name?.split(' ')[0] || '',
+          lastName: data.contactPerson.split(' ').slice(1).join(' ') || session.user.name?.split(' ')[1] || '',
           phone: data.phone,
           location: `${data.address}, ${data.postalCode} ${data.city}`,
           role: 'business',
@@ -91,19 +89,6 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Oppdater Clerk metadata
-    const clerkClient = (await import('@clerk/nextjs/server')).clerkClient
-    const client = await clerkClient()
-    
-    await client.users.updateUserMetadata(user?.id || userId || '', {
-      publicMetadata: {
-        role: 'business',
-        companyName: data.companyName,
-        orgNumber: cleanOrgNumber,
-        businessType: data.businessType,
-        businessSetupComplete: true
-      }
-    })
 
     // Send notifikasjon til admin om ny bedriftsregistrering
     notifyNewUser({
@@ -117,7 +102,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ Bedrift setup fullført:', {
       company: data.companyName,
       orgNumber: cleanOrgNumber,
-      contact: data.contactPerson || `${user?.firstName} ${user?.lastName}`,
+      contact: data.contactPerson || `${session.user.name?.split(' ')[0]} ${session.user.name?.split(' ')[1]}`,
       type: data.businessType,
       userId: dbUser.id
     })

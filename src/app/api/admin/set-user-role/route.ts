@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { UserRole } from '@/lib/types'
 
@@ -9,9 +8,9 @@ const prisma = new PrismaClient()
 // POST - Sett brukerrolle (kun for admins)
 export async function POST(request: NextRequest) {
   try {
-    const { userId: currentUserId } = await auth()
+    const session = await auth()
     
-    if (!currentUserId) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Ikke autentisert' },
         { status: 401 }
@@ -20,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // Sjekk at kun admin kan endre roller
     const currentUser = await prisma.user.findUnique({
-      where: { clerkId: currentUserId },
+      where: { id: session.user.id },
       select: { role: true }
     })
 
@@ -49,17 +48,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Oppdater rolle i Clerk
-    const client = await clerkClient()
-    await client.users.updateUserMetadata(targetUserId, {
-      publicMetadata: {
-        role: newRole
-      }
-    })
-
     // Oppdater rolle i database
     await prisma.user.updateMany({
-      where: { clerkId: targetUserId },
+      where: { id: targetUserId },
       data: { 
         role: newRole as UserRole,
         updatedAt: new Date()
@@ -85,9 +76,9 @@ export async function POST(request: NextRequest) {
 // GET - Hent brukerroller (for admin)
 export async function GET(request: NextRequest) {
   try {
-    const { userId: currentUserId } = await auth()
+    const session = await auth()
     
-    if (!currentUserId) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Ikke autentisert' },
         { status: 401 }
@@ -96,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     // Sjekk admin-tilgang
     const currentUser = await prisma.user.findUnique({
-      where: { clerkId: currentUserId },
+      where: { id: session.user.id },
       select: { role: true }
     })
 
@@ -111,7 +102,6 @@ export async function GET(request: NextRequest) {
     const users = await prisma.user.findMany({
       select: {
         id: true,
-        clerkId: true,
         email: true,
         firstName: true,
         lastName: true,

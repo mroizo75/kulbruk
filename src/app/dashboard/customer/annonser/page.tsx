@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, Eye, Edit, Trash2, Clock, CheckCircle, XCircle } from 'lucide-react'
@@ -8,9 +8,9 @@ import { Badge } from '@/components/ui/badge'
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default async function MyListingsPage() {
-  const user = await currentUser()
+  const session = await auth()
   
-  if (!user) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/customer/annonser')
   }
 

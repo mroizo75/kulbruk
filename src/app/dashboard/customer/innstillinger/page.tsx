@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Settings, User, Bell, Shield, CreditCard, Eye } from 'lucide-react'
@@ -11,9 +11,9 @@ import { Switch } from '@/components/ui/switch'
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default async function SettingsPage() {
-  const user = await currentUser()
+  const session = await auth()
   
-  if (!user) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/customer/innstillinger')
   }
 

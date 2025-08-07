@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { PrismaClient } from '@prisma/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,15 +31,15 @@ import BusinessSubscriptionCard from '@/components/business-subscription-card'
 const prisma = new PrismaClient()
 
 export default async function BusinessSettingsPage() {
-  const user = await currentUser()
+  const session = await auth()
   
-  if (!user) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/business/innstillinger')
   }
 
   // Sjekk business tilgang og hent data
   const dbUser = await prisma.user.findUnique({
-    where: { clerkId: user.id },
+    where: { id: session.user?.id },
     select: { 
       role: true, 
       companyName: true,

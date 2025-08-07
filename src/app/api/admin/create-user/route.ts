@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // Opprett bruker i database (uten Clerk først)
     const dbUser = await prisma.user.create({
       data: {
-        clerkId: `temp_${Date.now()}`, // Midlertidig ID
+        id: `temp_${Date.now()}`, // Midlertidig ID
         email: email,
         firstName,
         lastName,
@@ -52,7 +52,6 @@ export async function POST(request: NextRequest) {
       note: 'Clerk-integrasjon midlertidig deaktivert',
       user: {
         id: dbUser.id,
-        clerkId: dbUser.clerkId,
         email: email,
         firstName,
         lastName,
