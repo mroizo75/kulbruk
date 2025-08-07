@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
       },
       
       // Dekk og felg
-      tires: tekniskeData?.dekkOgFelg?.akselDekkOgFelgKombinasjon?.[0]?.akselDekkOgFelg?.map(dekk => ({
+      tires: tekniskeData?.dekkOgFelg?.akselDekkOgFelgKombinasjon?.[0]?.akselDekkOgFelg?.map((dekk: any) => ({
         dimension: dekk.dekkdimensjon,
         speedRating: dekk.hastighetskodeDekk,
         loadRating: dekk.belastningskodeDekk,
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
       
       // Sikkerhet
       abs: tekniskeData?.bremser?.abs || false,
-      airbags: tekniskeData?.persontall?.sitteplassListe?.sitteplass?.some(seat => 
+      airbags: tekniskeData?.persontall?.sitteplassListe?.sitteplass?.some((seat: any) => 
         seat.frontairbag || seat.sideairbag || seat.hodegardinairbag
       ) || false,
       
@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
       technicalCode: carData.godkjenning?.tekniskGodkjenning?.kjoretoyklassifisering?.tekniskKode?.kodeNavn || null,
       
       // Merknader
-      remarks: carData.godkjenning?.kjoretoymerknad?.map(merknad => merknad.merknad) || [],
+      remarks: carData.godkjenning?.kjoretoymerknad?.map((merknad: any) => merknad.merknad) || [],
       
       // Debug data (fjernes i produksjon)
       rawData: carData

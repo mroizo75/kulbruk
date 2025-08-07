@@ -22,9 +22,9 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 // Mock data - senere hentes fra database
@@ -83,7 +83,8 @@ async function getListing(id: string) {
         category: true,
         images: {
           orderBy: { sortOrder: 'asc' }
-        }
+        },
+        vehicleSpec: true
       }
     })
 
@@ -96,7 +97,8 @@ async function getListing(id: string) {
 
 export default async function ListingDetailPage({ params }: PageProps) {
   const user = await currentUser()
-  const listing = await getListing(params.id)
+  const { id } = await params
+  const listing = await getListing(id)
   
   if (!listing) {
     redirect('/annonser')
@@ -105,7 +107,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
   // Oppdater visningsantall
   try {
     await prisma.listing.update({
-      where: { id: params.id },
+      where: { id },
       data: { views: { increment: 1 } }
     })
   } catch (error) {
@@ -173,10 +175,10 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 </div>
                 
                 <div className="text-4xl font-bold text-blue-600 mb-4">
-                  {listing.price.toLocaleString('no-NO')} kr
+                  {Number(listing.price).toLocaleString('no-NO')} kr
                 </div>
                 
-                <Badge className="mb-4">{listing.category}</Badge>
+                <Badge className="mb-4">{listing.category.name}</Badge>
               </CardContent>
             </Card>
 
@@ -193,7 +195,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
             </Card>
 
             {/* Bil-spesifikasjoner (kun for biler) */}
-            {listing.category === 'Biler' && listing.vehicleInfo && (
+            {listing.category.slug === 'biler' && listing.vehicleSpec && (
               <Card>
                 <CardHeader>
                   <CardTitle>Tekniske data</CardTitle>
@@ -202,27 +204,27 @@ export default async function ListingDetailPage({ params }: PageProps) {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                       <span className="text-sm text-gray-600">År</span>
-                      <p className="font-medium">{listing.vehicleInfo.year}</p>
+                      <p className="font-medium">{listing.vehicleSpec.year}</p>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Kilometerstand</span>
-                      <p className="font-medium">{listing.vehicleInfo.mileage?.toLocaleString('no-NO')} km</p>
+                      <p className="font-medium">{listing.vehicleSpec.mileage?.toLocaleString('no-NO')} km</p>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Drivstoff</span>
-                      <p className="font-medium">{listing.vehicleInfo.fuelType}</p>
+                      <p className="font-medium">{listing.vehicleSpec.fuelType}</p>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Girkasse</span>
-                      <p className="font-medium">{listing.vehicleInfo.transmission}</p>
+                      <p className="font-medium">{listing.vehicleSpec.transmission}</p>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-600">Motorstørrelse</span>
-                      <p className="font-medium">{listing.vehicleInfo.engineSize}</p>
+                      <span className="text-sm text-gray-600">Effekt</span>
+                      <p className="font-medium">{listing.vehicleSpec.power} hk</p>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">Farge</span>
-                      <p className="font-medium">{listing.vehicleInfo.color}</p>
+                      <p className="font-medium">{listing.vehicleSpec.color}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -298,15 +300,13 @@ export default async function ListingDetailPage({ params }: PageProps) {
                       <User className="h-5 w-5 text-gray-400" />
                     </div>
                     <div>
-                      <p className="font-medium">{listing.seller.name}</p>
-                      <p className="text-sm text-gray-600">{listing.seller.location}</p>
+                      <p className="font-medium">{listing.user.firstName} {listing.user.lastName}</p>
+                      <p className="text-sm text-gray-600">{listing.location}</p>
                     </div>
                   </div>
                   
                   <div className="text-sm text-gray-600 space-y-1">
-                    <p>⭐ {listing.seller.rating}/5.0 vurdering</p>
-                    <p>📅 Medlem siden {listing.seller.memberSince.toLocaleDateString('no-NO', { month: 'long', year: 'numeric' })}</p>
-                    <p>📝 {listing.seller.totalAds} aktive annonser</p>
+                    <p>📅 Medlem siden {listing.user.createdAt.toLocaleDateString('no-NO', { month: 'long', year: 'numeric' })}</p>
                   </div>
                   
                   <Button variant="outline" className="w-full">

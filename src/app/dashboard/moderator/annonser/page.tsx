@@ -100,7 +100,8 @@ export default async function ModeratorListingsPage() {
       include: {
         user: {
           select: { firstName: true, lastName: true, email: true }
-        }
+        },
+        category: true
       },
       orderBy: { createdAt: 'desc' }
     }),
@@ -113,7 +114,8 @@ export default async function ModeratorListingsPage() {
       include: {
         user: {
           select: { firstName: true, lastName: true, email: true }
-        }
+        },
+        category: true
       },
       orderBy: { updatedAt: 'desc' },
       take: 10
@@ -215,11 +217,11 @@ export default async function ModeratorListingsPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
                       <div>
                         <span className="font-medium">Kategori:</span>
-                        <p className="text-gray-600">{listing.category}</p>
+                        <p className="text-gray-600">{listing.category?.name || 'Ukjent'}</p>
                       </div>
                       <div>
                         <span className="font-medium">Pris:</span>
-                        <p className="text-gray-600">{listing.price.toLocaleString('no-NO')} kr</p>
+                        <p className="text-gray-600">{Number(listing.price).toLocaleString('no-NO')} kr</p>
                       </div>
                       <div>
                         <span className="font-medium">Lokasjon:</span>
@@ -254,7 +256,7 @@ export default async function ModeratorListingsPage() {
                         </a>
                       </Button>
 
-                      <form action={approveListing.bind(null, listing.id)} className="inline">
+                      <form action={async (formData: FormData) => { await approveListing(listing.id) }} className="inline">
                         <Button
                           type="submit"
                           size="sm"
@@ -265,7 +267,7 @@ export default async function ModeratorListingsPage() {
                         </Button>
                       </form>
 
-                      <form action={rejectListing.bind(null, listing.id)} className="inline">
+                      <form action={async (formData: FormData) => { await rejectListing(listing.id) }} className="inline">
                         <Button
                           type="submit"
                           size="sm"

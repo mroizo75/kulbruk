@@ -1,3 +1,5 @@
+'use client'
+
 import VehicleInfoForm from '@/components/vehicle-info-form'
 
 export default function TestBilInfoPage() {

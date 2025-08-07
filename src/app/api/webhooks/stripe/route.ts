@@ -138,10 +138,14 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 
 async function handleSubscriptionPaymentSuccess(invoice: Stripe.Invoice) {
   try {
-    if (!invoice.subscription) return
+    const subscriptionId = (invoice as any).subscription
+    if (!subscriptionId) return
+
+    const finalSubscriptionId = typeof subscriptionId === 'string' ? subscriptionId : subscriptionId?.id
+    if (!finalSubscriptionId) return
 
     const subscription = await prisma.subscription.findUnique({
-      where: { stripeSubscriptionId: invoice.subscription as string },
+      where: { stripeSubscriptionId: finalSubscriptionId },
     })
 
     if (subscription) {
@@ -157,7 +161,7 @@ async function handleSubscriptionPaymentSuccess(invoice: Stripe.Invoice) {
       })
     }
 
-    console.log(`Abonnement betaling vellykket: ${invoice.subscription}`)
+    console.log(`Abonnement betaling vellykket: ${(invoice as any).subscription}`)
   } catch (error) {
     console.error('Feil ved håndtering av abonnement betaling:', error)
   }
@@ -165,14 +169,15 @@ async function handleSubscriptionPaymentSuccess(invoice: Stripe.Invoice) {
 
 async function handleSubscriptionPaymentFailed(invoice: Stripe.Invoice) {
   try {
-    if (!invoice.subscription) return
+    const subscriptionId = (invoice as any).subscription
+    if (!subscriptionId) return
 
     await prisma.subscription.updateMany({
-      where: { stripeSubscriptionId: invoice.subscription as string },
+      where: { stripeSubscriptionId: subscriptionId },
       data: { status: 'PAST_DUE' },
     })
 
-    console.log(`Abonnement betaling feilet: ${invoice.subscription}`)
+    console.log(`Abonnement betaling feilet: ${subscriptionId}`)
   } catch (error) {
     console.error('Feil ved håndtering av mislykket abonnement betaling:', error)
   }

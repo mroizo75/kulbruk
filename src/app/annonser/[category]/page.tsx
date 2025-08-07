@@ -3,13 +3,13 @@ import { getCategoryRedirect, isValidMainCategory } from '@/lib/category-mapper'
 import CategoryListings from '@/components/category-listings'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     category: string
-  }
+  }>
 }
 
-export default function CategoryPage({ params }: PageProps) {
-  const { category } = params
+export default async function CategoryPage({ params }: PageProps) {
+  const { category } = await params
   
   // Sjekk om kategorien er gyldig
   if (!isValidMainCategory(category)) {

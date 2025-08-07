@@ -226,7 +226,8 @@ export default function CreateListingForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Hovedinnhold */}
         <div className="lg:col-span-2 space-y-6">
@@ -457,9 +458,9 @@ export default function CreateListingForm() {
           </Card>
         </div>
       </div>
-    </form>
+      </form>
 
-    {/* Betalingsskjema modal */}
+      {/* Betalingsskjema modal */}
     {showPayment && createdListingId && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -495,5 +496,6 @@ export default function CreateListingForm() {
         </div>
       </div>
     )}
+  </div>
   )
 }

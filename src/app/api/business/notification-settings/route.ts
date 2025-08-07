@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     // Sjekk at brukeren er business
     const businessUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId },
+      where: { clerkId: user?.id || userId || '' },
       select: { 
         id: true, 
         role: true,
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -87,7 +87,7 @@ export async function PUT(request: NextRequest) {
 
     // Sjekk at brukeren er business
     const businessUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId },
+      where: { clerkId: user?.id || userId || '' },
       select: { 
         id: true, 
         role: true,

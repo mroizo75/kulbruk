@@ -7,7 +7,7 @@ const prisma = new PrismaClient()
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -53,13 +53,13 @@ export async function POST(request: NextRequest) {
 
     // Sjekk om brukeren allerede eksisterer
     let dbUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId }
+      where: { clerkId: user?.id || userId || '' }
     })
 
     if (dbUser) {
       // Oppdater eksisterende bruker med bedriftsinformasjon
       dbUser = await prisma.user.update({
-        where: { clerkId: user?.id || userId },
+        where: { clerkId: user?.id || userId || '' },
         data: {
           role: 'business',
           companyName: data.companyName,
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       // Opprett ny bruker
       dbUser = await prisma.user.create({
         data: {
-          clerkId: user?.id || userId,
+          clerkId: user?.id || userId || '',
           email: data.email || user?.emailAddresses[0]?.emailAddress || '',
           firstName: data.contactPerson.split(' ')[0] || user?.firstName || '',
           lastName: data.contactPerson.split(' ').slice(1).join(' ') || user?.lastName || '',
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     const clerkClient = (await import('@clerk/nextjs/server')).clerkClient
     const client = await clerkClient()
     
-    await client.users.updateUserMetadata(user?.id || userId, {
+    await client.users.updateUserMetadata(user?.id || userId || '', {
       publicMetadata: {
         role: 'business',
         companyName: data.companyName,

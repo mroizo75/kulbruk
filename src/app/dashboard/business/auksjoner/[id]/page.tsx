@@ -31,14 +31,15 @@ import BidModal from '@/components/bid-modal'
 const prisma = new PrismaClient()
 
 interface PageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function AuctionDetailPage({ params }: PageProps) {
   const user = await currentUser()
+  const { id } = await params
   
   if (!user) {
-    redirect('/sign-in?redirectUrl=/dashboard/business/auksjoner/' + params.id)
+    redirect('/sign-in?redirectUrl=/dashboard/business/auksjoner/' + id)
   }
 
   // Sjekk business tilgang
@@ -53,7 +54,7 @@ export default async function AuctionDetailPage({ params }: PageProps) {
 
   // Mock detailed auction data
   const auction = {
-    id: params.id,
+    id: id,
     title: '2020 BMW X5 xDrive40i - Perfekt stand med full utstyrspakke',
     description: `Denne BMW X5 er i utmerket stand og har vært kjørt av kun en eier siden ny. Bilen har full servicehistorikk fra autorisert BMW-forhandler og kommer med alle originaldokumenter.
 

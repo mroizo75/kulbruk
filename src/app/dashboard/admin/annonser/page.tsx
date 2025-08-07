@@ -147,7 +147,7 @@ export default async function AdminListingsPage() {
                             <div className="flex items-center gap-1">
                               <Euro className="h-4 w-4" />
                               <span className="font-medium text-green-600">
-                                {listing.price.toLocaleString('no-NO')} kr
+                                {Number(listing.price).toLocaleString('no-NO')} kr
                               </span>
                             </div>
                             <div className="flex items-center gap-1">

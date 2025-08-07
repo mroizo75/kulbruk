@@ -5,7 +5,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 export async function GET(request: NextRequest) {
   try {
     // Test auth() funksjonen
-    const authResult = auth()
+    const authResult = await auth()
     console.log('Auth result:', authResult)
     
     // Test currentUser() funksjonen

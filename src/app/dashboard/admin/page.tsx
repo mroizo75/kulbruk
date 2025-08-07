@@ -33,7 +33,8 @@ export default async function AdminDashboard() {
     prisma.listing.findMany({
       where: { status: 'PENDING' },
       include: {
-        user: { select: { firstName: true, lastName: true, email: true } }
+        user: { select: { firstName: true, lastName: true, email: true } },
+        category: true
       },
       orderBy: { createdAt: 'desc' },
       take: 10
@@ -90,7 +91,7 @@ export default async function AdminDashboard() {
     time: getTimeAgo(listing.createdAt),
     status: 'PENDING' as const,
     user: `${listing.user.firstName} ${listing.user.lastName}`,
-    category: listing.category
+    category: listing.categoryId || 'Ukjent'
   }))
 
   function getTimeAgo(date: Date) {

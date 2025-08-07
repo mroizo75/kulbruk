@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         id: `listing_${listing.id}`,
         type: 'new_listing' as const,
         title: listing.title,
-        message: `Ny annonse fra ${listing.user.firstName} ${listing.user.lastName} i ${listing.category}`,
+        message: `Ny annonse fra ${listing.user.firstName} ${listing.user.lastName} i ${listing.categoryId}`,
         data: { listingId: listing.id },
         timestamp: listing.createdAt
       })),

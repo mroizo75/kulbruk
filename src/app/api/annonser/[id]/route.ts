@@ -7,11 +7,12 @@ const prisma = new PrismaClient()
 // GET - Hent spesifikk annonse
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const listing = await prisma.listing.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         user: {
           select: {
@@ -39,7 +40,7 @@ export async function GET(
     // Øk antall visninger (bare for godkjente annonser)
     if (listing.status === 'APPROVED') {
       await prisma.listing.update({
-        where: { id: params.id },
+        where: { id },
         data: { views: { increment: 1 } }
       })
     }
@@ -58,10 +59,10 @@ export async function GET(
 // PUT - Oppdater annonse
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     
     if (!userId) {
       return NextResponse.json(
@@ -70,11 +71,12 @@ export async function PUT(
       )
     }
 
+    const { id } = await params
     const data = await request.json()
 
     // Sjekk at annonsen tilhører brukeren
     const existingListing = await prisma.listing.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       select: { userId: true }
     })
 
@@ -94,7 +96,7 @@ export async function PUT(
 
     // Oppdater annonse
     const updatedListing = await prisma.listing.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         title: data.title,
         description: data.description,
@@ -135,10 +137,10 @@ export async function PUT(
 // DELETE - Slett annonse
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+  ) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     
     if (!userId) {
       return NextResponse.json(
@@ -147,9 +149,11 @@ export async function DELETE(
       )
     }
 
+    const { id } = await params
+    
     // Sjekk at annonsen tilhører brukeren
     const existingListing = await prisma.listing.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       select: { userId: true }
     })
 
@@ -169,7 +173,7 @@ export async function DELETE(
 
     // Slett annonse (cascade sletter også bilder og bil-spesifikasjoner)
     await prisma.listing.delete({
-      where: { id: params.id }
+      where: { id: id }
     })
 
     return NextResponse.json({

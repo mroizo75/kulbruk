@@ -243,6 +243,10 @@ export async function GET(request: NextRequest) {
               firstName: true,
               lastName: true
             }
+          },
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 1
           }
         },
         orderBy,
@@ -276,16 +280,14 @@ export async function GET(request: NextRequest) {
       location: listing.location,
       category: listing.category?.name || 'Ukjent',
       status: listing.status,
-      mainImage: listing.images?.[0] || `/api/placeholder/400/300?text=${encodeURIComponent(listing.title)}`,
+      mainImage: listing.images?.[0]?.url || `/api/placeholder/400/300?text=${encodeURIComponent(listing.title)}`,
       views: listing.views,
       createdAt: listing.createdAt,
       isFeatured: listing.isFeatured,
       listingType: listing.listingType,
-      make: listing.make,
-      model: listing.model,
-      year: listing.year,
-      mileage: listing.mileage,
       registrationNumber: listing.registrationNumber,
+      mileage: listing.mileage,
+      condition: listing.condition,
       contactName: listing.contactName,
       contactEmail: listing.contactEmail,
       contactPhone: listing.contactPhone,
@@ -324,6 +326,10 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Feil ved henting av annonser:', error)
+    
+    // Hent parametere på nytt for fallback
+    const { searchParams } = new URL(request.url)
+    const categoryParam = searchParams.get('category')
     
     // Fallback til dummy data
     let dummyListings = [
@@ -367,16 +373,16 @@ export async function GET(request: NextRequest) {
     ]
 
     // Filtrer dummy data basert på kategori
-    if (category && category !== 'alle') {
-      if (category === 'bil') {
+    if (categoryParam && categoryParam !== 'alle') {
+      if (categoryParam === 'bil') {
         dummyListings = dummyListings.filter(listing => 
           listing.category.toLowerCase().includes('bil')
         )
-      } else if (category === 'eiendom') {
+      } else if (categoryParam === 'eiendom') {
         dummyListings = dummyListings.filter(listing => 
           listing.category.toLowerCase().includes('eiendom')
         )
-      } else if (category === 'torget') {
+      } else if (categoryParam === 'torget') {
         dummyListings = dummyListings.filter(listing => 
           !listing.category.toLowerCase().includes('bil') && 
           !listing.category.toLowerCase().includes('eiendom')
@@ -384,7 +390,7 @@ export async function GET(request: NextRequest) {
       } else {
         // Generisk kategori-søk
         dummyListings = dummyListings.filter(listing => 
-          listing.category.toLowerCase().includes(category.toLowerCase())
+          listing.category.toLowerCase().includes(categoryParam.toLowerCase())
         )
       }
     }

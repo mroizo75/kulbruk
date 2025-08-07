@@ -38,7 +38,7 @@ export default function BusinessAuctionsPage() {
     manualReconnect 
   } = useLiveAuctions()
 
-  const getTimeLeft = (endDate: string) => {
+  const getTimeLeft = (endDate: Date | string) => {
     const now = new Date()
     const end = new Date(endDate)
     const diff = end.getTime() - now.getTime()
@@ -321,7 +321,7 @@ export default function BusinessAuctionsPage() {
                             </div>
                             <div className="flex items-center gap-1">
                               <Car className="h-4 w-4" />
-                              {auction.vehicleSpec?.mileage?.toLocaleString('no-NO')} km
+                              {(auction as any).vehicleSpec?.mileage ? Number((auction as any).vehicleSpec.mileage).toLocaleString('no-NO') : 'N/A'} km
                             </div>
                             <div className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
@@ -347,11 +347,11 @@ export default function BusinessAuctionsPage() {
                         </div>
                         <div>
                           <span className="font-medium">Drivstoff:</span>
-                          <p>{auction.vehicleSpec?.fuelType}</p>
+                          <p>{(auction as any).vehicleSpec?.fuelType || 'N/A'}</p>
                         </div>
                         <div>
                           <span className="font-medium">Gir:</span>
-                          <p>{auction.vehicleSpec?.transmission}</p>
+                          <p>{(auction as any).vehicleSpec?.transmission || 'N/A'}</p>
                         </div>
                       </div>
                     </div>
@@ -365,21 +365,21 @@ export default function BusinessAuctionsPage() {
                           <div className="flex items-center gap-2 mb-2">
                             <TrendingUp className="h-4 w-4 text-purple-600" />
                             <span className="text-sm font-medium text-purple-900">AI Prisestimering</span>
-                            {getMarketTrendIcon(auction.marketTrend)}
+                            {getMarketTrendIcon((auction as any).marketTrend || 'STABLE')}
                           </div>
                           <div className="text-2xl font-bold text-gray-900 mb-1">
                             {auction.estimatedPrice?.toLocaleString('no-NO')} kr
                           </div>
                           <div className="flex items-center gap-2 text-xs">
-                            {getPriceConfidenceBadge(auction.priceConfidence)}
+                            {getPriceConfidenceBadge((auction as any).priceConfidence || 'MEDIUM')}
                             <Badge variant="outline" className="text-xs">
-                              {auction.pricingMethodology === 'AI_ANALYSIS' ? '🧠 AI' : 
-                               auction.pricingMethodology === 'MARKET_COMPARISON' ? '📊 Marked' : '📈 Basic'}
+                              {(auction as any).pricingMethodology === 'AI_ANALYSIS' ? '🧠 AI' : 
+                               (auction as any).pricingMethodology === 'MARKET_COMPARISON' ? '📊 Marked' : '📈 Basic'}
                             </Badge>
                           </div>
-                          {auction.priceRange && (
+                          {(auction as any).priceRange && (
                             <div className="text-xs text-gray-600 mt-1">
-                              Område: {auction.priceRange.min?.toLocaleString('no-NO')} - {auction.priceRange.max?.toLocaleString('no-NO')} kr
+                              Område: {(auction as any).priceRange.min?.toLocaleString('no-NO')} - {(auction as any).priceRange.max?.toLocaleString('no-NO')} kr
                             </div>
                           )}
                         </div>
@@ -406,7 +406,7 @@ export default function BusinessAuctionsPage() {
                             <div className="text-sm text-gray-600 mb-1">Ingen bud ennå</div>
                             <div className="text-lg text-gray-400">Vær først ut!</div>
                             <div className="text-xs text-gray-500 mt-1">
-                              Startpris: {auction.startingPrice?.toLocaleString('no-NO')} kr
+                              Startpris: {(auction as any).startingPrice?.toLocaleString('no-NO') || 'N/A'} kr
                             </div>
                           </div>
                         )}
@@ -432,7 +432,7 @@ export default function BusinessAuctionsPage() {
                         <div className="bg-green-50 p-3 rounded-lg text-sm">
                           <div className="font-medium text-green-900 mb-1">Quick Profit</div>
                           <div className="text-green-700 text-xs space-y-1">
-                            <div>Kjøp: {(auction.currentBid || auction.startingPrice || 0).toLocaleString('no-NO')} kr</div>
+                            <div>Kjøp: {(auction.currentBid || (auction as any).startingPrice || 0).toLocaleString('no-NO')} kr</div>
                             <div>Salg: ~{Math.round((auction.estimatedPrice || 400000) * 1.15).toLocaleString('no-NO')} kr</div>
                             <div className="font-semibold border-t border-green-200 pt-1">
                               Margin: ~{Math.round((auction.estimatedPrice || 400000) * 0.15).toLocaleString('no-NO')} kr

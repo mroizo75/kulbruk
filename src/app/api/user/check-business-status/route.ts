@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     console.log('=== CHECK-BUSINESS-STATUS API ===')
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     // Sjekk database først
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId },
+      where: { clerkId: user?.id || userId || '' },
       select: { 
         role: true, 
         companyName: true, 

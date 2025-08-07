@@ -152,7 +152,7 @@ function generateOldMockFlightOffers(origin: string, destination: string, depart
 // POST /api/flights/search - Søk etter flybilletter
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     
     // Autentisering er ikke påkrevd for søk, men kan være nyttig for personalisering
     
@@ -355,7 +355,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!finalSearchResult.success) {
-      console.error('Amadeus API feil:', finalSearchResult.error)
+      console.error('Amadeus API feil:', finalSearchResult)
       return NextResponse.json(
         { error: 'Kunne ikke søke etter flybilletter. Prøv igjen senere.' },
         { status: 500 }

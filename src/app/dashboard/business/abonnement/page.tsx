@@ -82,7 +82,7 @@ export default async function BusinessSubscriptionPage() {
                       {subscription.plan === 'BASIC' ? 'Basic Business' : 'Standard Business'}
                     </CardTitle>
                     <CardDescription>
-                      {subscription.pricePerMonth} kr per måned
+                      {Number(subscription.pricePerMonth)} kr per måned
                     </CardDescription>
                   </div>
                 </div>

@@ -308,7 +308,7 @@ export default async function BusinessSettingsPage() {
 
           {/* Abonnement */}
           <TabsContent value="subscription">
-            <BusinessSubscriptionCard subscription={subscription} />
+            <BusinessSubscriptionCard subscription={subscription as any} />
           </TabsContent>
 
           {/* Varsler */}

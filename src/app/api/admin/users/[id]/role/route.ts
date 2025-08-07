@@ -6,10 +6,10 @@ const prisma = new PrismaClient()
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -31,7 +31,8 @@ export async function PATCH(
       )
     }
 
-    const targetUserId = params.id
+    const { id } = await params
+    const targetUserId = id
     const { role } = await request.json()
 
     // Valider rolle

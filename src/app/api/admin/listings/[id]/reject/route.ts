@@ -6,10 +6,10 @@ const prisma = new PrismaClient()
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -31,7 +31,8 @@ export async function POST(
       )
     }
 
-    const listingId = params.id
+    const { id } = await params
+    const listingId = id
 
     // Sjekk at annonsen eksisterer og er PENDING
     const listing = await prisma.listing.findUnique({

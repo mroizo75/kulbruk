@@ -32,14 +32,6 @@ export default async function BusinessDashboard() {
   // Sjekk at brukeren er business
   const dbUser = await prisma.user.findUnique({
     where: { clerkId: user.id },
-    select: { 
-      role: true, 
-      companyName: true, 
-      orgNumber: true,
-      phone: true,
-      website: true,
-      createdAt: true
-    },
     include: {
       subscription: true
     }

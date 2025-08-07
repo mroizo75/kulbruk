@@ -3,7 +3,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const clerkClient = (await import('@clerk/nextjs/server')).clerkClient
     const client = await clerkClient()
     
-    await client.users.updateUserMetadata(user?.id || userId, {
+    await client.users.updateUserMetadata(user?.id || userId || '', {
       publicMetadata: {
         ...user?.publicMetadata,
         role: 'customer', // Fall back til customer role

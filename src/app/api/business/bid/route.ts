@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // Sjekk at brukeren er business
     const businessUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId },
+      where: { clerkId: user?.id || userId || '' },
       select: { 
         id: true, 
         role: true, 
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Sjekk at budet er høyt nok
-    const currentHighestBid = listing.bids[0]?.amount || 0
+    const currentHighestBid = Number(listing.bids[0]?.amount) || 0
     const minimumBid = currentHighestBid + 5000 // Minimum 5000 kr over
 
     if (amount < minimumBid) {
@@ -105,7 +105,8 @@ export async function POST(request: NextRequest) {
     // Opprett nytt bud
     const bid = await prisma.bid.create({
       data: {
-        listingId: auctionId,
+        auctionId: auctionId, // Kreves av Prisma schema
+        listingId: auctionId, // Samme verdi siden auctionId brukes feil her
         bidderId: businessUser.id,
         amount: parseFloat(amount.toString()),
         message: message || null,
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
 // GET - Hent bud for en spesifikk annonse eller bedrift
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     if (!userId && !user) {
@@ -171,7 +172,7 @@ export async function GET(request: NextRequest) {
     if (myBids) {
       // Hent alle bud fra denne bedriften
       const businessUser = await prisma.user.findUnique({
-        where: { clerkId: user?.id || userId },
+        where: { clerkId: user?.id || userId || '' },
         select: { id: true, role: true }
       })
 

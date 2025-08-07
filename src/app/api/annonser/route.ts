@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     console.log('Authorization header:', !!authHeader)
     
     // Prøv både auth() og currentUser() for debugging
-    const { userId } = auth()
+    const { userId } = await auth()
     const user = await currentUser()
     
     console.log('Auth debug:', { 

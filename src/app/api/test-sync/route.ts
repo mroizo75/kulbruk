@@ -8,7 +8,7 @@ const prisma = new PrismaClient()
 // GET - Test Clerk synkronisering
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     
     if (!userId) {
       return NextResponse.json(
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
 // POST - Manuell synkronisering av current user
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = auth()
+    const { userId } = await auth()
     
     if (!userId) {
       return NextResponse.json(

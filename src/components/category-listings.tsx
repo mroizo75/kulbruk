@@ -18,7 +18,7 @@ import ListingCard, { ListingGrid, ListingCardSkeleton } from '@/components/list
 import AdvancedFilters from '@/components/advanced-filters'
 import CarSearch from '@/components/car-search'
 import { sorteringsAlternativer } from '@/lib/norway-data'
-import { ListingStatus } from '@/generated/prisma'
+import { ListingStatus } from '@prisma/client'
 
 interface Listing {
   id: string

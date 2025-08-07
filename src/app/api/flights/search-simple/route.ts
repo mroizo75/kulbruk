@@ -31,7 +31,7 @@ function generateSimpleMockFlights(origin: string, destination: string) {
       'KL': 0.95  // KLM - ca 570-950 kr
     }
     
-    const multiplier = priceMultipliers[airline.code] || 1.0
+    const multiplier = priceMultipliers[airline.code as keyof typeof priceMultipliers] || 1.0
     const randomVariation = 0.8 + Math.random() * 0.8 // 80% - 160% av base
     const price = basePrice * multiplier * randomVariation
     
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Simple Flight Search API feil:', error)
     return NextResponse.json(
-      { error: 'Intern server feil', details: error.message },
+      { error: 'Intern server feil', details: error instanceof Error ? error.message : 'Ukjent feil' },
       { status: 500 }
     )
   }

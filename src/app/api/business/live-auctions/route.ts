@@ -6,10 +6,10 @@ import { estimateVehiclePrice } from '@/lib/ai-price-estimation'
 const prisma = new PrismaClient()
 
 // Store active connections for live updates
-const liveConnections = new Map<string, WritableStreamDefaultController<Uint8Array>>()
+const liveConnections = new Map<string, ReadableStreamDefaultController<Uint8Array>>()
 
 export async function GET(request: NextRequest) {
-  const { userId } = auth()
+  const { userId } = await auth()
   const user = await currentUser()
 
   if (!userId && !user) {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   // Sjekk business tilgang
   const businessUser = await prisma.user.findUnique({
-    where: { clerkId: user?.id || userId },
+    where: { clerkId: user?.id || userId || '' },
     select: { role: true, companyName: true, id: true }
   })
 
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
 
 // Simulate live auction updates for demo
 async function simulateLiveAuctionUpdate(
-  controller: WritableStreamDefaultController<Uint8Array>, 
+  controller: ReadableStreamDefaultController<Uint8Array>, 
   businessUserId: string
 ) {
   const updateTypes = ['NEW_AUCTION', 'BID_UPDATE', 'AUCTION_ENDING', 'PRICE_UPDATE']
@@ -240,8 +240,8 @@ async function generatePriceUpdate() {
   }
 }
 
-// Function to broadcast updates to all connected businesses
-export function broadcastToBusinesses(update: any) {
+// Function to broadcast updates to all connected businesses (internal use only)
+function broadcastToBusinesses(update: any) {
   console.log('📢 Broadcasting to', liveConnections.size, 'business connections')
   
   liveConnections.forEach((controller, connectionId) => {
@@ -254,7 +254,7 @@ export function broadcastToBusinesses(update: any) {
   })
 }
 
-// Function to get connection count
-export function getActiveConnectionCount(): number {
+// Function to get connection count (internal use only)
+function getActiveConnectionCount(): number {
   return liveConnections.size
 }

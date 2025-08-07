@@ -156,7 +156,7 @@ export default async function ModeratorDashboard() {
                         av {listing.user.firstName} {listing.user.lastName}
                       </p>
                       <p className="text-sm text-gray-400">
-                        {listing.category} • {new Date(listing.createdAt).toLocaleDateString('no-NO')}
+                        {listing.categoryId} • {new Date(listing.createdAt).toLocaleDateString('no-NO')}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">

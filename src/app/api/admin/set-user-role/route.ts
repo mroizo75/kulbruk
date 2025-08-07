@@ -8,7 +8,7 @@ const prisma = new PrismaClient()
 // POST - Sett brukerrolle (kun for admins)
 export async function POST(request: NextRequest) {
   try {
-    const { userId: currentUserId } = auth()
+    const { userId: currentUserId } = await auth()
     
     if (!currentUserId) {
       return NextResponse.json(
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 // GET - Hent brukerroller (for admin)
 export async function GET(request: NextRequest) {
   try {
-    const { userId: currentUserId } = auth()
+    const { userId: currentUserId } = await auth()
     
     if (!currentUserId) {
       return NextResponse.json(

@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
     const bilCategories = await prisma.category.findMany({
       where: {
         OR: [
-          { name: { contains: 'bil', mode: 'insensitive' } },
-          { slug: { contains: 'bil', mode: 'insensitive' } }
+          { name: { contains: 'bil' } },
+          { slug: { contains: 'bil' } }
         ]
       }
     })
