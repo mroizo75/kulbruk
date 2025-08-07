@@ -1,68 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { currentUser, clerkClient } from '@clerk/nextjs/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { currentUser } from '@clerk/nextjs/server'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await currentUser()
+    const clerkUser = await currentUser()
     
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Ikke innlogget' },
-        { status: 401 }
-      )
+    if (!clerkUser) {
+      return NextResponse.redirect(new URL('/sign-in', request.url))
     }
 
-    console.log('=== SYNC USER ROLE DEBUG ===')
-    console.log('Clerk User ID:', user.id)
-    console.log('Clerk Email:', user.emailAddresses[0]?.emailAddress)
-    console.log('Clerk publicMetadata:', user.publicMetadata)
+    console.log('Synkroniserer bruker:', clerkUser.id)
 
-    // Hent database bruker
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user.id }
+    // Sjekk om bruker allerede eksisterer
+    const existingUser = await prisma.user.findUnique({
+      where: { clerkId: clerkUser.id }
     })
 
-    console.log('Database bruker:', dbUser)
-
-    if (!dbUser) {
-      return NextResponse.json(
-        { error: 'Bruker ikke funnet i database' },
-        { status: 404 }
-      )
+    if (existingUser) {
+      console.log('Bruker eksisterer allerede:', existingUser.id)
+      return NextResponse.redirect(new URL('/dashboard/customer', request.url))
     }
 
-    // Synkroniser rolle fra database til Clerk
-    const client = await clerkClient()
-    
-    await client.users.updateUserMetadata(user.id, {
-      publicMetadata: {
-        ...user.publicMetadata,
-        role: dbUser.role
-      }
-    })
-
-    console.log(`Synkronisert rolle ${dbUser.role} til Clerk for ${dbUser.email}`)
-
-    return NextResponse.json({
-      success: true,
-      message: 'Rolle synkronisert',
+    // Opprett bruker i database
+    const newUser = await prisma.user.create({
       data: {
-        clerkId: user.id,
-        email: dbUser.email,
-        databaseRole: dbUser.role,
-        clerkRole: user.publicMetadata?.role,
-        newClerkRole: dbUser.role
+        clerkId: clerkUser.id,
+        email: clerkUser.emailAddresses[0]?.emailAddress || '',
+        firstName: clerkUser.firstName || '',
+        lastName: clerkUser.lastName || '',
+        role: 'customer',
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     })
+
+    console.log('Ny bruker opprettet:', newUser.id)
+
+    // Redirect tilbake til dashboard
+    return NextResponse.redirect(new URL('/dashboard/customer', request.url))
 
   } catch (error) {
-    console.error('Feil ved synkronisering:', error)
-    return NextResponse.json(
-      { error: 'Kunne ikke synkronisere rolle' },
-      { status: 500 }
-    )
+    console.error('Feil ved brukersynkronisering:', error)
+    
+    // Redirect til error page eller dashboard med error parameter
+    return NextResponse.redirect(new URL('/dashboard/customer?error=sync_failed', request.url))
   }
 }
