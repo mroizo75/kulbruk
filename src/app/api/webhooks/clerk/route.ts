@@ -62,7 +62,17 @@ export async function POST(request: NextRequest) {
         // Opprett bruker i database når ny bruker registrerer seg
         const userRole = evt.data.public_metadata?.role || 'customer' // Standard rolle
         
-        await prisma.user.create({
+        // Sjekk først om bruker allerede eksisterer (unngå duplikater)
+        const existingUser = await prisma.user.findUnique({
+          where: { clerkId: evt.data.id }
+        })
+        
+        if (existingUser) {
+          console.log('Bruker eksisterer allerede:', evt.data.id)
+          break
+        }
+        
+        const newUser = await prisma.user.create({
           data: {
             clerkId: evt.data.id,
             email: evt.data.email_addresses[0]?.email_address || '',
@@ -73,7 +83,7 @@ export async function POST(request: NextRequest) {
             updatedAt: new Date()
           }
         })
-        console.log('Bruker opprettet i database:', evt.data.id, 'med rolle:', userRole)
+        console.log('✅ Bruker opprettet i database via webhook:', newUser.id, 'med rolle:', userRole)
         break
 
       case 'user.updated':

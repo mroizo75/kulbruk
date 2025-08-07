@@ -1,43 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { currentUser } from '@clerk/nextjs/server'
+import { prisma } from '@/lib/prisma'
 
-// GET - Debug webhook setup
 export async function GET(request: NextRequest) {
   try {
-    const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
-    const clerkSecretKey = process.env.CLERK_SECRET_KEY
-    const publicKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+    const clerkUser = await currentUser()
+    
+    if (!clerkUser) {
+      return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
+    }
 
-    return NextResponse.json({
-      webhook: {
-        secret: webhookSecret ? 'Satt ✅' : 'Mangler ❌',
-        url: 'Skal være: https://ditt-domene.no/api/webhooks/clerk',
-        events: [
-          'user.created',
-          'user.updated', 
-          'user.deleted'
-        ]
-      },
-      environment: {
-        clerkSecretKey: clerkSecretKey ? 'Satt ✅' : 'Mangler ❌',
-        publicKey: publicKey ? 'Satt ✅' : 'Mangler ❌',
-        nodeEnv: process.env.NODE_ENV
-      },
-      instructions: [
-        '1. Gå til Clerk Dashboard → Webhooks',
-        '2. Legg til endpoint: https://ditt-domene.no/api/webhooks/clerk',
-        '3. Velg events: user.created, user.updated, user.deleted',
-        '4. Kopier webhook secret til CLERK_WEBHOOK_SECRET i .env.local',
-        '5. Test webhook ved å opprette ny bruker'
-      ],
-      testing: {
-        localWebhook: 'http://localhost:3000/api/webhooks/clerk',
-        ngrokExample: 'https://abc123.ngrok.io/api/webhooks/clerk'
+    // Sjekk om bruker eksisterer i database
+    const dbUser = await prisma.user.findUnique({
+      where: { clerkId: clerkUser.id }
+    })
+
+    // Hent alle brukere for debug (kun i development)
+    const allUsers = process.env.NODE_ENV === 'development' 
+      ? await prisma.user.findMany({ take: 10 })
+      : []
+
+    return NextResponse.json({ 
+      debug: {
+        clerkUser: {
+          id: clerkUser.id,
+          email: clerkUser.emailAddresses[0]?.emailAddress,
+          firstName: clerkUser.firstName,
+          lastName: clerkUser.lastName,
+          createdAt: clerkUser.createdAt
+        },
+        dbUser: dbUser || null,
+        isUserSynced: !!dbUser,
+        allUsersCount: await prisma.user.count(),
+        recentUsers: allUsers,
+        webhookStatus: 'Sjekk Clerk Dashboard for webhook-konfigurasjonen',
+        environment: process.env.NODE_ENV
       }
     })
 
   } catch (error) {
-    return NextResponse.json({
-      error: 'Kunne ikke debug webhook',
+    console.error('Debug API feil:', error)
+    return NextResponse.json({ 
+      error: 'Debug feil',
       details: error instanceof Error ? error.message : 'Ukjent feil'
     }, { status: 500 })
   }

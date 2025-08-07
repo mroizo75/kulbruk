@@ -14,9 +14,8 @@ export default async function CustomerDashboard() {
     redirect('/sign-in?redirectUrl=/dashboard/customer')
   }
   
-  // Sjekk om bruker eksisterer i database
+  // Sjekk om bruker eksisterer i database - hvis ikke, redirect til error
   let dbUser = null
-  let needsSync = false
   
   try {
     dbUser = await prisma.user.findUnique({
@@ -24,61 +23,21 @@ export default async function CustomerDashboard() {
     })
     
     if (!dbUser) {
-      needsSync = true
-      // Prøv å opprette bruker automatisk
-      try {
-        dbUser = await prisma.user.create({
-          data: {
-            clerkId: clerkUser.id,
-            email: clerkUser.emailAddresses[0]?.emailAddress || '',
-            firstName: clerkUser.firstName || '',
-            lastName: clerkUser.lastName || '',
-            role: 'customer',
-            createdAt: new Date(),
-            updatedAt: new Date()
-          }
-        })
-        needsSync = false
-      } catch (createError) {
-        console.error('Kunne ikke opprette bruker automatisk:', createError)
-      }
+      // Dette bør ikke skje hvis webhook fungerer
+      console.error('🚨 KRITISK: Bruker ikke funnet i database:', clerkUser.id)
+      redirect('/dashboard/setup-error')
     }
   } catch (error) {
-    console.error('Feil ved henting av bruker fra database:', error)
-    needsSync = true
+    console.error('🚨 Database-feil ved henting av bruker:', error)
+    redirect('/dashboard/setup-error')
   }
   
-  // Bruker-info fra Clerk
+  // Bruker-info fra database
   const user = {
-    id: clerkUser.id,
-    firstName: clerkUser.firstName || 'Bruker',
-    email: clerkUser.emailAddresses[0]?.emailAddress || 'bruker@kulbruk.no'
-  }
-  
-  // Hvis bruker ikke er synkronisert, vis synkronisering-melding
-  if (needsSync) {
-    return (
-      <DashboardLayout userRole="customer">
-        <div className="max-w-2xl mx-auto text-center py-12">
-          <AlertCircle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Setter opp din profil...
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Vi må synkronisere din bruker med vårt system. Dette skjer vanligvis automatisk, men noen ganger trenger det litt hjelp.
-          </p>
-          <form action="/api/sync-user-role" method="POST">
-            <Button type="submit" className="inline-flex items-center">
-              <Plus className="mr-2 h-4 w-4" />
-              Fullfør profiloppsettet
-            </Button>
-          </form>
-          <p className="text-sm text-gray-500 mt-4">
-            Denne siden vil oppdateres automatisk når synkroniseringen er fullført.
-          </p>
-        </div>
-      </DashboardLayout>
-    )
+    id: dbUser.clerkId,
+    firstName: dbUser.firstName || clerkUser.firstName || 'Bruker',
+    email: dbUser.email || clerkUser.emailAddresses[0]?.emailAddress || 'bruker@kulbruk.no',
+    role: dbUser.role
   }
 
   const stats = [

@@ -1,227 +1,245 @@
 'use client'
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, XCircle, AlertCircle, Webhook, Database, RefreshCw } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
+import { RefreshCw, CheckCircle, XCircle, AlertCircle, Database, User, Webhook } from 'lucide-react'
+
+interface DebugData {
+  clerkUser: {
+    id: string
+    email: string
+    firstName: string | null
+    lastName: string | null
+    createdAt: number
+  }
+  dbUser: any | null
+  isUserSynced: boolean
+  allUsersCount: number
+  recentUsers: any[]
+  webhookStatus: string
+  environment: string
+}
 
 export default function WebhookTestPage() {
+  const [debugData, setDebugData] = useState<DebugData | null>(null)
   const [loading, setLoading] = useState(false)
-  const [webhookTest, setWebhookTest] = useState<any>(null)
-  const [userCount, setUserCount] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const testWebhookEndpoint = async () => {
+  const fetchDebugData = async () => {
     setLoading(true)
+    setError(null)
+    
     try {
-      const response = await fetch('/api/webhooks/clerk-simple')
-      const data = await response.json()
-      setWebhookTest({
-        ...data,
-        status: response.status,
-        working: response.ok
-      })
-    } catch (error) {
-      setWebhookTest({
-        error: 'Webhook endpoint ikke tilgjengelig',
-        working: false,
-        details: error
-      })
-    }
-    setLoading(false)
-  }
-
-  const checkUserCounts = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/manual-user-sync')
-      const data = await response.json()
-      setUserCount(data)
-    } catch (error) {
-      setUserCount({
-        error: 'Kunne ikke hente brukerstatistikk',
-        details: error
-      })
-    }
-    setLoading(false)
-  }
-
-  const simulateWebhook = async () => {
-    setLoading(true)
-    try {
-      // Simuler en webhook-payload
-      const mockPayload = {
-        type: 'user.created',
-        data: {
-          id: 'test_user_' + Date.now(),
-          email_addresses: [{ email_address: 'test@example.com' }],
-          first_name: 'Test',
-          last_name: 'Bruker',
-          public_metadata: { role: 'customer' }
-        }
+      const response = await fetch('/api/webhook-debug')
+      if (!response.ok) {
+        throw new Error(`API feil: ${response.status}`)
       }
-
-      const response = await fetch('/api/webhooks/clerk-simple', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mockPayload)
-      })
-
-      const result = await response.text()
-      setWebhookTest({
-        message: 'Webhook test sendt',
-        status: response.status,
-        response: result,
-        working: response.ok,
-        simulated: true
-      })
-    } catch (error) {
-      setWebhookTest({
-        error: 'Webhook simulering feilet',
-        working: false,
-        details: error
-      })
+      
+      const data = await response.json()
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      
+      setDebugData(data.debug)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ukjent feil')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
+
+  useEffect(() => {
+    fetchDebugData()
+  }, [])
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Webhook Test Center</h1>
-          <p className="text-gray-600">Test og verifiser webhook-konfigurasjonen for automatisk brukersynkronisering</p>
-        </div>
+    <div className="container mx-auto py-8 px-4 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Webhook Test & Debug</h1>
+        <p className="text-gray-600">Test om Clerk webhook synkroniserer brukere korrekt</p>
+      </div>
 
-        <div className="grid gap-6">
-          {/* Webhook Status */}
+      <div className="mb-6">
+        <Button 
+          onClick={fetchDebugData} 
+          disabled={loading}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Henter data...' : 'Oppdater data'}
+        </Button>
+      </div>
+
+      {error && (
+        <Card className="mb-6 border-red-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-5 w-5" />
+              <span className="font-medium">Feil: {error}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {debugData && (
+        <div className="space-y-6">
+          {/* Status oversikt */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Webhook className="h-5 w-5" />
-                Webhook Endpoint Status
+                Webhook Status
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Button onClick={testWebhookEndpoint} disabled={loading}>
-                  {loading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Test Endpoint
-                </Button>
-                <Button variant="outline" onClick={simulateWebhook} disabled={loading}>
-                  {loading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Simuler Webhook
-                </Button>
-              </div>
-
-              {webhookTest && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    {webhookTest.working ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    )}
-                    <span className="font-semibold">
-                      Status: {webhookTest.status}
-                    </span>
-                    <Badge variant={webhookTest.working ? "default" : "destructive"}>
-                      {webhookTest.working ? "Fungerer" : "Feil"}
-                    </Badge>
-                    {webhookTest.simulated && (
-                      <Badge variant="secondary">Simulert</Badge>
-                    )}
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center gap-3">
+                  {debugData.isUserSynced ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  )}
+                  <div>
+                    <p className="font-medium">
+                      {debugData.isUserSynced ? 'Synkronisert' : 'IKKE synkronisert'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Bruker i database: {debugData.isUserSynced ? 'Ja' : 'Nei'}
+                    </p>
                   </div>
-                  <pre className="text-xs bg-white p-2 rounded border overflow-auto">
-                    {JSON.stringify(webhookTest, null, 2)}
-                  </pre>
                 </div>
-              )}
+                
+                <div className="flex items-center gap-3">
+                  <Database className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="font-medium">{debugData.allUsersCount} brukere</p>
+                    <p className="text-sm text-gray-600">I database totalt</p>
+                  </div>
+                </div>
+              </div>
+              
+              <Separator className="my-4" />
+              
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Webhook-status:</strong> {debugData.webhookStatus}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Miljø: {debugData.environment}
+                </p>
+              </div>
             </CardContent>
           </Card>
 
-          {/* User Count Verification */}
+          {/* Clerk bruker */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Clerk Bruker
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">ID</p>
+                    <p className="font-mono text-sm">{debugData.clerkUser.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">E-post</p>
+                    <p>{debugData.clerkUser.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Navn</p>
+                    <p>{debugData.clerkUser.firstName} {debugData.clerkUser.lastName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Opprettet</p>
+                    <p>{new Date(debugData.clerkUser.createdAt).toLocaleString('no-NO')}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Database bruker */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5" />
-                Bruker Synkronisering
+                Database Bruker
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Button onClick={checkUserCounts} disabled={loading}>
-                {loading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
-                Sjekk Synkronisering
-              </Button>
-
-              {userCount && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+            <CardContent>
+              {debugData.dbUser ? (
+                <div className="space-y-4">
+                  <Badge variant="outline" className="text-green-600 border-green-200">
+                    Bruker eksisterer i database
+                  </Badge>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-semibold text-gray-700">Clerk</h4>
-                      <p className="text-2xl font-bold">{userCount.clerk?.total || 'N/A'}</p>
+                      <p className="text-sm font-medium text-gray-600">Database ID</p>
+                      <p className="font-mono text-sm">{debugData.dbUser.id}</p>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-700">Database</h4>
-                      <p className="text-2xl font-bold">{userCount.database?.total || 'N/A'}</p>
+                      <p className="text-sm font-medium text-gray-600">Clerk ID</p>
+                      <p className="font-mono text-sm">{debugData.dbUser.clerkId}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">E-post</p>
+                      <p>{debugData.dbUser.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Rolle</p>
+                      <Badge variant="secondary">{debugData.dbUser.role}</Badge>
                     </div>
                   </div>
-                  
-                  {userCount.sync && (
-                    <div className="flex items-center gap-2">
-                      {userCount.sync.needed ? (
-                        <AlertCircle className="h-5 w-5 text-orange-500" />
-                      ) : (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      )}
-                      <span>{userCount.sync.message}</span>
-                    </div>
-                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <XCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+                  <h3 className="font-medium text-gray-900 mb-2">Bruker ikke funnet</h3>
+                  <p className="text-gray-600 text-sm">
+                    Denne brukeren eksisterer ikke i databasen. Webhook fungerer ikke korrekt.
+                  </p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Setup Instructions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>📋 Setup Instruksjoner</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-semibold mb-2">🔧 For automatisk synkronisering:</h4>
-                <ol className="list-decimal list-inside space-y-1 text-sm">
-                  <li>Sett opp <code>.env.local</code> med <code>CLERK_WEBHOOK_SECRET</code></li>
-                  <li>Gå til Clerk Dashboard → Webhooks</li>
-                  <li>Legg til endpoint: <code>http://localhost:3000/api/webhooks/clerk-simple</code></li>
-                  <li>Velg events: user.created, user.updated, user.deleted</li>
-                  <li>Test ved å registrere ny bruker</li>
-                </ol>
-              </div>
-
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h4 className="font-semibold mb-2">✅ Webhook fungerer når:</h4>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Endpoint test returnerer 200 OK</li>
-                  <li>Nye brukere automatisk havner i database</li>
-                  <li>Terminal viser webhook-logging</li>
-                  <li>Clerk og database brukerantal stemmer overens</li>
-                </ul>
-              </div>
-
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <h4 className="font-semibold mb-2">⚠️ Vanlige problemer:</h4>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Manglende <code>CLERK_WEBHOOK_SECRET</code> i .env.local</li>
-                  <li>Feil webhook URL i Clerk Dashboard</li>
-                  <li>Server ikke tilgjengelig på webhook URL</li>
-                  <li>Database connection problemer</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Webhook instruksjoner */}
+          {!debugData.isUserSynced && (
+            <Card className="border-orange-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-orange-600">
+                  <AlertCircle className="h-5 w-5" />
+                  Webhook Konfigurering Påkrevd
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-gray-700">
+                    Webhook er ikke konfigurert riktig. Følg disse stegene:
+                  </p>
+                  
+                  <ol className="list-decimal list-inside space-y-2 text-sm">
+                    <li>Gå til <a href="https://dashboard.clerk.com" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Clerk Dashboard</a></li>
+                    <li>Velg ditt prosjekt → Webhooks</li>
+                    <li>Legg til endpoint: <code className="bg-gray-100 px-2 py-1 rounded">https://kulbruk.no/api/webhooks/clerk</code></li>
+                    <li>Velg events: <code className="bg-gray-100 px-2 py-1 rounded">user.created</code>, <code className="bg-gray-100 px-2 py-1 rounded">user.updated</code>, <code className="bg-gray-100 px-2 py-1 rounded">user.deleted</code></li>
+                    <li>Sett webhook secret i <code className="bg-gray-100 px-2 py-1 rounded">CLERK_WEBHOOK_SECRET</code> miljøvariabel</li>
+                  </ol>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
