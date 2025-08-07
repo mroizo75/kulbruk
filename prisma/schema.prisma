@@ -35,6 +35,8 @@ model User {
   listings       Listing[]
   bids           Bid[]
   flightBookings FlightBooking[]
+  payments       Payment[]
+  subscription   Subscription?
 
   @@map("users")
 }
@@ -104,6 +106,7 @@ model Listing {
   priceEstimation PriceEstimation?
   auction         Auction?
   bids            Bid[]
+  listingPayment  ListingPayment?
 
   @@map("listings")
 }
@@ -404,4 +407,128 @@ enum FlightBookingStatus {
   TICKETED      // Billetter utstedt
   CANCELLED     // Kansellert
   COMPLETED     // Reise fullført
+}
+
+// ===== BETALINGER OG ABONNEMENTER =====
+model Payment {
+  id String @id @default(cuid())
+  
+  // Stripe informasjon
+  stripePaymentIntentId String @unique
+  stripeChargeId       String?
+  
+  // Brukerinformasjon
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Betalingsdetaljer
+  amount      Decimal @db.Decimal(10, 2)
+  currency    String  @default("NOK")
+  description String
+  
+  // Type betaling
+  type PaymentType
+  
+  // Relaterte objekter
+  listingId      String? // For annonse-betalinger
+  subscriptionId String? // For abonnements-betalinger
+  
+  // Status og metadata
+  status    PaymentStatus @default(PENDING)
+  metadata  Json? // Ekstra informasjon
+  
+  // Relasjoner
+  listingPayment ListingPayment?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("payments")
+}
+
+model Subscription {
+  id String @id @default(cuid())
+  
+  // Stripe informasjon
+  stripeSubscriptionId String @unique
+  stripeCustomerId     String
+  stripePriceId        String
+  
+  // Brukerinformasjon
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Abonnementsdetaljer
+  plan              SubscriptionPlan
+  status            SubscriptionStatus @default(ACTIVE)
+  adsRemaining      Int                @default(0) // Antall annonser igjen
+  adsPerMonth       Int // Antall annonser per måned
+  pricePerMonth     Decimal            @db.Decimal(10, 2)
+  
+  // Datoer
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAt          DateTime? // Når abonnementet avsluttes
+  canceledAt        DateTime? // Når det ble kansellert
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("subscriptions")
+}
+
+model ListingPayment {
+  id String @id @default(cuid())
+  
+  // Annonse-informasjon
+  listingId String @unique
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  // Betaling informasjon
+  paymentId String @unique
+  payment   Payment @relation(fields: [paymentId], references: [id])
+  
+  // Type og pris
+  type   ListingPaymentType
+  amount Decimal            @db.Decimal(10, 2)
+  
+  // Status
+  isPaid Boolean @default(false)
+  paidAt DateTime?
+  
+  createdAt DateTime @default(now())
+  
+  @@map("listing_payments")
+}
+
+// ===== BETALINGS-ENUMS =====
+enum PaymentType {
+  LISTING_FEE    // Gebyr for annonse
+  SUBSCRIPTION   // Abonnement
+  FEATURED_AD    // Fremhevet annonse
+}
+
+enum PaymentStatus {
+  PENDING    // Venter på betaling
+  PROCESSING // Behandles
+  SUCCEEDED  // Vellykket
+  FAILED     // Mislykket
+  CANCELED   // Kansellert
+}
+
+enum SubscriptionPlan {
+  BASIC     // 5 annonser - 99 NOK
+  STANDARD  // 10 annonser - 199 NOK
+}
+
+enum SubscriptionStatus {
+  ACTIVE    // Aktivt abonnement
+  CANCELED  // Kansellert
+  PAST_DUE  // Forfalt
+  UNPAID    // Ubetalt
+}
+
+enum ListingPaymentType {
+  CAR_AD      // Bil-annonse (49 NOK)
+  TORGET_AD   // Torget-annonse (Gratis)
 }

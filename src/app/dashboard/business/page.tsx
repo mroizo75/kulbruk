@@ -39,6 +39,9 @@ export default async function BusinessDashboard() {
       phone: true,
       website: true,
       createdAt: true
+    },
+    include: {
+      subscription: true
     }
   })
 

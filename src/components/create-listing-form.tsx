@@ -13,11 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Upload, X, Car } from 'lucide-react'
+import { Upload, X, Car, CreditCard } from 'lucide-react'
 import { toast } from 'sonner'
 import VehicleInfoForm from './vehicle-info-form'
 import PriceEstimation from './price-estimation'
 import ImageUpload from '@/components/image-upload'
+import PaymentForm from '@/components/payment-form'
+import { getListingPrice } from '@/lib/stripe'
 
 // Validering schema
 const listingSchema = z.object({
@@ -59,6 +61,8 @@ export default function CreateListingForm() {
   const [showVehicleFields, setShowVehicleFields] = useState(false)
   const [vehicleData, setVehicleData] = useState<any>(null)
   const [showPriceEstimation, setShowPriceEstimation] = useState(false)
+  const [showPayment, setShowPayment] = useState(false)
+  const [createdListingId, setCreatedListingId] = useState<string | null>(null)
 
   const {
     register,
@@ -117,6 +121,18 @@ export default function CreateListingForm() {
   // Håndter bildeopplasting
   const handleImagesChange = (images: any[]) => {
     setUploadedImages(images)
+  }
+
+  // Håndter vellykket betaling
+  const handlePaymentSuccess = () => {
+    setShowPayment(false)
+    toast.success('Betaling fullført! Annonsen er nå publisert.')
+    router.push('/dashboard/customer/annonser')
+  }
+
+  // Håndter betalingsfeil
+  const handlePaymentError = (error: string) => {
+    toast.error(`Betalingsfeil: ${error}`)
   }
 
   // Send inn skjema
@@ -187,8 +203,19 @@ export default function CreateListingForm() {
       
       const result = await createResponse.json()
       
-      toast.success('Annonse opprettet! Venter på godkjenning.')
-      router.push('/dashboard/customer/annonser')
+      // Sjekk om annonsen krever betaling
+      const pricing = getListingPrice(data.category)
+      
+      if (pricing.amount > 0) {
+        // Vis betalingsskjema
+        setCreatedListingId(result.id)
+        setShowPayment(true)
+        toast.success('Annonse opprettet! Fullfør betaling for å publisere.')
+      } else {
+        // Gratis annonse - gå direkte til dashboard
+        toast.success('Annonse opprettet! Venter på godkjenning.')
+        router.push('/dashboard/customer/annonser')
+      }
       
     } catch (error: any) {
       console.error('Feil ved opprettelse:', error)
@@ -392,21 +419,81 @@ export default function CreateListingForm() {
           {/* Submit knapp */}
           <Card>
             <CardContent className="pt-6">
+              {/* Prisinfo */}
+              {watch('category') && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Annonsegebyr:</span>
+                    <span className="font-semibold">
+                      {getListingPrice(watch('category')).amount === 0 
+                        ? 'Gratis' 
+                        : `${getListingPrice(watch('category')).amount / 100} kr`
+                      }
+                    </span>
+                  </div>
+                  {getListingPrice(watch('category')).amount > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Betaling kreves etter opprettelse av annonse
+                    </p>
+                  )}
+                </div>
+              )}
+
               <Button 
                 type="submit" 
                 className="w-full" 
                 size="lg"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Oppretter annonse...' : 'Publiser annonse'}
+                {isSubmitting ? 'Oppretter annonse...' : 'Opprett annonse'}
               </Button>
               <p className="text-xs text-gray-500 mt-2 text-center">
-                Annonsen vil bli sendt til godkjenning før publisering
+                {watch('category') === 'biler' 
+                  ? 'Annonsen publiseres etter betaling og godkjenning'
+                  : 'Annonsen vil bli sendt til godkjenning før publisering'
+                }
               </p>
             </CardContent>
           </Card>
         </div>
       </div>
     </form>
+
+    {/* Betalingsskjema modal */}
+    {showPayment && createdListingId && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            <div className="text-center mb-6">
+              <CreditCard className="h-8 w-8 text-[#af4c0f] mx-auto mb-2" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                Fullfør betaling
+              </h2>
+              <p className="text-gray-600">
+                For å publisere din bil-annonse må du betale annonsegebyret.
+              </p>
+            </div>
+
+            <PaymentForm
+              amount={getListingPrice(watch('category')).amount}
+              description={getListingPrice(watch('category')).description}
+              categorySlug={watch('category')}
+              listingId={createdListingId}
+              onSuccess={handlePaymentSuccess}
+              onError={handlePaymentError}
+            />
+
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setShowPayment(false)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Avbryt og returner senere
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
   )
 }

@@ -92,27 +92,27 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/help" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
+                <Link href="/hjelp-og-stotte" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
                   Hjelp og støtte
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
+                <Link href="/kontakt-oss" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
                   Kontakt oss
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
+                <Link href="/personvern" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
                   Personvern
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
+                <Link href="/vilkar-og-betingelser" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
                   Vilkår og betingelser
                 </Link>
               </li>
               <li>
-                <Link href="/safety" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
+                <Link href="/trygg-handel" className="text-gray-400 hover:text-[#af4c0f] transition-colors">
                   Trygg handel
                 </Link>
               </li>
