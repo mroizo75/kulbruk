@@ -79,7 +79,7 @@ export default function ReiserPage() {
     const unique: FlightOffer[] = []
     
     for (const offer of offers) {
-      // Kun fjern EKSAKTE duplikater (samme ID fra Amadeus)
+      // Kun fjern EKSAKTE duplikater (samme ID fra API)
       const signature = offer.id
       
       if (!seen.has(signature)) {
@@ -831,7 +831,7 @@ export default function ReiserPage() {
                 </div>
               </div>
 
-              {/* Flere alternativer - FINN.no stil med Amadeus tjenester */}
+              {/* Flere alternativer - FINN.no stil med reisetjenester */}
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900">Flere reisealternativer</h2>
                 
@@ -845,7 +845,7 @@ export default function ReiserPage() {
                       </div>
                       <h3 className="font-bold text-lg mb-2">🏨 Hoteller</h3>
                       <p className="text-sm text-gray-600 mb-4">
-                        <strong>Via Amadeus API</strong><br/>
+                        <strong>Hotelløsninger</strong><br/>
                         Søk og book hoteller verden rundt med live priser og tilgjengelighet
                       </p>
                       <div className="flex items-center justify-center text-orange-600 group-hover:text-orange-700">
@@ -864,7 +864,7 @@ export default function ReiserPage() {
                       </div>
                       <h3 className="font-bold text-lg mb-2">🚗 Leiebiler</h3>
                       <p className="text-sm text-gray-600 mb-4">
-                        <strong>Via Amadeus API</strong><br/>
+                        <strong>Bilutleie</strong><br/>
                         Finn og sammenlign leiebiler fra alle store utleieselskaper
                       </p>
                       <div className="flex items-center justify-center text-green-600 group-hover:text-green-700">
@@ -883,7 +883,7 @@ export default function ReiserPage() {
                       </div>
                       <h3 className="font-bold text-lg mb-2">🎯 Reiseinspirajon</h3>
                       <p className="text-sm text-gray-600 mb-4">
-                        <strong>Via Amadeus AI</strong><br/>
+                        <strong>AI-reiseassistent</strong><br/>
                         Oppdage nye destinasjoner basert på priser og personlige preferanser
                       </p>
                       <div className="flex items-center justify-center text-blue-600 group-hover:text-blue-700">
@@ -894,7 +894,7 @@ export default function ReiserPage() {
                   </Card>
                 </div>
 
-                {/* Amadeus info banner */}
+                {/* Reise-API info banner */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
                   <div className="flex items-start space-x-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -904,10 +904,10 @@ export default function ReiserPage() {
                     </div>
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-gray-900 mb-2">
-                        ✈️ Powered by Amadeus - Verdens ledende reise-API
+                        ✈️ Powered by Professional Travel APIs
                       </h3>
                       <p className="text-gray-600 mb-3">
-                        Kulbruk.no bruker Amadeus sitt omfattende API-system som gir tilgang til:
+                        Kulbruk.no bruker avanserte reisetjeneste-API-er som gir tilgang til:
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div className="flex items-center space-x-2">
@@ -941,7 +941,7 @@ export default function ReiserPage() {
                     </div>
                     <h3 className="font-bold text-lg mb-2">Alle flyselskaper</h3>
                     <p className="text-sm text-gray-600">
-                      Sammenlign priser fra Norwegian, SAS og mange flere via Amadeus API
+                      Sammenlign priser fra Norwegian, SAS og mange flere via profesjonelle reise-API-er
                     </p>
                   </div>
                   

@@ -21,7 +21,7 @@ const categories = [
       active: 'Live priser',
       sold: 'Fra 499 kr'
     },
-    features: ['Amadeus API', 'Norske flyselskaper', 'NOK priser'],
+    features: ['Profesjonelle reise-API-er', 'Norske flyselskaper', 'NOK priser'],
     trending: true,
     isNew: true,
     image: '/api/placeholder/400/300'

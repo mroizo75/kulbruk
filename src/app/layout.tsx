@@ -3,6 +3,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import ConditionalNavbar from '@/components/conditional-navbar'
+import Footer from '@/components/footer'
 import './globals.css'
 
 const geistSans = Geist({
@@ -40,6 +41,7 @@ export default function RootLayout({
           <main className="min-h-screen">
             {children}
           </main>
+          <Footer />
           <Toaster position="top-right" richColors />
         </body>
       </html>

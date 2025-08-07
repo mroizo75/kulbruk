@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { AlertCircle, TrendingUp, RefreshCw, Car, Calculator } from 'lucide-react'
+import { AlertCircle, TrendingUp, RefreshCw, Car, Calculator, Brain, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface PriceEstimationProps {
@@ -57,39 +57,64 @@ export default function PriceEstimation({ onEstimationComplete, className = '' }
     setStep('loading')
 
     try {
-      const response = await fetch('/api/vegvesen', {
+      // First, try to get car data from Vegvesen API using GET endpoint
+      let vehicleData = null
+      try {
+        const vegvesenResponse = await fetch(`/api/vegvesen?regNumber=${regNumber.toUpperCase()}`, {
+          method: 'GET'
+        })
+        
+        if (vegvesenResponse.ok) {
+          const vegvesenData = await vegvesenResponse.json()
+          vehicleData = vegvesenData.carData
+          console.log('✅ Vegvesen data hentet:', vehicleData)
+        } else {
+          const errorData = await vegvesenResponse.json()
+          console.log('⚠️ Vegvesen API feil:', errorData.error)
+        }
+      } catch (vegvesenError) {
+        console.log('Vegvesen API ikke tilgjengelig, bruker manual input')
+      }
+
+      // Use AI estimation with available data
+      const estimationResponse = await fetch('/api/ai-price-estimation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          registrationNumber: regNumber.toUpperCase(),
+          make: vehicleData?.make || 'Ukjent merke',
+          model: vehicleData?.model || 'Ukjent modell',
+          year: vehicleData?.year || new Date().getFullYear() - 10, // Mer realistisk fallback
           mileage: parseInt(mileage),
-          condition: condition.toUpperCase()
+          condition: condition.toUpperCase(),
+          fuelType: vehicleData?.fuelType || 'Ukjent',
+          transmission: vehicleData?.transmission || 'Ukjent',
+          registrationNumber: regNumber.toUpperCase()
         })
       })
 
-      const data = await response.json()
+      const estimationData = await estimationResponse.json()
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Kunne ikke hente prisestimering')
+      if (!estimationResponse.ok) {
+        throw new Error(estimationData.error || 'Kunne ikke beregne AI-prisestimering')
       }
 
-      setCarData(data.carData)
-      setEstimation(data.priceEstimation)
+      setCarData(estimationData.carData)
+      setEstimation(estimationData.estimation)
       setStep('result')
       
       // Kall callback
       if (onEstimationComplete) {
         onEstimationComplete({
-          ...data.priceEstimation,
-          carData: data.carData
+          ...estimationData.estimation,
+          carData: estimationData.carData
         })
       }
 
-      toast.success('Prisestimering beregnet!')
+      toast.success('AI-prisestimering beregnet!')
 
     } catch (error) {
       console.error('Prisestimering feil:', error)
-      toast.error(error instanceof Error ? error.message : 'Noe gikk galt')
+      toast.error(error instanceof Error ? error.message : 'Noe gikk galt med AI-estimeringen')
       setStep('input')
     }
   }
@@ -120,11 +145,11 @@ export default function PriceEstimation({ onEstimationComplete, className = '' }
     <Card className={`border-green-200 bg-green-50 ${className}`}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-green-900">
-          <Calculator className="h-5 w-5" />
-          🏆 Prisestimering for Auksjon
+          <Brain className="h-5 w-5" />
+          🤖 AI-Powered Prisestimering
         </CardTitle>
         <p className="text-sm text-green-700">
-          Få et prisestimat for din bil som skal selges på auksjon til forhandlere
+          Få et intelligent prisestimat med OpenAI GPT-4 basert på markedsdata og ekspertanalyse
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -176,21 +201,29 @@ export default function PriceEstimation({ onEstimationComplete, className = '' }
 
             <Button 
               onClick={handleEstimate} 
-              className="w-full"
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               disabled={!regNumber || !mileage || !condition}
             >
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Beregn Prisestimering
+              <Sparkles className="h-4 w-4 mr-2" />
+              Start AI-Analyse
             </Button>
           </div>
         )}
 
         {step === 'loading' && (
           <div className="text-center py-8">
-            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
-            <p className="text-sm text-gray-600">
-              Henter bildata fra Statens Vegvesen og beregner prisestimering...
+            <div className="relative mx-auto mb-4 w-16 h-16">
+              <Brain className="h-8 w-8 animate-pulse mx-auto text-purple-600" />
+              <Sparkles className="h-4 w-4 absolute -top-1 -right-1 animate-bounce text-yellow-500" />
+            </div>
+            <p className="text-sm text-gray-600 mb-2 font-medium">
+              🤖 AI analyserer din bil...
             </p>
+            <div className="text-xs text-gray-500 space-y-1">
+              <div>• Henter kjøretøydata fra Vegvesen</div>
+              <div>• Analyserer markedstrends med GPT-4</div>
+              <div>• Beregner intelligent prisestimering</div>
+            </div>
           </div>
         )}
 
@@ -236,11 +269,25 @@ export default function PriceEstimation({ onEstimationComplete, className = '' }
               </div>
 
               {estimation.factors && (
-                <div className="text-xs text-gray-600 space-y-1">
-                  <div>• Basisverdi ({carData.make}): {formatPrice(estimation.factors.basePrice)} kr</div>
-                  <div>• Alders-reduksjon ({estimation.factors.carAge} år): -{formatPrice(estimation.factors.ageDeduction)} kr</div>
-                  <div>• Kilometer-reduksjon ({formatPrice(estimation.factors.excessMileage)} km over 100k): -{formatPrice(estimation.factors.mileageDeduction)} kr</div>
-                  <div>• Tilstands-faktor ({condition}): ×{estimation.factors.conditionMultiplier}</div>
+                <div className="space-y-3">
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>• Basisverdi ({carData.make}): {formatPrice(estimation.factors.basePrice)} kr</div>
+                    <div>• Alders-reduksjon: -{formatPrice(estimation.factors.ageDeduction)} kr</div>
+                    <div>• Kilometer-reduksjon: -{formatPrice(estimation.factors.mileageDeduction)} kr</div>
+                    <div>• Tilstands-faktor ({condition}): ×{estimation.factors.conditionMultiplier}</div>
+                    <div>• Markedstrend: {estimation.factors.marketTrends}</div>
+                  </div>
+                  
+                  {estimation.explanation && (
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <div className="flex items-start gap-2">
+                        <Brain className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="text-xs text-blue-800">
+                          <strong>AI-analyse:</strong> {estimation.explanation}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

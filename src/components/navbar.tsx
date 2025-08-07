@@ -29,7 +29,7 @@ export default function Navbar() {
                 href="/reiser" 
                 className="text-gray-600 hover:text-gray-900 transition-colors"
               >
-                ✈️ Flyreiser
+                🛫 Reiser
               </Link>
               <Link 
                 href="/annonser/bil" 
@@ -58,7 +58,7 @@ export default function Navbar() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 placeholder="Søk etter varer, biler, møbler..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#af4c0f]"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#af4c0f] bg-white text-gray-900 placeholder:text-gray-500"
                 type="search"
               />
             </div>
@@ -70,14 +70,14 @@ export default function Navbar() {
             <SignedIn>
               <Link 
                 href="/opprett"
-                className="hidden sm:flex items-center bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+                className="hidden sm:flex items-center bg-[#af4c0f] text-white px-4 py-2 rounded hover:bg-[#af4c0f]/90 transition-colors"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Legg ut annonse
               </Link>
               <Link 
                 href="/opprett"
-                className="sm:hidden bg-green-600 text-white p-2 rounded hover:bg-green-700 transition-colors"
+                className="sm:hidden bg-[#af4c0f] text-white p-2 rounded hover:bg-[#af4c0f]/90 transition-colors"
               >
                 <Plus className="h-4 w-4" />
               </Link>

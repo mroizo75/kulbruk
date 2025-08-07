@@ -1,22 +1,12 @@
+import { Suspense } from 'react'
 import HeroSection from '@/components/homepage/hero-section'
-import CategoriesSection from '@/components/homepage/categories-section'
-import FeaturesSection from '@/components/homepage/features-section'
-import TestimonialsSection from '@/components/homepage/testimonials-section'
+import ListingCard, { ListingGrid, ListingCardSkeleton } from '@/components/listing-card'
+import LiveListings from '@/components/live-listings'
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
+    <div className="min-h-screen bg-white">
       <HeroSection />
-      
-      {/* Categories Section */}
-      <CategoriesSection />
-      
-      {/* Features Section */}
-      <FeaturesSection />
-      
-      {/* Testimonials & Stats Section */}
-      <TestimonialsSection />
     </div>
   )
 }
