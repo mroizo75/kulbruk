@@ -1,37 +1,29 @@
-// Kulbruk.no Prisma Schema
-// MySQL database med alle nødvendige tabeller for MVP
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
 }
 
-// ===== BRUKERE =====
 model User {
-  id        String  @id @default(cuid())
-  clerkId   String  @unique // Clerk user ID
-  email     String  @unique
-  firstName String?
-  lastName  String?
-  phone     String?
-  location  String? // By/kommune
-  avatar    String?
-  role      String  @default("customer") // customer, admin, moderator, business
-
-  // Bedrift-spesifikke felt
-  companyName String? // Bedriftsnavn
-  orgNumber   String? // Organisasjonsnummer
-  companyLogo String? // URL til bedriftslogo
-  website     String? // Bedriftens nettside
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relasjoner
+  id             String          @id @default(cuid())
+  clerkId        String          @unique
+  email          String          @unique
+  firstName      String?
+  lastName       String?
+  phone          String?
+  location       String?
+  avatar         String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  companyLogo    String?
+  companyName    String?
+  orgNumber      String?
+  role           String          @default("customer")
+  website        String?
   listings       Listing[]
   bids           Bid[]
   flightBookings FlightBooking[]
@@ -41,162 +33,124 @@ model User {
   @@map("users")
 }
 
-// ===== KATEGORIER =====
 model Category {
-  id          String   @id @default(cuid())
-  name        String   @unique // f.eks "Biler", "Møbler", "Elektronikk"
-  slug        String   @unique // f.eks "biler", "mobler", "elektronikk"
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
   description String?
-  icon        String? // Lucide icon navn
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-
-  // Relasjoner
-  listings Listing[]
+  icon        String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  listings    Listing[]
 
   @@map("categories")
 }
 
-// ===== ANNONSER =====
 model Listing {
-  id          String        @id @default(cuid())
-  title       String
-  description String        @db.Text
-  price       Decimal       @db.Decimal(10, 2)
-  location    String // By/kommune hvor varen befinner seg
-  status      ListingStatus @default(PENDING)
-  isActive    Boolean       @default(true)
-  views       Int           @default(0)
-  isFeatured  Boolean       @default(false) // For fremhevede annonser
-
-  // Kontaktinfo
-  contactEmail String?
-  contactPhone String?
-  contactName  String?
-
-  // Timestamps
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  publishedAt DateTime? // Når annonsen ble godkjent
-  expiresAt   DateTime? // Utløpsdato
-  soldAt      DateTime? // Når varen ble solgt
-
-  // Relasjoner
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  categoryId String
-  category   Category @relation(fields: [categoryId], references: [id])
-
-  // Auksjon/bud-system
-  listingType ListingType @default(FIXED_PRICE)
-
-  // Prisestimering
-  suggestedPrice Decimal? @db.Decimal(10, 2) // Systemets forslag
-  reservePrice   Decimal? @db.Decimal(10, 2) // Brukers minstepris
-
-  // Bil-spesifikke felt
-  registrationNumber String?
+  id                 String           @id @default(cuid())
+  title              String
+  description        String           @db.Text
+  price              Decimal          @db.Decimal(10, 2)
+  location           String
+  status             ListingStatus    @default(PENDING)
+  isActive           Boolean          @default(true)
+  views              Int              @default(0)
+  isFeatured         Boolean          @default(false)
+  contactEmail       String?
+  contactPhone       String?
+  contactName        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  publishedAt        DateTime?
+  expiresAt          DateTime?
+  soldAt             DateTime?
+  userId             String
+  categoryId         String
+  condition          String?
+  listingType        ListingType      @default(FIXED_PRICE)
   mileage            Int?
-  condition          String? // A, B, C, D
+  registrationNumber String?
+  reservePrice       Decimal?         @db.Decimal(10, 2)
+  suggestedPrice     Decimal?         @db.Decimal(10, 2)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category           Category         @relation(fields: [categoryId], references: [id])
+  images             Image[]
+  vehicleSpec        VehicleSpec?
+  priceEstimation    PriceEstimation?
+  auction            Auction?
+  bids               Bid[]
+  listingPayment     ListingPayment?
 
-  images          Image[]
-  vehicleSpec     VehicleSpec? // Kun for bil-annonser
-  priceEstimation PriceEstimation?
-  auction         Auction?
-  bids            Bid[]
-  listingPayment  ListingPayment?
-
+  @@index([categoryId], map: "listings_categoryId_fkey")
+  @@index([userId], map: "listings_userId_fkey")
   @@map("listings")
 }
 
-// ===== BILDER =====
 model Image {
   id        String   @id @default(cuid())
-  url       String // URL til bildet (UploadThing/Cloudinary)
+  url       String
   altText   String?
-  sortOrder Int      @default(0) // Rekkefølge i galleriet
-  isMain    Boolean  @default(false) // Hovedbilde
+  sortOrder Int      @default(0)
+  isMain    Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  // Relasjoner
   listingId String
-  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
+  @@index([listingId], map: "images_listingId_fkey")
   @@map("images")
 }
 
-// ===== PRISESTIMERING =====
 model PriceEstimation {
-  id        String  @id @default(cuid())
-  listingId String  @unique
-  listing   Listing @relation(fields: [listingId], references: [id])
-
-  // Automatisk data fra Vegvesen API
-  make         String? // Merke
-  model        String? // Modell  
-  year         Int? // Årsmodell
-  fuelType     String? // Drivstoff
-  transmission String? // Girkasse
-
-  // Beregnet estimat
-  estimatedPrice Decimal? @db.Decimal(10, 2) // Estimert pris
-  priceRange     Json? // { min: 180000, max: 220000 }
-
-  // Grunnlag for estimering
-  method     EstimationMethod
-  confidence String // HIGH, MEDIUM, LOW
-  factors    Json? // Faktorer brukt i beregning
-  disclaimer String? // Disclaimer tekst
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String           @id @default(cuid())
+  listingId      String           @unique
+  make           String?
+  model          String?
+  year           Int?
+  fuelType       String?
+  transmission   String?
+  estimatedPrice Decimal?         @db.Decimal(10, 2)
+  priceRange     String?          @db.LongText
+  method         EstimationMethod
+  confidence     String
+  factors        String?          @db.LongText
+  disclaimer     String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  listing        Listing          @relation(fields: [listingId], references: [id])
 
   @@map("price_estimations")
 }
 
-// ===== AUKSJONER =====
 model Auction {
-  id        String  @id @default(cuid())
-  listingId String  @unique
-  listing   Listing @relation(fields: [listingId], references: [id])
-
-  startTime      DateTime @default(now())
+  id             String        @id @default(cuid())
+  listingId      String        @unique
+  startTime      DateTime      @default(now())
   endTime        DateTime
-  reservePrice   Decimal? @db.Decimal(10, 2) // Minste pris selger godtar
-  currentHighBid Decimal? @db.Decimal(10, 2)
-
-  status AuctionStatus @default(PENDING)
-
-  bids Bid[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  reservePrice   Decimal?      @db.Decimal(10, 2)
+  currentHighBid Decimal?      @db.Decimal(10, 2)
+  status         AuctionStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  listing        Listing       @relation(fields: [listingId], references: [id])
+  bids           Bid[]
 
   @@map("auctions")
 }
 
-// ===== BUD =====
 model Bid {
-  id String @id @default(cuid())
-
+  id        String    @id @default(cuid())
   auctionId String
-  auction   Auction @relation(fields: [auctionId], references: [id])
-
   listingId String
-  listing   Listing @relation(fields: [listingId], references: [id])
-
-  bidderId String
-  bidder   User   @relation(fields: [bidderId], references: [id])
-
-  amount  Decimal @db.Decimal(10, 2)
-  message String? // Kommentar fra forhandler
-
-  status BidStatus @default(ACTIVE)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  bidderId  String
+  amount    Decimal   @db.Decimal(10, 2)
+  message   String?
+  status    BidStatus @default(ACTIVE)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  auction   Auction   @relation(fields: [auctionId], references: [id])
+  listing   Listing   @relation(fields: [listingId], references: [id])
+  bidder    User      @relation(fields: [bidderId], references: [id])
 
   @@index([auctionId, amount])
   @@index([listingId])
@@ -204,331 +158,246 @@ model Bid {
   @@map("bids")
 }
 
-// ===== BIL-SPESIFIKASJONER =====
 model VehicleSpec {
-  id String @id @default(cuid())
-
-  // Fra Vegvesen API
-  registrationNumber String? @unique
-  make               String? // Merke
-  model              String? // Modell
-  variant            String? // Variant
-  year               Int? // Årsmodell
-  fuelType           String? // Drivstoff
-  transmission       String? // Girtype
-  color              String? // Farge
-  power              Int? // Effekt (hk)
-  co2Emission        Int? // CO2-utslipp
-
-  // Brukerinput
-  mileage        Int? // Kilometerstand
-  nextInspection DateTime? // Neste EU-kontroll
-  insurance      String? // Forsikringstype
-  accidents      Boolean? // Har vært i ulykke
-
-  // Ekstra info
-  serviceHistory String? @db.Text // Servicehistorikk
-  modifications  String? @db.Text // Modifikasjoner
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relasjoner
-  listingId String  @unique
-  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(cuid())
+  registrationNumber String?   @unique
+  make               String?
+  model              String?
+  variant            String?
+  year               Int?
+  fuelType           String?
+  transmission       String?
+  color              String?
+  power              Int?
+  co2Emission        Int?
+  mileage            Int?
+  nextInspection     DateTime?
+  insurance          String?
+  accidents          Boolean?
+  serviceHistory     String?   @db.Text
+  modifications      String?   @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  listingId          String    @unique
+  listing            Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@map("vehicle_specs")
 }
 
-// ===== ENUMS =====
-enum ListingStatus {
-  PENDING // Venter på godkjenning
-  APPROVED // Godkjent og aktiv
-  REJECTED // Avvist
-  SOLD // Solgt
-  EXPIRED // Utløpt
-  SUSPENDED // Suspendert av admin
-}
-
-enum ListingType {
-  FIXED_PRICE // Normal annonse
-  AUCTION // Budrunde
-}
-
-enum EstimationMethod {
-  MANUAL_ADMIN // Admin setter manuelt
-  BASIC_ALGORITHM // Grunnleggende beregning
-  MARKET_ANALYSIS // Markedssammenligning
-  ML_ALGORITHM // Machine learning
-  EXTERNAL_API // Ekstern tjeneste
-}
-
-enum AuctionStatus {
-  PENDING // Venter på godkjenning
-  ACTIVE // Pågående budrunde
-  ENDED // Avsluttet, venter på selger
-  SOLD // Solgt
-  CANCELLED // Avbrutt
-}
-
-enum BidStatus {
-  ACTIVE // Gyldig bud
-  WITHDRAWN // Trukket tilbake
-  REJECTED // Avvist av system
-}
-
-// ===== FLYREISER =====
 model FlightBooking {
-  id String @id @default(cuid())
+  id              String              @id @default(cuid())
+  userId          String
+  origin          String
+  destination     String
+  departureDate   DateTime
+  returnDate      DateTime?
+  passengers      Int                 @default(1)
+  cabinClass      String              @default("ECONOMY")
+  amadeusOfferId  String?
+  flightOfferData String?             @db.LongText
+  totalPrice      Decimal             @db.Decimal(10, 2)
+  currency        String              @default("NOK")
+  bookingRef      String?
+  pnr             String?
+  status          FlightBookingStatus @default(SEARCHING)
+  bookingDate     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  travelers       FlightTraveler[]
+  segments        FlightSegment[]
 
-  // Brukerinformasjon
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Søkeparametere
-  origin      String // OSL, BGO, etc.
-  destination String // CPH, LHR, etc.
-  departureDate DateTime
-  returnDate    DateTime? // For tur/retur
-  passengers    Int @default(1)
-  cabinClass    String @default("ECONOMY") // ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST
-
-  // Amadeus offer data
-  amadeusOfferId String? // Referanse til Amadeus offer
-  flightOfferData Json? // Lagret Amadeus flight offer data
-  
-  // Booking detaljer
-  totalPrice    Decimal @db.Decimal(10, 2)
-  currency      String @default("NOK")
-  bookingRef    String? // Airline booking reference
-  pnr           String? // Passenger name record
-  
-  // Status
-  status        FlightBookingStatus @default(SEARCHING)
-  bookingDate   DateTime? // Når booking ble bekreftet
-  
-  // Metadata
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relasjoner
-  travelers FlightTraveler[]
-  segments  FlightSegment[]
-
+  @@index([userId], map: "flight_bookings_userId_fkey")
   @@map("flight_bookings")
 }
 
 model FlightTraveler {
-  id String @id @default(cuid())
-  
-  // Personinformasjon
-  firstName String
-  lastName  String
-  dateOfBirth DateTime
-  gender    String // M, F
-  
-  // Dokumenter
-  documentType   String // PASSPORT, ID_CARD
-  documentNumber String
-  nationality    String
-  
-  // Kontakt
-  email String?
-  phone String?
-  
-  // Relasjon til booking
+  id              String        @id @default(cuid())
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime
+  gender          String
+  documentType    String
+  documentNumber  String
+  nationality     String
+  email           String?
+  phone           String?
   flightBookingId String
+  createdAt       DateTime      @default(now())
   flightBooking   FlightBooking @relation(fields: [flightBookingId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
-  
+
+  @@index([flightBookingId], map: "flight_travelers_flightBookingId_fkey")
   @@map("flight_travelers")
 }
 
 model FlightSegment {
-  id String @id @default(cuid())
-  
-  // Flight detaljer
-  carrierCode     String // SK, DY, etc.
-  flightNumber    String
-  
-  // Rute
-  departureAirport String // OSL
-  arrivalAirport   String // CPH
+  id               String        @id @default(cuid())
+  carrierCode      String
+  flightNumber     String
+  departureAirport String
+  arrivalAirport   String
   departureTime    DateTime
   arrivalTime      DateTime
-  
-  // Aircraft info
-  aircraftCode String? // 73H, 32A, etc.
-  duration     String? // PT2H30M
-  
-  // Cabin og sete
-  cabinClass String // ECONOMY, BUSINESS, etc.
-  fareBasis  String? // Fare code
-  
-  // Relasjon til booking
-  flightBookingId String
-  flightBooking   FlightBooking @relation(fields: [flightBookingId], references: [id], onDelete: Cascade)
-  
-  // Segment nummer (for connecting flights)
-  segmentNumber Int
-  
-  createdAt DateTime @default(now())
-  
+  aircraftCode     String?
+  duration         String?
+  cabinClass       String
+  fareBasis        String?
+  flightBookingId  String
+  segmentNumber    Int
+  createdAt        DateTime      @default(now())
+  flightBooking    FlightBooking @relation(fields: [flightBookingId], references: [id], onDelete: Cascade)
+
+  @@index([flightBookingId], map: "flight_segments_flightBookingId_fkey")
   @@map("flight_segments")
 }
 
-// Airport cache for performance
 model Airport {
-  id String @id @default(cuid())
-  
-  iataCode String @unique // OSL, BGO, CPH, etc.
-  icaoCode String? // ENGM for OSL
-  name     String // Oslo Gardermoen
-  city     String // Oslo
-  country  String // Norway
-  
-  // Koordinater for kart/distance
+  id        String   @id @default(cuid())
+  iataCode  String   @unique
+  icaoCode  String?
+  name      String
+  city      String
+  country   String
   latitude  Float?
   longitude Float?
-  
-  // Metadata
-  isActive  Boolean @default(true)
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@map("airports")
 }
 
-enum FlightBookingStatus {
-  SEARCHING     // Søker etter tilbud
-  OFFER_SELECTED // Tilbud valgt, venter på booking
-  BOOKED        // Bekreftet booking
-  TICKETED      // Billetter utstedt
-  CANCELLED     // Kansellert
-  COMPLETED     // Reise fullført
-}
-
-// ===== BETALINGER OG ABONNEMENTER =====
 model Payment {
-  id String @id @default(cuid())
-  
-  // Stripe informasjon
-  stripePaymentIntentId String @unique
-  stripeChargeId       String?
-  
-  // Brukerinformasjon
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Betalingsdetaljer
-  amount      Decimal @db.Decimal(10, 2)
-  currency    String  @default("NOK")
-  description String
-  
-  // Type betaling
-  type PaymentType
-  
-  // Relaterte objekter
-  listingId      String? // For annonse-betalinger
-  subscriptionId String? // For abonnements-betalinger
-  
-  // Status og metadata
-  status    PaymentStatus @default(PENDING)
-  metadata  Json? // Ekstra informasjon
-  
-  // Relasjoner
-  listingPayment ListingPayment?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  id                    String          @id @default(cuid())
+  stripePaymentIntentId String          @unique
+  stripeChargeId        String?
+  userId                String
+  amount                Decimal         @db.Decimal(10, 2)
+  currency              String          @default("NOK")
+  description           String
+  type                  PaymentType
+  listingId             String?
+  subscriptionId        String?
+  status                PaymentStatus   @default(PENDING)
+  metadata              String?         @db.LongText
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingPayment        ListingPayment?
+
+  @@index([userId], map: "payments_userId_fkey")
   @@map("payments")
 }
 
 model Subscription {
-  id String @id @default(cuid())
-  
-  // Stripe informasjon
-  stripeSubscriptionId String @unique
+  id                   String             @id @default(cuid())
+  stripeSubscriptionId String             @unique
   stripeCustomerId     String
   stripePriceId        String
-  
-  // Brukerinformasjon
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Abonnementsdetaljer
-  plan              SubscriptionPlan
-  status            SubscriptionStatus @default(ACTIVE)
-  adsRemaining      Int                @default(0) // Antall annonser igjen
-  adsPerMonth       Int // Antall annonser per måned
-  pricePerMonth     Decimal            @db.Decimal(10, 2)
-  
-  // Datoer
-  currentPeriodStart DateTime
-  currentPeriodEnd   DateTime
-  cancelAt          DateTime? // Når abonnementet avsluttes
-  canceledAt        DateTime? // Når det ble kansellert
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  userId               String             @unique
+  plan                 SubscriptionPlan
+  status               SubscriptionStatus @default(ACTIVE)
+  adsRemaining         Int                @default(0)
+  adsPerMonth          Int
+  pricePerMonth        Decimal            @db.Decimal(10, 2)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAt             DateTime?
+  canceledAt           DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("subscriptions")
 }
 
 model ListingPayment {
-  id String @id @default(cuid())
-  
-  // Annonse-informasjon
-  listingId String @unique
-  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  
-  // Betaling informasjon
-  paymentId String @unique
-  payment   Payment @relation(fields: [paymentId], references: [id])
-  
-  // Type og pris
-  type   ListingPaymentType
-  amount Decimal            @db.Decimal(10, 2)
-  
-  // Status
-  isPaid Boolean @default(false)
-  paidAt DateTime?
-  
-  createdAt DateTime @default(now())
-  
+  id        String             @id @default(cuid())
+  listingId String             @unique
+  paymentId String             @unique
+  type      ListingPaymentType
+  amount    Decimal            @db.Decimal(10, 2)
+  isPaid    Boolean            @default(false)
+  paidAt    DateTime?
+  createdAt DateTime           @default(now())
+  listing   Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  payment   Payment            @relation(fields: [paymentId], references: [id])
+
   @@map("listing_payments")
 }
 
-// ===== BETALINGS-ENUMS =====
+enum ListingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SOLD
+  EXPIRED
+  SUSPENDED
+}
+
+enum ListingType {
+  FIXED_PRICE
+  AUCTION
+}
+
+enum EstimationMethod {
+  MANUAL_ADMIN
+  BASIC_ALGORITHM
+  MARKET_ANALYSIS
+  ML_ALGORITHM
+  EXTERNAL_API
+}
+
+enum AuctionStatus {
+  PENDING
+  ACTIVE
+  ENDED
+  SOLD
+  CANCELLED
+}
+
+enum BidStatus {
+  ACTIVE
+  WITHDRAWN
+  REJECTED
+}
+
+enum FlightBookingStatus {
+  SEARCHING
+  OFFER_SELECTED
+  BOOKED
+  TICKETED
+  CANCELLED
+  COMPLETED
+}
+
 enum PaymentType {
-  LISTING_FEE    // Gebyr for annonse
-  SUBSCRIPTION   // Abonnement
-  FEATURED_AD    // Fremhevet annonse
+  LISTING_FEE
+  SUBSCRIPTION
+  FEATURED_AD
 }
 
 enum PaymentStatus {
-  PENDING    // Venter på betaling
-  PROCESSING // Behandles
-  SUCCEEDED  // Vellykket
-  FAILED     // Mislykket
-  CANCELED   // Kansellert
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
 }
 
 enum SubscriptionPlan {
-  BASIC     // 5 annonser - 99 NOK
-  STANDARD  // 10 annonser - 199 NOK
+  BASIC
+  STANDARD
 }
 
 enum SubscriptionStatus {
-  ACTIVE    // Aktivt abonnement
-  CANCELED  // Kansellert
-  PAST_DUE  // Forfalt
-  UNPAID    // Ubetalt
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
 }
 
 enum ListingPaymentType {
-  CAR_AD      // Bil-annonse (49 NOK)
-  TORGET_AD   // Torget-annonse (Gratis)
+  CAR_AD
+  TORGET_AD
 }

@@ -21,6 +21,7 @@ interface DebugData {
   recentUsers: any[]
   webhookStatus: string
   environment: string
+  databaseError: string | null
 }
 
 export default function WebhookTestPage() {
@@ -123,13 +124,24 @@ export default function WebhookTestPage() {
               
               <Separator className="my-4" />
               
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Webhook-status:</strong> {debugData.webhookStatus}
+              <div className={`p-4 rounded-lg ${debugData.databaseError ? 'bg-red-50' : 'bg-blue-50'}`}>
+                <p className={`text-sm ${debugData.databaseError ? 'text-red-800' : 'text-blue-800'}`}>
+                  <strong>Status:</strong> {debugData.webhookStatus}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
                   Miljø: {debugData.environment}
                 </p>
+                {debugData.databaseError && (
+                  <div className="mt-3 p-3 bg-red-100 border border-red-200 rounded">
+                    <p className="text-sm font-medium text-red-800">Database-tilkoblingsfeil:</p>
+                    <p className="text-xs text-red-700 mt-1">{debugData.databaseError}</p>
+                    {debugData.databaseError.includes('sha256_password') && (
+                      <div className="mt-2 text-xs text-red-600">
+                        <strong>Løsning:</strong> Legg til <code className="bg-red-200 px-1 rounded">?authPlugin=mysql_native_password</code> i DATABASE_URL
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
