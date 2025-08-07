@@ -1,63 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 
 // GET - Debug autentisering (public endpoint)
 export async function GET(request: NextRequest) {
   try {
-    // Test auth() funksjonen
-    const authResult = await auth()
-    console.log('Auth result:', authResult)
+    // Test NextAuth session
+    const session = await auth()
+    console.log('Session result:', session)
     
-    // Test currentUser() funksjonen
-    let user = null
+    // Ingen currentUser() i NextAuth
+    let user = session?.user || null
     let userError = null
-    try {
-      user = await currentUser()
-      console.log('Current user:', user?.id)
-    } catch (error) {
-      console.error('currentUser() feilet:', error)
-      userError = error instanceof Error ? error.message : 'Ukjent feil'
-    }
 
     // Sjekk headers for debugging
     const headers = Object.fromEntries(request.headers.entries())
     
     return NextResponse.json({
       debug: {
-        auth: {
-          userId: authResult?.userId || null,
-          sessionId: authResult?.sessionId || null,
-          orgId: authResult?.orgId || null,
-          authType: typeof authResult,
+        session: {
+          userId: session?.user?.id || null,
+          email: session?.user?.email || null,
+          role: session?.user?.role || null,
+          sessionType: typeof session,
         },
         currentUser: user ? {
           id: user.id,
-          email: user.emailAddresses[0]?.emailAddress,
+          email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.publicMetadata?.role,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt
+          role: user.role,
+          name: user.name
         } : null,
         userError: userError,
-        isAuthenticated: !!authResult?.userId,
+        isAuthenticated: !!session?.user,
         isUserLoaded: !!user,
-        discrepancy: !!user && !authResult?.userId, // Client har bruker, server ikke
+        hasSession: !!session,
         timestamp: new Date().toISOString(),
         url: request.url,
         method: request.method,
         userAgent: headers['user-agent'],
-        clerkHeaders: {
+        nextAuthHeaders: {
           authorization: headers['authorization'] ? 'Present' : 'Missing',
           cookie: headers['cookie'] ? 'Present' : 'Missing',
-          'clerk-session': headers['clerk-session'] ? 'Present' : 'Missing'
+          'next-auth.session-token': headers['next-auth.session-token'] ? 'Present' : 'Missing'
         }
       },
       instructions: {
-        message: authResult?.userId ? 
-          'Du er logget inn! Nå kan du teste /api/test-sync' : 
+        message: session?.user ? 
+          'Du er logget inn med NextAuth! Dashboard tilgjengelig.' : 
           'Du er ikke logget inn. Gå til /sign-in først.',
-        nextSteps: authResult?.userId ? [
+        nextSteps: session?.user ? [
           'Test synkronisering: GET /api/test-sync',
           'Se dashboard: /dashboard',
           'Test bedrift dashboard: /dashboard/business'

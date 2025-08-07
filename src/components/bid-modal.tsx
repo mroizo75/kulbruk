@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@clerk/nextjs'
+import { useSession } from 'next-auth/react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,8 @@ interface BidModalProps {
 }
 
 export default function BidModal({ auctionId, title, currentBid, estimatedPrice }: BidModalProps) {
-  const { isSignedIn } = useAuth()
+  const { data: session } = useSession()
+  const isSignedIn = !!session
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [bidAmount, setBidAmount] = useState('')

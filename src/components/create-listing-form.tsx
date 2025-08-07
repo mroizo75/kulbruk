@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
-import { useUser, useAuth } from '@clerk/nextjs'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -53,8 +53,7 @@ const categories = [
 
 export default function CreateListingForm() {
   const router = useRouter()
-  const { user } = useUser()
-  const { getToken } = useAuth()
+  const { data: session } = useSession()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadedImages, setUploadedImages] = useState([])
 
@@ -82,27 +81,23 @@ export default function CreateListingForm() {
 
   // Automatisk fylle inn kontaktinformasjon fra Clerk
   useEffect(() => {
-    if (user) {
+    if (session?.user) {
       // Fyller inn navn (først og sist navn, eller bare firstName hvis det er alt som finnes)
-      const fullName = user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}` 
-        : user.firstName || user.fullName || ''
+      const fullName = session.user.firstName && session.user.lastName 
+        ? `${session.user.firstName} ${session.user.lastName}` 
+        : session.user.firstName || session.user.name || ''
       
       setValue('contactName', fullName)
       
-      // Fyller inn e-post (primær e-post fra Clerk)
-      const primaryEmail = user.emailAddresses.find(email => email.id === user.primaryEmailAddressId)?.emailAddress || 
-                          user.emailAddresses[0]?.emailAddress || ''
-      setValue('contactEmail', primaryEmail)
+      // Fyller inn e-post
+      setValue('contactEmail', session.user.email || '')
       
       // Fyller inn telefon hvis tilgjengelig
-      const primaryPhone = user.phoneNumbers.find(phone => phone.id === user.primaryPhoneNumberId)?.phoneNumber || 
-                          user.phoneNumbers[0]?.phoneNumber || ''
-      if (primaryPhone) {
-        setValue('contactPhone', primaryPhone)
+      if (session.user.phone) {
+        setValue('contactPhone', session.user.phone)
       }
     }
-  }, [user, setValue])
+  }, [session, setValue])
 
   // Håndter kategori-endring
   const handleCategoryChange = (value: string) => {
@@ -181,16 +176,14 @@ export default function CreateListingForm() {
         }))
       }
       
-      // Få session token fra Clerk
-      const token = await getToken()
-      console.log('Token hentet:', !!token)
+      // NextAuth håndterer automatisk autentisering
+      console.log('Bruker autentisert:', !!session)
       
-      // Send til API med eksplisitt token
+      // Send til API (NextAuth session sendes automatisk)
       const createResponse = await fetch('/api/annonser', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          'Content-Type': 'application/json'
         },
         credentials: 'include', // Inkluderer cookies som backup
         body: JSON.stringify(apiData)

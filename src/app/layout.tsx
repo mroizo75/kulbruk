@@ -1,9 +1,9 @@
 import { type Metadata } from 'next'
-import { ClerkProvider } from '@clerk/nextjs'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import ConditionalNavbar from '@/components/conditional-navbar'
 import Footer from '@/components/footer'
+import SessionProvider from '@/components/session-provider'
 import './globals.css'
 
 const geistSans = Geist({
@@ -35,17 +35,17 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="no">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="no">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <SessionProvider>
           <ConditionalNavbar />
           <main className="min-h-screen">
             {children}
           </main>
           <Footer />
           <Toaster position="top-right" richColors />
-        </body>
-      </html>
-    </ClerkProvider>
+        </SessionProvider>
+      </body>
+    </html>
   )
 }

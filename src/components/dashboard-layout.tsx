@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { SignOutButton, useUser } from '@clerk/nextjs'
+import { useSession, signOut } from 'next-auth/react'
 import AdminNotificationBell from './admin-notification-bell'
 
 interface DashboardLayoutProps {
@@ -35,7 +35,7 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children, userRole = 'customer' }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
-  const { user } = useUser()
+  const { data: session } = useSession()
 
   // Navigasjonsmenyer basert på brukerrolle
   const customerNavigation = [
@@ -162,7 +162,7 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
       {/* Footer med brukerinfo og sign out */}
       <div className="p-4 border-t border-gray-200 space-y-3">
         <div className="text-xs text-gray-500">
-          Logget inn som {user?.firstName || 'Bruker'}
+          Logget inn som {session?.user?.name || 'Bruker'}
           <br />
           <span className="text-blue-600 font-medium">
             {userRole === 'admin' ? 'Administrator' :
@@ -171,16 +171,15 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
           </span>
         </div>
         
-        <SignOutButton>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full flex items-center justify-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
-          >
-            <LogOut className="h-4 w-4" />
-            Logg ut
-          </Button>
-        </SignOutButton>
+        <Button 
+          onClick={() => signOut()}
+          variant="outline" 
+          size="sm" 
+          className="w-full flex items-center justify-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+        >
+          <LogOut className="h-4 w-4" />
+          Logg ut
+        </Button>
       </div>
     </div>
   )

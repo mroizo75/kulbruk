@@ -1,31 +1,19 @@
-import { currentUser, clerkClient } from '@clerk/nextjs/server'
+import { auth } from './auth'
 import { PrismaClient } from '@prisma/client'
 import { UserRole } from './types'
 
 const prisma = new PrismaClient()
 
-// Hent brukerrolle fra Clerk eller database
+// Hent brukerrolle fra NextAuth session eller database
 export async function getUserRole(): Promise<UserRole> {
   try {
-    const user = await currentUser()
+    const session = await auth()
     
-    if (!user) {
+    if (!session?.user) {
       return 'customer' // Standard rolle for ikke-innloggede
     }
 
-    // Først prøv å hente rolle fra Clerk metadata
-    const clerkRole = user.publicMetadata?.role as UserRole
-    if (clerkRole) {
-      return clerkRole
-    }
-
-    // Hvis ikke i Clerk, hent fra database
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user.id },
-      select: { role: true }
-    })
-
-    return (dbUser?.role as UserRole) || 'customer'
+    return session.user.role || 'customer'
   } catch (error) {
     console.error('Feil ved henting av brukerrolle:', error)
     return 'customer'
@@ -35,28 +23,28 @@ export async function getUserRole(): Promise<UserRole> {
 // Hent komplett brukerinformasjon
 export async function getUserInfo() {
   try {
-    const user = await currentUser()
+    const session = await auth()
     
-    if (!user) {
+    if (!session?.user) {
       return null
     }
 
     // Hent ekstra informasjon fra database
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user.id }
+      where: { email: session.user.email! }
     })
 
     return {
-      id: user.id,
-      firstName: user.firstName || dbUser?.firstName || '',
-      lastName: user.lastName || dbUser?.lastName || '',
-      email: user.emailAddresses[0]?.emailAddress || dbUser?.email || '',
-      role: (user.publicMetadata?.role as UserRole) || (dbUser?.role as UserRole) || 'customer',
-      avatar: user.imageUrl || dbUser?.avatar,
-      phone: user.phoneNumbers[0]?.phoneNumber || dbUser?.phone,
+      id: session.user.id,
+      firstName: session.user.firstName || dbUser?.firstName || '',
+      lastName: session.user.lastName || dbUser?.lastName || '',
+      email: session.user.email || '',
+      role: session.user.role || 'customer',
+      avatar: session.user.image || dbUser?.avatar,
+      phone: session.user.phone || dbUser?.phone,
       createdAt: dbUser?.createdAt || new Date(),
-      companyName: dbUser?.companyName || null, // For bedriftsbrukere
-      orgNumber: dbUser?.orgNumber || null, // Organisasjonsnummer
+      companyName: session.user.companyName || dbUser?.companyName || null,
+      orgNumber: session.user.orgNumber || dbUser?.orgNumber || null,
     }
   } catch (error) {
     console.error('Feil ved henting av brukerinformasjon:', error)
@@ -87,20 +75,12 @@ export async function hasRoleAccess(requiredRole: UserRole): Promise<boolean> {
   }
 }
 
-// Sett brukerrolle i Clerk metadata
+// Sett brukerrolle i database
 export async function setUserRole(userId: string, role: UserRole) {
   try {
-    const client = await clerkClient()
-    
-    await client.users.updateUserMetadata(userId, {
-      publicMetadata: {
-        role: role
-      }
-    })
-    
-    // Oppdater også i database
-    await prisma.user.updateMany({
-      where: { clerkId: userId },
+    // Oppdater rolle i database
+    await prisma.user.update({
+      where: { id: userId },
       data: { role: role }
     })
     

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
@@ -9,10 +10,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
-    const user = await currentUser()
+    const session = await getServerSession(authOptions)
     
-    if (!userId && !user) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Ikke autentisert' },
         { status: 401 }
@@ -21,7 +21,7 @@ export async function POST(
 
     // Sjekk at brukeren er admin
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: userId || user?.id }
+      where: { email: session.user.email! }
     })
 
     if (!dbUser || dbUser.role !== 'admin') {

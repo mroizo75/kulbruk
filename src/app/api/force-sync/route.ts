@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { currentUser, clerkClient } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()

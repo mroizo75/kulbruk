@@ -1,12 +1,36 @@
-import { SignIn } from '@clerk/nextjs'
+"use client"
+
+import { getProviders, signIn, getSession } from "next-auth/react"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function SignInPage() {
+  const [providers, setProviders] = useState<any>(null)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+
+  useEffect(() => {
+    const setUpProviders = async () => {
+      const providers = await getProviders()
+      setProviders(providers)
+    }
+    setUpProviders()
+  }, [])
+
+  const handleSignIn = async (providerId: string) => {
+    await signIn(providerId, { callbackUrl })
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
           <div className="flex justify-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xl">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#af4c0f] text-white font-bold text-xl">
               K
             </div>
           </div>
@@ -15,27 +39,43 @@ export default function SignInPage() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Eller{' '}
-            <a href="/sign-up" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link href="/registrer" className="font-medium text-[#af4c0f] hover:text-[#af4c0f]/80">
               opprett en ny konto
-            </a>
+            </Link>
           </p>
         </div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <SignIn
-            appearance={{
-              elements: {
-                formButtonPrimary: "bg-blue-600 hover:bg-blue-700",
-                card: "shadow-none",
-                headerTitle: "hidden",
-                headerSubtitle: "hidden"
-              }
-            }}
-            redirectUrl="/dashboard"
-          />
-        </div>
+        <Card className="bg-white shadow">
+          <CardHeader>
+            <CardTitle className="text-center">Velg innloggingsmetode</CardTitle>
+            <CardDescription className="text-center">
+              Logg inn med en av følgende tjenester
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {providers &&
+              Object.values(providers).map((provider: any) => (
+                <div key={provider.name}>
+                  <Button
+                    onClick={() => handleSignIn(provider.id)}
+                    className="w-full bg-[#af4c0f] hover:bg-[#af4c0f]/90"
+                    variant="default"
+                  >
+                    Logg inn med {provider.name}
+                  </Button>
+                </div>
+              ))}
+            
+            <div className="text-center text-sm text-gray-500 mt-4">
+              Ved å logge inn godtar du våre{' '}
+              <Link href="/vilkar-og-betingelser" className="text-[#af4c0f] hover:text-[#af4c0f]/80">
+                vilkår og betingelser
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

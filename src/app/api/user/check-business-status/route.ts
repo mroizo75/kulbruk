@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    const user = await currentUser()
+    const session = await getServerSession(authOptions)
     
     console.log('=== CHECK-BUSINESS-STATUS API ===')
-    console.log('UserId:', userId)
-    console.log('User ID:', user?.id)
-    console.log('User email:', user?.emailAddresses[0]?.emailAddress)
+    console.log('Session user:', session?.user)
     
-    if (!userId && !user) {
+    if (!session?.user) {
       console.log('❌ Ikke autentisert')
       return NextResponse.json(
         { error: 'Ikke autentisert' },
@@ -24,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // Sjekk database først
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId || '' },
+      where: { email: session.user.email! },
       select: { 
         role: true, 
         companyName: true, 
@@ -34,20 +32,10 @@ export async function GET(request: NextRequest) {
 
     console.log('Database bruker:', dbUser)
 
-    // Sjekk Clerk metadata
-    const clerkRole = user?.publicMetadata?.role
-    const businessSetupComplete = user?.publicMetadata?.businessSetupComplete
-
-    console.log('Clerk metadata:', { 
-      role: clerkRole, 
-      businessSetupComplete,
-      publicMetadata: user?.publicMetadata,
-      unsafeMetadata: user?.unsafeMetadata 
-    })
+    // Ikke lenger Clerk metadata i bruk
 
     const isBusinessSetup = (
-      (dbUser?.role === 'business' && dbUser.companyName && dbUser.orgNumber) ||
-      (clerkRole === 'business' && businessSetupComplete === true)
+      dbUser?.role === 'business' && !!dbUser.companyName && !!dbUser.orgNumber
     )
 
     console.log('Business setup status:', isBusinessSetup)
@@ -56,16 +44,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       isBusinessSetup,
-      currentRole: dbUser?.role || clerkRole || 'customer',
+      currentRole: dbUser?.role || 'customer',
       hasCompanyInfo: !!(dbUser?.companyName && dbUser?.orgNumber),
-      clerkMetadata: {
-        role: clerkRole,
-        businessSetupComplete: businessSetupComplete
-      },
+      clerkMetadata: null,
       debug: {
         dbUser,
-        clerkRole,
-        businessSetupComplete
+        sessionUser: session.user
       }
     })
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth, useUser } from '@clerk/nextjs'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,9 +13,10 @@ import { Building2, CheckCircle, ArrowRight, Loader } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function CompleteBusinessSetupPage() {
-  const { isSignedIn, isLoaded } = useAuth()
-  const { user } = useUser()
+  const { data: session, status } = useSession()
   const router = useRouter()
+  const isLoaded = status !== 'loading'
+  const isSignedIn = !!session
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingUser, setIsCheckingUser] = useState(true)
   const [formData, setFormData] = useState({
@@ -33,12 +34,12 @@ export default function CompleteBusinessSetupPage() {
   // Sjekk om brukeren allerede er satt opp som business
   useEffect(() => {
     const checkBusinessSetup = async () => {
-      if (!isLoaded || !isSignedIn || !user) {
-        console.log('Complete-business-setup: Venter på Clerk...', { isLoaded, isSignedIn, hasUser: !!user })
+      if (!isLoaded || !isSignedIn || !session?.user) {
+        console.log('Complete-business-setup: Venter på autentisering...', { isLoaded, isSignedIn, hasUser: !!session?.user })
         return
       }
 
-      console.log('Complete-business-setup: Sjekker business status for bruker:', user.id)
+      console.log('Complete-business-setup: Sjekker business status for bruker:', session.user.id)
 
       try {
         const response = await fetch('/api/user/check-business-status', {
@@ -63,7 +64,7 @@ export default function CompleteBusinessSetupPage() {
         // Pre-fill med brukerdata fra Clerk
         setFormData(prev => ({
           ...prev,
-          phone: user.phoneNumbers[0]?.phoneNumber || ''
+          phone: session.user.phone || ''
         }))
 
         console.log('Business setup ikke komplett - viser form')
@@ -75,7 +76,7 @@ export default function CompleteBusinessSetupPage() {
         // Fortsett med å vise skjema selv om API feiler
         setFormData(prev => ({
           ...prev,
-          phone: user.phoneNumbers[0]?.phoneNumber || ''
+          phone: session.user.phone || ''
         }))
       } finally {
         setIsCheckingUser(false)
@@ -83,7 +84,7 @@ export default function CompleteBusinessSetupPage() {
     }
 
     checkBusinessSetup()
-  }, [isLoaded, isSignedIn, user, router])
+  }, [isLoaded, isSignedIn, session, router])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))

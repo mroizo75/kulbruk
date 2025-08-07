@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useSession } from 'next-auth/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -65,7 +65,7 @@ interface FlightBookingModalProps {
 }
 
 export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }: FlightBookingModalProps) {
-  const { user } = useUser()
+  const { data: session } = useSession()
   const [step, setStep] = useState<'travelers' | 'contact' | 'payment' | 'confirmation'>('travelers')
   const [isLoading, setIsLoading] = useState(false)
   const [travelers, setTravelers] = useState<Traveler[]>([])

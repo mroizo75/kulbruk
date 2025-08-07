@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe, getListingPrice, PRICING } from '@/lib/stripe'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    
-    if (!userId) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
       return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
     }
 
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // Sjekk at bruker eksisterer
     const user = await prisma.user.findUnique({
-      where: { clerkId: userId }
+      where: { email: session.user.email! }
     })
 
     if (!user) {

@@ -1,32 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    const user = await currentUser()
-    
-    if (!userId && !user) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Ikke autentisert' },
         { status: 401 }
       )
     }
 
-    // Oppdater Clerk metadata for å indikere at business setup ble hoppet over
-    const clerkClient = (await import('@clerk/nextjs/server')).clerkClient
-    const client = await clerkClient()
-    
-    await client.users.updateUserMetadata(user?.id || userId || '', {
-      publicMetadata: {
-        ...user?.publicMetadata,
-        role: 'customer', // Fall back til customer role
-        businessSetupSkipped: true,
-        businessSetupComplete: false
-      }
-    })
+    // NextAuth: oppdater ikke Clerk, bare returner OK (rollen håndteres i DB)
 
-    console.log('✅ Business setup hoppet over for bruker:', user?.id || userId)
+    console.log('✅ Business setup hoppet over for bruker:', session.user.email)
 
     return NextResponse.json({
       success: true,

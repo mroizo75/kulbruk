@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { getUserRole, getUserInfo } from '@/lib/user-utils'
 
@@ -8,9 +9,8 @@ const prisma = new PrismaClient()
 // GET - Test Clerk synkronisering
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    
-    if (!userId) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
       return NextResponse.json(
         { 
           error: 'Ikke autentisert', 
@@ -21,10 +21,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Hent informasjon fra forskjellige kilder
-    const clerkUser = await (await clerkClient()).users.getUser(userId)
+    // Hent informasjon fra database
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: userId }
+      where: { email: session.user.email! }
     })
     const userRole = await getUserRole()
     const userInfo = await getUserInfo()
@@ -33,15 +32,13 @@ export async function GET(request: NextRequest) {
     let syncStatus = 'OK'
     if (!dbUser) {
       syncStatus = 'BRUKER_MANGLER_I_DB'
-      
-      // Opprett bruker i database hvis den mangler
+      // Opprett enkel bruker i database hvis den mangler
       await prisma.user.create({
         data: {
-          clerkId: userId,
-          email: clerkUser.emailAddresses[0]?.emailAddress || '',
-          firstName: clerkUser.firstName || '',
-          lastName: clerkUser.lastName || '',
-          role: (clerkUser.publicMetadata?.role as string) || 'customer',
+          email: session.user.email!,
+          firstName: userInfo?.firstName || null,
+          lastName: userInfo?.lastName || null,
+          role: userRole || 'customer',
           createdAt: new Date(),
           updatedAt: new Date()
         }
@@ -51,14 +48,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       syncStatus,
-      clerk: {
-        id: clerkUser.id,
-        email: clerkUser.emailAddresses[0]?.emailAddress,
-        firstName: clerkUser.firstName,
-        lastName: clerkUser.lastName,
-        role: clerkUser.publicMetadata?.role,
-        createdAt: clerkUser.createdAt
-      },
+      sessionUser: session.user,
       database: dbUser ? {
         id: dbUser.id,
         clerkId: dbUser.clerkId,

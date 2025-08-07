@@ -1,28 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { currentUser } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const clerkUser = await currentUser()
-    
-    if (!clerkUser) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
       return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
     }
 
     // Simuler en user.created webhook for den innloggede brukeren
     const mockWebhookPayload = {
       data: {
-        id: clerkUser.id,
+        id: session.user.id,
         object: "user",
         email_addresses: [
           {
-            email_address: clerkUser.emailAddresses[0]?.emailAddress || 'test@kulbruk.no',
+            email_address: session.user.email || 'test@kulbruk.no',
             id: "idn_test",
             object: "email_address"
           }
         ],
-        first_name: clerkUser.firstName || 'Test',
-        last_name: clerkUser.lastName || 'Bruker',
+        first_name: session.user.firstName || 'Test',
+        last_name: session.user.lastName || 'Bruker',
         public_metadata: {
           role: 'customer'
         },

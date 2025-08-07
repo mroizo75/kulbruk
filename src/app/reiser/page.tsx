@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useSession } from 'next-auth/react'
 import FlightSearchForm from '@/components/flight-search-form'
 import FlightFilters, { FlightFilters as FlightFiltersType } from '@/components/flight-filters'
 import { FlightBookingModal } from '@/components/flight-booking-modal'
@@ -60,7 +60,7 @@ const popularRoutes = [
 ]
 
 export default function ReiserPage() {
-  const { user, isLoaded } = useUser()
+  const { data: session } = useSession()
   const [searchResults, setSearchResults] = useState<FlightOffer[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)

@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -96,7 +96,7 @@ async function getListing(id: string) {
 }
 
 export default async function ListingDetailPage({ params }: PageProps) {
-  const user = await currentUser()
+  const session = await auth()
   const { id } = await params
   const listing = await getListing(id)
   
@@ -300,7 +300,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
                       <User className="h-5 w-5 text-gray-400" />
                     </div>
                     <div>
-                      <p className="font-medium">{listing.user.firstName} {listing.user.lastName}</p>
+                      <p className="font-medium">{listing.user.firstName || listing.user.name} {listing.user.lastName || ''}</p>
                       <p className="text-sm text-gray-600">{listing.location}</p>
                     </div>
                   </div>

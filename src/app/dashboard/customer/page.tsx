@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { PlusCircle, Package, Heart, Settings, TrendingUp, Eye, Clock, Plus, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -7,10 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { prisma } from '@/lib/prisma'
 
+
+
 export default async function CustomerDashboard() {
-  const clerkUser = await currentUser()
+  const session = await auth()
   
-  if (!clerkUser) {
+  if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/customer')
   }
   
@@ -19,12 +21,12 @@ export default async function CustomerDashboard() {
   
   try {
     dbUser = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id }
+      where: { id: session.user?.id }
     })
     
     if (!dbUser) {
       // Dette bør ikke skje hvis webhook fungerer
-      console.error('🚨 KRITISK: Bruker ikke funnet i database:', clerkUser.id)
+      console.error('🚨 KRITISK: Bruker ikke funnet i database:', session.user?.id)
       redirect('/dashboard/setup-error')
     }
   } catch (error) {
@@ -34,9 +36,9 @@ export default async function CustomerDashboard() {
   
   // Bruker-info fra database
   const user = {
-    id: dbUser.clerkId,
-    firstName: dbUser.firstName || clerkUser.firstName || 'Bruker',
-    email: dbUser.email || clerkUser.emailAddresses[0]?.emailAddress || 'bruker@kulbruk.no',
+    id: dbUser.id,
+    firstName: dbUser.firstName || session.user?.name || 'Bruker',
+    email: dbUser.email || session.user?.email || 'bruker@kulbruk.no',
     role: dbUser.role
   }
 

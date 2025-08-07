@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+// import { auth } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { notifyNewListing } from '@/lib/notification-manager'
 

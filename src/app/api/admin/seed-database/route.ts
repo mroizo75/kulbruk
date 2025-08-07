@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { seedDatabase } from '@/lib/seed-database'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
+    const session = await getServerSession(authOptions)
     
-    if (!userId) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     // Sjekk at brukeren er admin
     const user = await prisma.user.findUnique({
-      where: { clerkId: userId }
+      where: { email: session.user.email! }
     })
 
     if (!user || user.role !== 'admin') {

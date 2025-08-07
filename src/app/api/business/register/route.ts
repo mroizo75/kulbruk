@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { notifyNewUser } from '@/lib/notification-manager'
 
@@ -7,10 +7,8 @@ const prisma = new PrismaClient()
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    const user = await currentUser()
-    
-    if (!userId && !user) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Ikke autentisert' },
         { status: 401 }
@@ -53,13 +51,13 @@ export async function POST(request: NextRequest) {
 
     // Sjekk om brukeren allerede eksisterer
     let dbUser = await prisma.user.findUnique({
-      where: { clerkId: user?.id || userId || '' }
+      where: { email: data.email }
     })
 
     if (dbUser) {
       // Oppdater eksisterende bruker med bedriftsinformasjon
       dbUser = await prisma.user.update({
-        where: { clerkId: user?.id || userId || '' },
+        where: { email: data.email },
         data: {
           role: 'business',
           companyName: data.companyName,
@@ -77,7 +75,6 @@ export async function POST(request: NextRequest) {
       // Opprett ny bruker
       dbUser = await prisma.user.create({
         data: {
-          clerkId: user?.id || userId || '',
           email: data.email,
           firstName: data.contactPerson.split(' ')[0] || data.contactPerson,
           lastName: data.contactPerson.split(' ').slice(1).join(' ') || '',
@@ -91,18 +88,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Oppdater Clerk metadata
-    const clerkClient = (await import('@clerk/nextjs/server')).clerkClient
-    const client = await clerkClient()
-    
-    await client.users.updateUserMetadata(user?.id || userId || '', {
-      publicMetadata: {
-        role: 'business',
-        companyName: data.companyName,
-        orgNumber: cleanOrgNumber,
-        businessType: data.businessType
-      }
-    })
+    // Clerk fjernet
 
     // Send notifikasjon til admin om ny bedriftsregistrering
     notifyNewUser({

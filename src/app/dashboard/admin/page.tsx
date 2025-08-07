@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { Users, FileCheck, AlertTriangle, TrendingUp, Package, Shield, CheckCircle, XCircle, Clock } from 'lucide-react'
 import Link from 'next/link'
@@ -11,9 +11,8 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 export default async function AdminDashboard() {
-  const clerkUser = await currentUser()
-  
-  if (!clerkUser) {
+  const session = await auth()
+  if (!session?.user) {
     redirect('/sign-in?redirectUrl=/dashboard/admin')
   }
   

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { notificationManager } from '@/lib/notification-manager'
 
@@ -7,16 +8,15 @@ const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    const user = await currentUser()
+    const session = await getServerSession(authOptions)
     
-    if (!userId && !user) {
+    if (!session?.user) {
       return new Response('Ikke autentisert', { status: 401 })
     }
 
     // Sjekk at brukeren er admin eller moderator
     const currentUserDb = await prisma.user.findUnique({
-      where: { clerkId: userId || user?.id }
+      where: { email: session.user.email! }
     })
 
     if (!currentUserDb || (currentUserDb.role !== 'admin' && currentUserDb.role !== 'moderator')) {

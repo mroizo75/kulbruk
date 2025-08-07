@@ -1,4 +1,4 @@
-import { currentUser } from '@clerk/nextjs/server'
+import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { PrismaClient } from '@prisma/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,15 +23,14 @@ import Link from 'next/link'
 const prisma = new PrismaClient()
 
 export default async function BusinessDashboard() {
-  const user = await currentUser()
-  
-  if (!user) {
+  const session = await auth()
+  if (!session?.user) {
     redirect('/sign-in?redirectUrl=/dashboard/business')
   }
 
   // Sjekk at brukeren er business
   const dbUser = await prisma.user.findUnique({
-    where: { clerkId: user.id },
+    where: { email: session.user.email! },
     include: {
       subscription: true
     }

@@ -4,11 +4,12 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Search, Plus, User, Menu, X } from 'lucide-react'
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
+import { useSession, signOut } from 'next-auth/react'
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const { data: session, status } = useSession()
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -118,53 +119,68 @@ export default function Navbar() {
             </Link>
 
             {/* Auth section */}
-            <SignedIn>
-              {/* Dashboard link - hidden on mobile */}
-              <Link 
-                href="/dashboard"
-                className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 transition-colors px-2 py-1"
-              >
-                <User className="h-4 w-4 mr-1" />
-                <span className="hidden lg:block">Dashboard</span>
-              </Link>
-              
-              <UserButton 
-                appearance={{
-                  elements: {
-                    avatarBox: "h-8 w-8"
-                  }
-                }}
-                userProfileMode="navigation"
-                userProfileUrl="/dashboard"
-              />
-            </SignedIn>
+            {session ? (
+              <>
+                {/* Dashboard link - hidden on mobile */}
+                <Link 
+                  href="/dashboard"
+                  className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 transition-colors px-2 py-1"
+                >
+                  <User className="h-4 w-4 mr-1" />
+                  <span className="hidden lg:block">Dashboard</span>
+                </Link>
+                
+                {/* User menu button */}
+                <div className="relative">
+                  <button
+                    onClick={() => signOut()}
+                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors px-2 py-1"
+                  >
+                    {session.user?.image ? (
+                      <Image
+                        src={session.user.image}
+                        alt={session.user.name || 'Bruker'}
+                        width={32}
+                        height={32}
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                        <User className="h-4 w-4" />
+                      </div>
+                    )}
+                    <span className="hidden lg:block">Logg ut</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Desktop auth buttons */}
+                <div className="hidden md:flex items-center space-x-2">
+                  <Link
+                    href="/sign-in"
+                    className="text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 text-sm lg:text-base"
+                  >
+                    Logg inn
+                  </Link>
+                  <Link
+                    href="/registrer"
+                    className="bg-gray-900 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm lg:text-base"
+                  >
+                    Registrer
+                  </Link>
+                </div>
 
-            <SignedOut>
-              {/* Desktop auth buttons */}
-              <div className="hidden md:flex items-center space-x-2">
+                {/* Mobile auth button */}
                 <Link
                   href="/sign-in"
-                  className="text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 text-sm lg:text-base"
+                  className="md:hidden text-gray-600 hover:text-gray-900 transition-colors p-2"
+                  aria-label="Logg inn"
                 >
-                  Logg inn
+                  <User className="h-5 w-5" />
                 </Link>
-                <Link
-                  href="/registrer"
-                  className="bg-gray-900 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm lg:text-base"
-                >
-                  Registrer
-                </Link>
-              </div>
-
-              {/* Mobile auth button */}
-              <Link
-                href="/sign-in"
-                className="md:hidden text-gray-600 hover:text-gray-900 transition-colors p-2"
-                aria-label="Logg inn"
-              >
-                <User className="h-5 w-5" />
-              </Link>
-            </SignedOut>
+              </>
+            )}
 
             {/* Mobile menu button */}
             <button
@@ -233,7 +249,7 @@ export default function Navbar() {
                 Torget
               </Link>
               
-              <SignedIn>
+              {session ? (
                 <div className="border-t border-gray-200 pt-2 mt-2">
                   <Link
                     href="/dashboard"
@@ -242,10 +258,17 @@ export default function Navbar() {
                   >
                     📊 Dashboard
                   </Link>
+                  <button
+                    onClick={() => {
+                      signOut()
+                      setIsMobileMenuOpen(false)
+                    }}
+                    className="block w-full text-left px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                  >
+                    Logg ut
+                  </button>
                 </div>
-              </SignedIn>
-              
-              <SignedOut>
+              ) : (
                 <div className="border-t border-gray-200 pt-2 mt-2">
                   <Link
                     href="/sign-in"
@@ -262,7 +285,7 @@ export default function Navbar() {
                     Registrer deg
                   </Link>
                 </div>
-              </SignedOut>
+              )}
             </div>
           </div>
         )}

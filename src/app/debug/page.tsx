@@ -1,14 +1,16 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useUser } from '@clerk/nextjs'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { CheckCircle, XCircle, RefreshCw, User, Database, Settings } from 'lucide-react'
 
 export default function DebugPage() {
-  const { user, isLoaded, isSignedIn } = useUser()
+  const { data: session, status } = useSession()
+  const isLoaded = status !== 'loading'
+  const isSignedIn = !!session
   const [authDebug, setAuthDebug] = useState<any>(null)
   const [syncTest, setSyncTest] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -118,14 +120,14 @@ export default function DebugPage() {
                 </span>
               </div>
 
-              {isSignedIn && user && (
+              {isSignedIn && session?.user && (
                 <div className="bg-green-50 p-4 rounded-lg">
                   <h4 className="font-semibold text-green-800 mb-2">Brukerinformasjon:</h4>
                   <div className="text-sm space-y-1">
-                    <p><strong>ID:</strong> {user.id}</p>
-                    <p><strong>E-post:</strong> {user.emailAddresses[0]?.emailAddress}</p>
-                    <p><strong>Navn:</strong> {user.firstName} {user.lastName}</p>
-                    <p><strong>Rolle:</strong> {user.publicMetadata?.role as string || 'Ikke satt'}</p>
+                    <p><strong>ID:</strong> {session?.user.id}</p>
+                    <p><strong>E-post:</strong> {session?.user.email}</p>
+                    <p><strong>Navn:</strong> {session?.user.firstName} {session?.user.lastName}</p>
+                    <p><strong>Rolle:</strong> {session?.user.role || 'Ikke satt'}</p>
                   </div>
                 </div>
               )}

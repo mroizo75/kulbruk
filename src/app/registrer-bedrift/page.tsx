@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth, useUser } from '@clerk/nextjs'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,16 +14,16 @@ import { Building2, FileText, Phone, Mail, Globe, MapPin, CreditCard, Shield } f
 import { toast } from 'sonner'
 
 export default function RegisterBusinessPage() {
-  const { isSignedIn } = useAuth()
-  const { user } = useUser()
+  const { data: session } = useSession()
+  const isSignedIn = !!session
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     companyName: '',
     orgNumber: '',
-    contactPerson: user?.firstName + ' ' + user?.lastName || '',
+    contactPerson: (session?.user.firstName || '') + ' ' + (session?.user.lastName || ''),
     phone: '',
-    email: user?.emailAddresses[0]?.emailAddress || '',
+    email: session?.user.email || '',
     address: '',
     postalCode: '',
     city: '',

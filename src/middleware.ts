@@ -1,25 +1,32 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { auth } from "@/lib/auth-edge"
 import { NextRequest, NextResponse } from 'next/server'
 import { getCategoryRedirect } from './lib/category-mapper'
 
 // Ruter som krever autentisering
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard/(.*)',
+const protectedRoutes = [
+  '/dashboard',
   '/opprett',
   '/complete-business-setup'
-])
+]
 
-export default clerkMiddleware((auth, req) => {
+export default auth((req) => {
   // Håndter kategori-redirects først
   const categoryRedirect = handleCategoryRedirects(req)
   if (categoryRedirect) {
     return categoryRedirect
   }
 
-  // Håndter autentisering for beskyttede ruter
-  if (isProtectedRoute(req)) {
-    auth().protect()
+  // Beskytt ruter manuelt: hvis match på protectedRoutes og ikke session -> redirect
+  const isProtected = protectedRoutes.some((route) => req.nextUrl.pathname.startsWith(route))
+  // @ts-expect-error: auth wrapper legger session på request
+  const session = req.auth
+  if (isProtected && !session?.user) {
+    const url = new URL('/sign-in', req.nextUrl)
+    url.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search)
+    return NextResponse.redirect(url)
   }
+
+  return NextResponse.next()
 })
 
 function handleCategoryRedirects(req: NextRequest): NextResponse | null {
