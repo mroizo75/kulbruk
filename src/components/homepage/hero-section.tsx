@@ -98,32 +98,32 @@ export default function HeroSection() {
     <div className="bg-white">
       {/* Hero Section med søk og kategorier */}
       <section className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 sm:mb-4 leading-tight">
               Finn det du leter etter på 
               <span className="text-[#af4c0f]"> Kulbruk.no</span>
             </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto px-4">
               Norges markedsplass for trygg kjøp og salg
             </p>
           </div>
 
           {/* Søkeboks */}
-          <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-8">
+          <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-6 sm:mb-8 px-4">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
               <Input
                 type="text"
                 placeholder="Søk etter biler, leiligheter, møbler..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-14 text-lg bg-white border-2 border-gray-200 focus:border-[#af4c0f] focus:ring-[#af4c0f] text-gray-900 placeholder:text-gray-500 rounded-lg"
+                className="pl-10 sm:pl-12 h-12 sm:h-14 text-base sm:text-lg bg-white border-2 border-gray-200 focus:border-[#af4c0f] focus:ring-[#af4c0f] text-gray-900 placeholder:text-gray-500 rounded-lg"
               />
               <Button 
                 type="submit"
-                className="absolute right-2 top-2 h-10 px-6 bg-[#af4c0f] hover:bg-[#af4c0f]/90 text-white rounded-md"
+                className="absolute right-2 top-2 h-8 sm:h-10 px-3 sm:px-6 bg-[#af4c0f] hover:bg-[#af4c0f]/90 text-white rounded-md text-sm sm:text-base"
               >
                 Søk
               </Button>
@@ -131,9 +131,9 @@ export default function HeroSection() {
           </form>
 
           {/* Populære søk */}
-          <div className="text-center mb-8">
-            <p className="text-sm text-gray-500 mb-2">Populære søk:</p>
-            <div className="flex flex-wrap justify-center gap-2">
+          <div className="text-center mb-6 sm:mb-8 px-4">
+            <p className="text-xs sm:text-sm text-gray-500 mb-2">Populære søk:</p>
+            <div className="flex flex-wrap justify-center gap-1 sm:gap-2">
               {liveStats.popularSearches.map((search, index) => (
                 <button
                   key={index}
@@ -141,7 +141,7 @@ export default function HeroSection() {
                     setSearchQuery(search)
                     window.location.href = `/annonser?search=${encodeURIComponent(search)}`
                   }}
-                  className="text-sm text-[#af4c0f] hover:text-[#af4c0f]/80 border border-[#af4c0f]/20 hover:border-[#af4c0f]/40 px-3 py-1 rounded-full transition-colors"
+                  className="text-xs sm:text-sm text-[#af4c0f] hover:text-[#af4c0f]/80 border border-[#af4c0f]/20 hover:border-[#af4c0f]/40 px-2 sm:px-3 py-1 rounded-full transition-colors"
                 >
                   {search}
                 </button>
@@ -150,10 +150,10 @@ export default function HeroSection() {
           </div>
 
           {/* Legg ut annonse knapp */}
-          <div className="text-center">
-            <Button asChild size="lg" className="bg-[#af4c0f] hover:bg-[#af4c0f]/90 text-white">
+          <div className="text-center px-4">
+            <Button asChild size="lg" className="bg-[#af4c0f] hover:bg-[#af4c0f]/90 text-white w-full sm:w-auto">
               <Link href="/opprett">
-                <Plus className="h-5 w-5 mr-2" />
+                <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 Legg ut annonse
               </Link>
             </Button>
@@ -162,11 +162,11 @@ export default function HeroSection() {
       </section>
 
       {/* Kategori-oversikt */}
-      <section className="py-8 bg-gray-50">
+      <section className="py-6 sm:py-8 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Kategorier</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Kategorier</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {mainCategories.map((category) => {
               const IconComponent = category.icon
               return (
@@ -210,21 +210,21 @@ export default function HeroSection() {
       </section>
 
       {/* Anbefalte annonser */}
-      <section className="py-8 bg-white">
+      <section className="py-6 sm:py-8 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Anbefalte annonser</h2>
-              <p className="text-sm text-gray-600 mt-1">Basert på dine tidligere søk og interesse</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Anbefalte annonser</h2>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">Basert på dine tidligere søk og interesse</p>
             </div>
-            <Button asChild variant="outline" className="border-[#af4c0f] text-[#af4c0f] hover:bg-[#af4c0f]/5">
+            <Button asChild variant="outline" className="border-[#af4c0f] text-[#af4c0f] hover:bg-[#af4c0f]/5 w-full sm:w-auto">
               <Link href="/annonser">
                 Se alle annonser
               </Link>
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {recommendedListings.map((listing) => (
               <Link key={listing.id} href={`/annonser/detaljer/${listing.id}`}>
                 <Card className="hover:shadow-md transition-all duration-200 cursor-pointer group overflow-hidden">
@@ -269,9 +269,9 @@ export default function HeroSection() {
       </section>
 
       {/* Statistikk */}
-      <section className="py-8 bg-[#af4c0f]/5">
+      <section className="py-6 sm:py-8 bg-[#af4c0f]/5">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
             <div>
               <div className="flex items-center justify-center mb-2">
                 <div className="w-8 h-8 bg-[#af4c0f] rounded-full flex items-center justify-center">

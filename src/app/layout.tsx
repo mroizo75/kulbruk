@@ -20,6 +20,7 @@ export const metadata: Metadata = {
   title: 'Kulbruk.no - Norges nye markedsplass',
   description: 'Kulbruk.no er et brukervennlig og profesjonelt markedsplass-alternativ hvor privatpersoner og bedrifter kan legge ut annonser til en rimelig pris.',
   keywords: ['markedsplass', 'salg', 'brukt', 'annonser', 'norge', 'bil', 'møbler', 'elektronikk'],
+  viewport: 'width=device-width, initial-scale=1',
   openGraph: {
     title: 'Kulbruk.no - Norges nye markedsplass',
     description: 'Et brukervennlig og profesjonelt markedsplass-alternativ hvor privatpersoner og bedrifter kan legge ut annonser til en rimelig pris.',
