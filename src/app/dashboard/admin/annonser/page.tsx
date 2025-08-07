@@ -170,7 +170,7 @@ export default async function AdminListingsPage() {
 
                         {/* Handlinger */}
                         <div className="flex flex-col gap-2 ml-4">
-                          <Link href={`/annonser/${listing.id}`}>
+                          <Link href={`/annonser/detaljer/${listing.id}`}>
                             <Button variant="outline" size="sm" className="w-full">
                               <Eye className="h-4 w-4 mr-2" />
                               Se annonse

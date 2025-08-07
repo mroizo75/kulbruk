@@ -149,7 +149,7 @@ export default function ListingCard({
 
   // Hvis annonsen er godkjent, wrap i Link
   return (
-    <Link href={`/annonser/${id}`} className="block">
+    <Link href={`/annonser/detaljer/${id}`} className="block">
       {cardContent}
     </Link>
   )

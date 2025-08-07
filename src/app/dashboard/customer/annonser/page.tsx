@@ -181,7 +181,7 @@ export default async function MyListingsPage() {
                         <div className="flex gap-2">
                           {listing.status === 'APPROVED' && (
                             <Button size="sm" variant="outline" asChild>
-                              <Link href={`/annonser/${listing.id}`}>
+                              <Link href={`/annonser/detaljer/${listing.id}`}>
                                 <Eye className="mr-1 h-4 w-4" />
                                 Se annonse
                               </Link>

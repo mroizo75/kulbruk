@@ -285,7 +285,7 @@ export default async function AdminModerationPage() {
                         Venter
                       </Badge>
                       <Button size="sm" variant="outline" asChild>
-                        <Link href={`/annonser/${listing.id}`} target="_blank">
+                        <Link href={`/annonser/detaljer/${listing.id}`} target="_blank">
                           <Eye className="h-4 w-4 mr-1" />
                           Se
                         </Link>

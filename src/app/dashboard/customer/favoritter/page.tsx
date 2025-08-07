@@ -164,7 +164,7 @@ export default async function FavoritesPage() {
                     <div className="flex gap-2">
                       {favorite.isActive ? (
                         <Button size="sm" asChild className="flex-1">
-                          <Link href={`/annonser/${favorite.id}`}>
+                          <Link href={`/annonser/detaljer/${favorite.id}`}>
                             Se annonse
                           </Link>
                         </Button>

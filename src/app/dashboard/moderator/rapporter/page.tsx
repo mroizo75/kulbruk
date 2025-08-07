@@ -193,7 +193,7 @@ export default async function ModeratorReportsPage() {
                         variant="outline"
                         asChild
                       >
-                        <a href={`/annonser/${report.listingId}`} target="_blank">
+                        <a href={`/annonser/detaljer/${report.listingId}`} target="_blank">
                           <Eye className="h-4 w-4 mr-2" />
                           Se annonse
                         </a>

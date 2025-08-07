@@ -248,7 +248,7 @@ export default async function ModeratorListingsPage() {
                         variant="outline"
                         asChild
                       >
-                        <a href={`/annonser/${listing.id}`} target="_blank">
+                        <a href={`/annonser/detaljer/${listing.id}`} target="_blank">
                           <Eye className="h-4 w-4 mr-2" />
                           Forhåndsvis
                         </a>
