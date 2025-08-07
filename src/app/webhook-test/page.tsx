@@ -52,6 +52,28 @@ export default function WebhookTestPage() {
     }
   }
 
+  const testWebhook = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const response = await fetch('/api/test-webhook', { method: 'POST' })
+      if (!response.ok) {
+        throw new Error(`Webhook test feil: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      console.log('Webhook test resultat:', result)
+      
+      // Oppdater data etter test
+      await fetchDebugData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Webhook test feilet')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchDebugData()
   }, [])
@@ -63,7 +85,7 @@ export default function WebhookTestPage() {
         <p className="text-gray-600">Test om Clerk webhook synkroniserer brukere korrekt</p>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex gap-4">
         <Button 
           onClick={fetchDebugData} 
           disabled={loading}
@@ -71,6 +93,16 @@ export default function WebhookTestPage() {
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? 'Henter data...' : 'Oppdater data'}
+        </Button>
+        
+        <Button 
+          onClick={testWebhook} 
+          disabled={loading}
+          variant="outline"
+          className="flex items-center gap-2 border-green-200 text-green-600 hover:bg-green-50"
+        >
+          <Webhook className="h-4 w-4" />
+          Test webhook
         </Button>
       </div>
 
