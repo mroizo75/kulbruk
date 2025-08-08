@@ -8,6 +8,8 @@ import Credentials from "next-auth/providers/credentials"
 
 // Felles NextAuth v5-konfig
 export const authConfig: NextAuthConfig = {
+  // Tillat lokale/dev-hosts uten å feile på UntrustedHost
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   providers: [
     Credentials({
@@ -88,13 +90,14 @@ export const authConfig: NextAuthConfig = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.sub!
-        session.user.role = token.role as UserRole
-        session.user.firstName = token.firstName as string | null | undefined
-        session.user.lastName = token.lastName as string | null | undefined
-        session.user.phone = token.phone as string | null | undefined
-        session.user.companyName = token.companyName as string | null | undefined
-        session.user.orgNumber = token.orgNumber as string | null | undefined
+        // Utvid NextAuth sin SessionUser type via type cast, vi vet hvilke felter vi legger på
+        ;(session.user as any).id = token.sub!
+        ;(session.user as any).role = token.role as UserRole
+        ;(session.user as any).firstName = token.firstName as string | null | undefined
+        ;(session.user as any).lastName = token.lastName as string | null | undefined
+        ;(session.user as any).phone = token.phone as string | null | undefined
+        ;(session.user as any).companyName = token.companyName as string | null | undefined
+        ;(session.user as any).orgNumber = token.orgNumber as string | null | undefined
       }
       return session
     },
@@ -132,16 +135,16 @@ export async function getCurrentUser() {
   }
 
   return {
-    id: session.user.id,
+    id: (session.user as any).id,
     email: session.user.email,
-    firstName: session.user.firstName || '',
-    lastName: session.user.lastName || '',
-    role: session.user.role,
+    firstName: (session.user as any).firstName || '',
+    lastName: (session.user as any).lastName || '',
+    role: (session.user as any).role,
     name: session.user.name,
-    image: session.user.image,
-    phone: session.user.phone,
-    companyName: session.user.companyName,
-    orgNumber: session.user.orgNumber,
+    image: (session.user as any).image,
+    phone: (session.user as any).phone,
+    companyName: (session.user as any).companyName,
+    orgNumber: (session.user as any).orgNumber,
   }
 }
 
