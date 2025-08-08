@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { amadeusClient } from '@/lib/amadeus-client'
 
 // Realistisk mock-data for konkurransedyktige priser
@@ -153,9 +151,8 @@ function generateOldMockFlightOffers(origin: string, destination: string, depart
 // POST /api/flights/search - Søk etter flybilletter
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    
     // Autentisering er ikke påkrevd for søk, men kan være nyttig for personalisering
+    // (fjernet avhengighet til auth() for å unngå runtime-feil)
     
     const body = await request.json()
     const { 
