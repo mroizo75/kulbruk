@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-// import { auth } from '@/lib/auth'
-import { PrismaClient } from '@prisma/client'
+import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { notifyNewListing } from '@/lib/notification-manager'
 
-const prisma = new PrismaClient()
+// Bruk delt Prisma-klient
 
 // GET - Hent annonser med filtrering og paginering
 export async function GET(request: NextRequest) {
@@ -111,64 +111,31 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     console.log('Authorization header:', !!authHeader)
     
-    // Prøv både auth() og currentUser() for debugging
-    const { userId } = await auth()
-    const user = await currentUser()
-    
-    console.log('Auth debug:', { 
-      userId, 
-      userExists: !!user, 
-      userEmail: user?.emailAddresses?.[0]?.emailAddress,
-      hasAuthHeader: !!authHeader 
-    })
-    
-    if (!userId && !user) {
+    // Auth.js v5
+    const session = await auth()
+    if (!session?.user?.email) {
       return NextResponse.json(
-        { error: 'Ikke autentisert - ingen bruker funnet. Prøv å logge ut og inn igjen.' },
+        { error: 'Ikke autentisert' },
         { status: 401 }
       )
     }
-    
-    const finalUserId = userId || user?.id
-    if (!finalUserId) {
-      return NextResponse.json(
-        { error: 'Kunne ikke bestemme bruker ID' },
-        { status: 401 }
-      )
-    }
-    
-    // Sjekk om brukeren eksisterer i databasen (bruker clerkId)
+
+    // Finn eller opprett bruker i databasen basert på e‑post
     let dbUser = await prisma.user.findUnique({
-      where: { clerkId: finalUserId }
+      where: { email: session.user.email },
     })
-    
+
     if (!dbUser) {
-      console.log('Bruker ikke funnet i database, oppretter:', { clerkId: finalUserId, email: user?.emailAddresses?.[0]?.emailAddress })
-      
-      // Opprett brukeren i databasen hvis den ikke eksisterer
-      try {
-        // Importer admin-setup logikk
-        const { determineUserRole } = await import('@/lib/admin-setup')
-        const userEmail = user?.emailAddresses?.[0]?.emailAddress || ''
-        const userRole = await determineUserRole(userEmail)
-        
-        dbUser = await prisma.user.create({
-          data: {
-            clerkId: finalUserId, // Riktig felt for Clerk ID
-            email: userEmail,
-            firstName: user?.firstName || '',
-            lastName: user?.lastName || '',
-            role: userRole // Automatisk rolle-tildeling
-          }
-        })
-        console.log('Bruker opprettet i database med ID:', dbUser.id)
-      } catch (createError) {
-        console.error('Feil ved opprettelse av bruker:', createError)
-        return NextResponse.json(
-          { error: 'Kunne ikke opprette bruker i database' },
-          { status: 500 }
-        )
-      }
+      // Sett standardverdier ved første opprettelse
+      dbUser = await prisma.user.create({
+        data: {
+          email: session.user.email,
+          name: session.user.name ?? null,
+          firstName: (session.user as any).firstName ?? null,
+          lastName: (session.user as any).lastName ?? null,
+          role: (session.user as any).role ?? 'customer',
+        },
+      })
     }
     
     // Bruk database user ID for listing
@@ -192,7 +159,7 @@ export async function POST(request: NextRequest) {
       data: {
         title: data.title,
         description: data.description,
-        price: parseFloat(data.price),
+        price: typeof data.price === 'number' ? data.price : parseFloat(String(data.price)),
         location: data.location,
         categoryId: data.categoryId,
         userId: dbUserId, // Bruker database user ID, ikke Clerk ID

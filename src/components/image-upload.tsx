@@ -14,7 +14,7 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react'
-import Image from 'next/image'
+import NextImage from 'next/image'
 import { toast } from 'sonner'
 
 interface UploadedImage {
@@ -75,7 +75,7 @@ export default function ImageUpload({
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')!
-      const img = new Image()
+      const img = new window.Image()
       
       img.onload = () => {
         // Beregn nye dimensjoner (maks 1920x1080)
@@ -316,10 +316,11 @@ export default function ImageUpload({
               <Card key={image.id} className="relative group">
                 <CardContent className="p-2">
                   <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-100">
-                    <Image
+                    <NextImage
                       src={image.url}
                       alt={image.name}
                       fill
+                      unoptimized
                       className="object-cover"
                     />
                     

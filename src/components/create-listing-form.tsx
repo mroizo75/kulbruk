@@ -19,7 +19,7 @@ import VehicleInfoForm from './vehicle-info-form'
 import PriceEstimation from './price-estimation'
 import ImageUpload from '@/components/image-upload'
 import PaymentForm from '@/components/payment-form'
-import { getListingPrice } from '@/lib/stripe'
+import { getListingPrice } from '@/lib/stripe-shared'
 
 // Validering schema
 const listingSchema = z.object({
@@ -143,7 +143,7 @@ export default function CreateListingForm() {
     
     try {
       // Sjekk at bruker er logget inn
-      if (!user) {
+      if (!session?.user) {
         toast.error('Du må være logget inn for å legge ut en annonse')
         router.push('/sign-in')
         return

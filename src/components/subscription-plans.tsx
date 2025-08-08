@@ -16,7 +16,7 @@ import {
   ArrowRight,
   Crown
 } from 'lucide-react'
-import { PRICING, formatPrice } from '@/lib/stripe'
+import { PRICING, formatPrice } from '@/lib/stripe-shared'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 

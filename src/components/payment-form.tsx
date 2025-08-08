@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, CreditCard, CheckCircle, AlertCircle } from 'lucide-react'
-import { formatPrice } from '@/lib/stripe'
+import { formatPrice } from '@/lib/stripe-shared'
 
 // Initialiser Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
