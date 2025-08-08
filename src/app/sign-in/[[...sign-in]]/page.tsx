@@ -1,11 +1,12 @@
 "use client"
 
-import { getProviders, signIn, getSession } from "next-auth/react"
+import { getProviders, signIn } from "next-auth/react"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
 export default function SignInPage() {
   const [providers, setProviders] = useState<any>(null)
@@ -49,25 +50,48 @@ export default function SignInPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <Card className="bg-white shadow">
           <CardHeader>
-            <CardTitle className="text-center">Velg innloggingsmetode</CardTitle>
+            <CardTitle className="text-center">Logg inn</CardTitle>
             <CardDescription className="text-center">
-              Logg inn med en av følgende tjenester
+              Med e‑post og passord eller en tredjepartsleverandør
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* E‑post / passord */}
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const form = e.currentTarget as HTMLFormElement
+                const formData = new FormData(form)
+                const email = String(formData.get('email') || '')
+                const password = String(formData.get('password') || '')
+                if (!email || !password) return
+                await signIn('credentials', { email, password, callbackUrl })
+              }}
+              className="space-y-3"
+            >
+              <Input type="email" name="email" placeholder="E‑post" required />
+              <Input type="password" name="password" placeholder="Passord" required />
+              <Button type="submit" className="w-full bg-[#af4c0f] hover:bg-[#af4c0f]/90">
+                Logg inn
+              </Button>
+            </form>
+
+            {/* OAuth-leverandører */}
             {providers &&
-              Object.values(providers).map((provider: any) => (
-                <div key={provider.name}>
-                  <Button
-                    onClick={() => handleSignIn(provider.id)}
-                    className="w-full bg-[#af4c0f] hover:bg-[#af4c0f]/90"
-                    variant="default"
-                  >
-                    Logg inn med {provider.name}
-                  </Button>
-                </div>
-              ))}
-            
+              Object.values(providers)
+                .filter((provider: any) => provider.id !== 'credentials')
+                .map((provider: any) => (
+                  <div key={provider.name}>
+                    <Button
+                      onClick={() => handleSignIn(provider.id)}
+                      className="w-full bg-[#af4c0f] hover:bg-[#af4c0f]/90"
+                      variant="default"
+                    >
+                      Logg inn med {provider.name}
+                    </Button>
+                  </div>
+                ))}
+
             <div className="text-center text-sm text-gray-500 mt-4">
               Ved å logge inn godtar du våre{' '}
               <Link href="/vilkar-og-betingelser" className="text-[#af4c0f] hover:text-[#af4c0f]/80">
