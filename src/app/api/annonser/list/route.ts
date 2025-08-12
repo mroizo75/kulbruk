@@ -280,7 +280,9 @@ export async function GET(request: NextRequest) {
       location: listing.location,
       category: listing.category?.name || 'Ukjent',
       status: listing.status,
-      mainImage: listing.images?.[0]?.url || `/api/placeholder/400/300?text=${encodeURIComponent(listing.title)}`,
+      // Hvis ingen bilde i DB, ikke bruk uimplementert /api/placeholder. La UI håndtere fallback.
+      mainImage: listing.images?.[0]?.url || '',
+      images: (listing.images || []).map(img => ({ url: img.url, altText: img.altText || undefined })),
       views: listing.views,
       createdAt: listing.createdAt,
       isFeatured: listing.isFeatured,

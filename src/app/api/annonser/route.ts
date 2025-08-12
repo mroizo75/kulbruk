@@ -154,6 +154,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Enricher vehicleSpec fra Vegvesen hvis registreringsnummer er oppgitt
+    let enrichedVehicleSpec: any = null
+    if (data?.vehicleSpec?.registrationNumber) {
+      try {
+        const origin = new URL(request.url).origin
+        const res = await fetch(`${origin}/api/vegvesen?regNumber=${encodeURIComponent(String(data.vehicleSpec.registrationNumber))}`, {
+          cache: 'no-store'
+        })
+        if (res.ok) {
+          const json = await res.json()
+          const carData = json?.carData
+          if (carData) {
+            enrichedVehicleSpec = {
+              registrationNumber: data.vehicleSpec.registrationNumber,
+              mileage: data.vehicleSpec.mileage ?? null,
+              nextInspection: data.vehicleSpec.nextInspection ? new Date(data.vehicleSpec.nextInspection) : null,
+              accidents: data.vehicleSpec.accidents ?? null,
+              serviceHistory: data.vehicleSpec.serviceHistory ?? null,
+              modifications: data.vehicleSpec.modifications ?? null,
+              // Fra Vegvesen
+              make: carData.make ?? null,
+              model: carData.model ?? null,
+              year: carData.year ?? null,
+              fuelType: carData.fuelType ?? null,
+              transmission: carData.transmission ?? null,
+              color: carData.color ?? null,
+              power: carData.maxPower ?? null,
+              co2Emission: carData.co2Emissions ?? null,
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Kunne ikke berike VehicleSpec fra Vegvesen:', e)
+      }
+    }
+
     // Opprett annonse
     const listing = await prisma.listing.create({
       data: {
@@ -166,7 +202,27 @@ export async function POST(request: NextRequest) {
         contactEmail: data.contactEmail,
         contactPhone: data.contactPhone,
         contactName: data.contactName,
-        status: 'PENDING' // Alle nye annonser venter på godkjenning
+        status: 'PENDING', // Alle nye annonser venter på godkjenning
+        // Opprett VehicleSpec dersom sendt inn
+        ...((data.vehicleSpec || enrichedVehicleSpec) ? {
+          vehicleSpec: {
+            create: {
+              ...(enrichedVehicleSpec ?? {
+                registrationNumber: data.vehicleSpec.registrationNumber || null,
+                mileage: data.vehicleSpec.mileage || null,
+                nextInspection: data.vehicleSpec.nextInspection ? new Date(data.vehicleSpec.nextInspection) : null,
+                accidents: data.vehicleSpec.accidents ?? null,
+                serviceHistory: data.vehicleSpec.serviceHistory || null,
+                modifications: data.vehicleSpec.modifications || null,
+                fuelType: data.vehicleSpec.fuelType || null,
+                transmission: data.vehicleSpec.transmission || null,
+                color: data.vehicleSpec.color || null,
+                power: data.vehicleSpec.power || null,
+                year: data.vehicleSpec.year || null,
+              })
+            }
+          }
+        } : {}),
       },
       include: {
         category: true,

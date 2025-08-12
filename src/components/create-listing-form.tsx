@@ -176,6 +176,20 @@ export default function CreateListingForm() {
         contactEmail: data.contactEmail,
         contactPhone: data.contactPhone,
         contactName: data.contactName,
+        // Bil-spesifikke felt
+        ...(selectedCategory === 'biler' && vehicleData ? {
+          vehicleSpec: {
+            registrationNumber: vehicleData.registrationNumber || null,
+            mileage: vehicleData.mileage || null,
+            nextInspection: vehicleData.nextInspection || null,
+            accidents: vehicleData.hasAccidents || false,
+            serviceHistory: vehicleData.serviceHistory || '',
+            modifications: [
+              vehicleData.modifications || '',
+              ...(vehicleData.additionalEquipment || [])
+            ].filter(Boolean).join(', ')
+          }
+        } : {}),
         images: uploadedImages.filter(img => img.uploaded).map(img => ({ 
           url: img.url, 
           altText: img.name,

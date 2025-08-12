@@ -14,12 +14,23 @@ import {
   ArrowLeft,
   Heart,
   Share2,
-  Flag
+  Flag,
+  Gauge,
+  Fuel,
+  Cog,
+  Car as CarIcon,
+  Droplet,
+  Palette,
+  Compass
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import ListingCard, { ListingGrid } from '@/components/listing-card'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 interface PageProps {
   params: Promise<{
@@ -95,6 +106,21 @@ async function getListing(id: string) {
   }
 }
 
+async function getVegvesenData(regNumber: string | null | undefined) {
+  if (!regNumber) return null
+  try {
+    const res = await fetch(`/api/vegvesen?regNumber=${encodeURIComponent(regNumber)}`, {
+      // Sørg for at dette kjøres på server. Uten cache for ferske data
+      cache: 'no-store'
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    return json?.carData || null
+  } catch {
+    return null
+  }
+}
+
 export default async function ListingDetailPage({ params }: PageProps) {
   const session = await auth()
   const { id } = await params
@@ -115,14 +141,39 @@ export default async function ListingDetailPage({ params }: PageProps) {
   }
   
   // Sjekk om brukeren er innlogget for å vise kontaktinfo
-  const showContactInfo = !!user
+  const showContactInfo = !!session?.user
+
+  // Hent Vegvesen-data dersom registreringsnummer finnes
+  const vegvesen = await getVegvesenData(listing.registrationNumber)
+  // Liten heuristikk for "Mer som dette" (samme kategori og evt. merke/modell)
+  const similar = await prisma.listing.findMany({
+    where: {
+      id: { not: listing.id },
+      status: 'APPROVED',
+      isActive: true,
+      ...(listing.categoryId ? { categoryId: listing.categoryId } : {}),
+      ...(vegvesen?.make || listing.vehicleSpec?.make
+        ? {
+            OR: [
+              vegvesen?.make ? { title: { contains: String(vegvesen.make) } } : undefined,
+              listing.vehicleSpec?.model ? { title: { contains: String(listing.vehicleSpec.model) } } : undefined,
+            ].filter(Boolean) as any,
+          }
+        : {}),
+    },
+    include: { category: true, images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+    take: 8,
+    orderBy: { createdAt: 'desc' },
+  })
+  
+  // Vesentlige spesifikasjoner under tittel (kun i UI)
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tilbake-knapp */}
         <div className="mb-6">
-          <Link href="/" className="inline-flex items-center text-gray-600 hover:text-gray-900">
+          <Link href="/annonser" className="inline-flex items-center text-gray-600 hover:text-gray-900">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Tilbake til annonser
           </Link>
@@ -136,7 +187,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
               images={listing.images?.map(img => img.url) || []}
               alt={listing.title}
               aspectRatio="video"
-              allowDownload={true}
+              allowDownload={false}
               allowShare={true}
             />
 
@@ -194,38 +245,183 @@ export default async function ListingDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
 
-            {/* Bil-spesifikasjoner (kun for biler) */}
+            {/* Bil-spesifikasjoner (DB) */}
             {listing.category.slug === 'biler' && listing.vehicleSpec && (
               <Card>
                 <CardHeader>
                   <CardTitle>Tekniske data</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
-                      <span className="text-sm text-gray-600">År</span>
-                      <p className="font-medium">{listing.vehicleSpec.year}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-600">Modellår</p>
+                        <p className="font-medium">{listing.vehicleSpec.year ?? '—'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Kilometerstand</span>
-                      <p className="font-medium">{listing.vehicleSpec.mileage?.toLocaleString('no-NO')} km</p>
+                    <div className="flex items-center gap-3">
+                      <Compass className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-600">Kilometerstand</p>
+                        <p className="font-medium">{listing.vehicleSpec.mileage ? listing.vehicleSpec.mileage.toLocaleString('no-NO') + ' km' : '—'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Drivstoff</span>
-                      <p className="font-medium">{listing.vehicleSpec.fuelType}</p>
+                    <div className="flex items-center gap-3">
+                      <Fuel className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-600">Drivstoff</p>
+                        <p className="font-medium">{listing.vehicleSpec.fuelType ?? '—'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Girkasse</span>
-                      <p className="font-medium">{listing.vehicleSpec.transmission}</p>
+                    <div className="flex items-center gap-3">
+                      <Cog className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-600">Girkasse</p>
+                        <p className="font-medium">{listing.vehicleSpec.transmission ?? '—'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Effekt</span>
-                      <p className="font-medium">{listing.vehicleSpec.power} hk</p>
+                    <div className="flex items-center gap-3">
+                      <Gauge className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-600">Effekt</p>
+                        <p className="font-medium">{listing.vehicleSpec.power ? `${listing.vehicleSpec.power} hk` : '—'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-sm text-gray-600">Farge</span>
-                      <p className="font-medium">{listing.vehicleSpec.color}</p>
+                    <div className="flex items-center gap-3">
+                      <Palette className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-600">Farge</p>
+                        <p className="font-medium">{listing.vehicleSpec.color ?? '—'}</p>
+                      </div>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Vegvesen data (ikon-liste) */}
+            {listing.category.slug === 'biler' && vegvesen && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Data fra Vegvesen</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                        <CarIcon className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-600">Merke / Modell</p>
+                          <p className="font-medium">{vegvesen.make} {vegvesen.model}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-600">Årsmodell</p>
+                          <p className="font-medium">{vegvesen.year ?? '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Fuel className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-600">Drivstoff</p>
+                          <p className="font-medium">{vegvesen.fuelType ?? '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Cog className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-600">Girkasse</p>
+                          <p className="font-medium">{vegvesen.transmission ?? '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Gauge className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-600">Effekt</p>
+                          <p className="font-medium">{vegvesen.maxPower ? `${vegvesen.maxPower} hk` : '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Droplet className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-600">CO₂ (blandet)</p>
+                          <p className="font-medium">{vegvesen.co2Emissions ?? '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <User className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-600">Sitteplasser</p>
+                          <p className="font-medium">{vegvesen.seats ?? '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-600">EU-kontroll</p>
+                          <p className="font-medium">{vegvesen.lastApprovedInspection ?? vegvesen.lastInspection ?? '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {vegvesen.tires && vegvesen.tires.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold mb-2">Dekk og felg</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            {vegvesen.tires.map((t: any, i: number) => (
+                              <div key={i} className="flex justify-between bg-gray-50 rounded p-2">
+                                <span>{t.dimension}</span>
+                                <span>{t.rimSize}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {vegvesen.remarks && vegvesen.remarks.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold mb-2">Merknader</h4>
+                          <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1">
+                            {vegvesen.remarks.map((m: string, i: number) => (
+                              <li key={i}>{m}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Service og ekstrautstyr */}
+            {listing.vehicleSpec && (listing.vehicleSpec.serviceHistory || listing.vehicleSpec.modifications) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Service og ekstrautstyr</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {listing.vehicleSpec.serviceHistory && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Servicehistorikk</h4>
+                        <p className="whitespace-pre-line text-sm text-gray-700">{listing.vehicleSpec.serviceHistory}</p>
+                      </div>
+                    )}
+                    {listing.vehicleSpec.modifications && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Ekstrautstyr</h4>
+                        <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1">
+                          {(listing.vehicleSpec.modifications.split(/\r?\n|,|;/).map(s => s.trim()).filter(Boolean)).map((item, i) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -288,33 +484,35 @@ export default async function ListingDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
 
-            {/* Selger-informasjon */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Om selger</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
-                      <User className="h-5 w-5 text-gray-400" />
+            {/* Selger-informasjon (kun for innloggede) */}
+            {showContactInfo && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Om selger</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
+                        <User className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{listing.user.firstName || (listing as any).user.name} {listing.user.lastName || ''}</p>
+                        <p className="text-sm text-gray-600">{listing.location}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{listing.user.firstName || listing.user.name} {listing.user.lastName || ''}</p>
-                      <p className="text-sm text-gray-600">{listing.location}</p>
+                    
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <p>📅 Medlem siden {listing.user.createdAt.toLocaleDateString('no-NO', { month: 'long', year: 'numeric' })}</p>
                     </div>
+                    
+                    <Button variant="outline" className="w-full">
+                      Se alle annonser fra selger
+                    </Button>
                   </div>
-                  
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p>📅 Medlem siden {listing.user.createdAt.toLocaleDateString('no-NO', { month: 'long', year: 'numeric' })}</p>
-                  </div>
-                  
-                  <Button variant="outline" className="w-full">
-                    Se alle annonser fra selger
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Sikkerhetstips */}
             <Card>
@@ -330,6 +528,28 @@ export default async function ListingDetailPage({ params }: PageProps) {
             </Card>
           </div>
         </div>
+        {similar && similar.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <h2 className="text-2xl font-bold mb-4">Mer som dette</h2>
+            <ListingGrid>
+              {similar.map((s: any) => (
+                <ListingCard
+                  key={s.id}
+                  id={s.id}
+                  title={s.title}
+                  price={s.price ? Number(s.price) : 0}
+                  location={s.location}
+                  category={s.category?.name || 'Ukjent'}
+                  status={s.status}
+                  mainImage={s.images?.[0]?.url || ''}
+                  images={(s.images || []).map((img: any) => ({ url: img.url, altText: img.altText || undefined }))}
+                  views={s.views}
+                  createdAt={s.createdAt}
+                />
+              ))}
+            </ListingGrid>
+          </div>
+        )}
       </div>
     </div>
   )

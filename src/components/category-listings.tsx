@@ -18,7 +18,6 @@ import ListingCard, { ListingGrid, ListingCardSkeleton } from '@/components/list
 import AdvancedFilters from '@/components/advanced-filters'
 import CarSearch from '@/components/car-search'
 import { sorteringsAlternativer } from '@/lib/norway-data'
-import { ListingStatus } from '@prisma/client'
 
 interface Listing {
   id: string
@@ -27,7 +26,7 @@ interface Listing {
   price: number | null
   location: string
   category: string
-  status: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SOLD' | 'EXPIRED' | 'SUSPENDED'
   mainImage: string
   views: number
   createdAt: string | Date
@@ -306,7 +305,7 @@ export default function CategoryListings({ category }: CategoryListingsProps) {
                 {...listing}
                 createdAt={new Date(listing.createdAt)}
                 price={listing.price || 0}
-                status={listing.status as ListingStatus}
+                status={listing.status}
               />
             ))}
           </ListingGrid>

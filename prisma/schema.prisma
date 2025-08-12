@@ -206,7 +206,7 @@ model Bid {
 
 model VehicleSpec {
   id                 String    @id @default(cuid())
-  registrationNumber String?   @unique
+  registrationNumber String?
   make               String?
   model              String?
   variant            String?
