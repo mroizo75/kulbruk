@@ -45,6 +45,10 @@ export default function RootLayout({
           <Footer />
           <Toaster position="top-right" richColors />
         </SessionProvider>
+        {/* Inline minimal CSS fallback in case main CSS fails to load on enkelte mobilnettlesere */}
+        <noscript>
+          <link rel="stylesheet" href="/base-fallback.css" />
+        </noscript>
       </body>
     </html>
   )

@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import ImageGallery from '@/components/image-gallery'
 import { 
@@ -28,6 +29,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import ListingCard, { ListingGrid } from '@/components/listing-card'
+import LoanCalculator from '@/components/loan-calculator'
+// Address map uses a simple Google Maps embed per your preference
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -145,19 +148,24 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
   // Hent Vegvesen-data dersom registreringsnummer finnes
   const vegvesen = await getVegvesenData(listing.registrationNumber)
-  // Liten heuristikk for "Mer som dette" (samme kategori og evt. merke/modell)
-  const similar = await prisma.listing.findMany({
+
+  // Bedre "Mer som dette": bruk make/model fra både Vegvesen og VehicleSpec
+  const searchTerms = [
+    vegvesen?.make,
+    vegvesen?.model,
+    listing.vehicleSpec?.make,
+    listing.vehicleSpec?.model,
+  ].filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+
+  let similar = await prisma.listing.findMany({
     where: {
       id: { not: listing.id },
       status: 'APPROVED',
       isActive: true,
       ...(listing.categoryId ? { categoryId: listing.categoryId } : {}),
-      ...(vegvesen?.make || listing.vehicleSpec?.make
+      ...(searchTerms.length > 0
         ? {
-            OR: [
-              vegvesen?.make ? { title: { contains: String(vegvesen.make) } } : undefined,
-              listing.vehicleSpec?.model ? { title: { contains: String(listing.vehicleSpec.model) } } : undefined,
-            ].filter(Boolean) as any,
+            OR: searchTerms.map((term) => ({ title: { contains: term } })),
           }
         : {}),
     },
@@ -165,15 +173,35 @@ export default async function ListingDetailPage({ params }: PageProps) {
     take: 8,
     orderBy: { createdAt: 'desc' },
   })
+
+  // Fallback: hvis ingen treff på make/model, vis flere fra samme kategori
+  if (!similar || similar.length === 0) {
+    similar = await prisma.listing.findMany({
+      where: {
+        id: { not: listing.id },
+        status: 'APPROVED',
+        isActive: true,
+        ...(listing.categoryId ? { categoryId: listing.categoryId } : {}),
+      },
+      include: { category: true, images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+      take: 8,
+      orderBy: { createdAt: 'desc' },
+    })
+  }
   
   // Vesentlige spesifikasjoner under tittel (kun i UI)
+  const showAddressEnabled = (listing as any)?.showAddress === true
+
+  // Hent callbackUrl for tilbake-knapp
+  const hdrs = await headers()
+  const referer = hdrs.get('referer') || '/annonser'
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tilbake-knapp */}
         <div className="mb-6">
-          <Link href="/annonser" className="inline-flex items-center text-gray-600 hover:text-gray-900">
+          <Link href={referer} className="inline-flex items-center text-gray-600 hover:text-gray-900">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Tilbake til annonser
           </Link>
@@ -232,6 +260,9 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 <Badge className="mb-4">{listing.category.name}</Badge>
               </CardContent>
             </Card>
+
+            {/* Lånekalkulator */}
+            <LoanCalculator listingId={listing.id} priceNok={Number(listing.price)} />
 
             {/* Beskrivelse */}
             <Card>
@@ -483,6 +514,25 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 )}
               </CardContent>
             </Card>
+
+            {/* Kart over selgers adresse (kun hvis selger vil vise adresse) */}
+            {showAddressEnabled && listing.location && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Adresse</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-gray-700 mb-3">{listing.location}</div>
+                  <iframe
+                    title="Kart"
+                    className="w-full h-64 rounded-md border"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={`https://www.google.com/maps?q=${encodeURIComponent(listing.location)}&output=embed`}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             {/* Selger-informasjon (kun for innloggede) */}
             {showContactInfo && (

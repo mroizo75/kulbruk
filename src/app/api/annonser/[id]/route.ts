@@ -106,6 +106,7 @@ export async function PUT(
         contactEmail: data.contactEmail,
         contactPhone: data.contactPhone,
         contactName: data.contactName,
+        showAddress: typeof data.showAddress === 'boolean' ? data.showAddress : undefined,
         // Status settes tilbake til PENDING hvis innhold endres
         status: data.title || data.description || data.price ? 'PENDING' : undefined
       },

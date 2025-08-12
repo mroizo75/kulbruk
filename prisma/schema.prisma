@@ -99,6 +99,7 @@ model Listing {
   description        String           @db.Text
   price              Decimal          @db.Decimal(10, 2)
   location           String
+  showAddress        Boolean          @default(false)
   status             ListingStatus    @default(PENDING)
   isActive           Boolean          @default(true)
   views              Int              @default(0)

@@ -298,16 +298,27 @@ export default function CategoryListings({ category }: CategoryListingsProps) {
 
         {/* Annonser */}
         {listings.length > 0 ? (
-          <ListingGrid>
-            {listings.map((listing) => (
-              <ListingCard 
-                key={listing.id} 
-                {...listing}
-                createdAt={new Date(listing.createdAt)}
-                price={listing.price || 0}
-                status={listing.status}
-              />
-            ))}
+              <ListingGrid>
+            {listings.map((listing) => {
+              const callbackUrl = typeof window !== 'undefined' ? window.location.href : ''
+              // Wrap ListingCard with a link including callbackUrl
+              return (
+                <a key={listing.id} href={`/annonser/detaljer/${listing.id}?callbackUrl=${encodeURIComponent(callbackUrl)}`}>
+                  <ListingCard 
+                    id={listing.id}
+                    title={listing.title}
+                    price={listing.price || 0}
+                    location={listing.location}
+                    category={listing.category}
+                    status={listing.status}
+                    mainImage={listing.mainImage}
+                    images={undefined}
+                    views={listing.views}
+                    createdAt={new Date(listing.createdAt)}
+                  />
+                </a>
+              )
+            })}
           </ListingGrid>
         ) : (
           <div className="text-center py-12 bg-white rounded-lg border">
@@ -366,16 +377,16 @@ export default function CategoryListings({ category }: CategoryListingsProps) {
         {/* Call to action */}
         <Card className={`mt-8 bg-gradient-to-r ${config.color.replace('bg-', 'from-')}-500 ${config.color.replace('bg-', 'to-')}-600 text-white`}>
           <CardContent className="p-8 text-center">
-            <config.icon className="h-12 w-12 mx-auto mb-4 opacity-80" />
-            <h2 className="text-2xl font-bold mb-4">Har du noe å selge?</h2>
-            <p className="text-lg mb-6 opacity-90">
+            <config.icon className="h-12 w-12 mx-auto mb-4 opacity-80 text-[#af4c0f]" />
+            <h2 className="text-2xl font-bold mb-4 text-[#af4c0f]">Har du noe å selge?</h2>
+            <p className="text-lg mb-6 opacity-90 text-[#af4c0f]">
               Legg ut din annonse på Kulbruk.no og nå tusenvis av potensielle kjøpere
             </p>
             <Link href="/opprett">
               <Button 
                 size="lg" 
                 variant="secondary" 
-                className="bg-white text-gray-900 hover:bg-gray-100 hover:scale-105 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl"
+                className="bg-[#af4c0f] text-white hover:bg-gray-100 hover:scale-105 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl"
               >
                 {config.ctaText}
               </Button>

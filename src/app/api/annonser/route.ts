@@ -202,6 +202,7 @@ export async function POST(request: NextRequest) {
         contactEmail: data.contactEmail,
         contactPhone: data.contactPhone,
         contactName: data.contactName,
+        showAddress: !!data.showAddress,
         status: 'PENDING', // Alle nye annonser venter på godkjenning
         // Opprett VehicleSpec dersom sendt inn
         ...((data.vehicleSpec || enrichedVehicleSpec) ? {

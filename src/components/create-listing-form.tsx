@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Upload, X, Car, CreditCard } from 'lucide-react'
 import { toast } from 'sonner'
@@ -50,6 +51,7 @@ export default function CreateListingForm() {
   const [showPriceEstimation, setShowPriceEstimation] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [createdListingId, setCreatedListingId] = useState<string | null>(null)
+  const [showAddress, setShowAddress] = useState<boolean>(false)
 
   const {
     register,
@@ -190,6 +192,7 @@ export default function CreateListingForm() {
             ].filter(Boolean).join(', ')
           }
         } : {}),
+        showAddress,
         images: uploadedImages.filter(img => img.uploaded).map(img => ({ 
           url: img.url, 
           altText: img.name,
@@ -411,6 +414,11 @@ export default function CreateListingForm() {
                 {errors.contactPhone && (
                   <p className="text-sm text-red-600 mt-1">{errors.contactPhone.message}</p>
                 )}
+              </div>
+
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox id="showAddress" checked={showAddress} onCheckedChange={(v) => setShowAddress(!!v)} />
+                <Label htmlFor="showAddress" className="text-sm">Vis adresse på annonse</Label>
               </div>
             </CardContent>
           </Card>
