@@ -43,7 +43,9 @@ export const formatPrice = (amountInOre: number): string => {
 }
 
 export const getListingPrice = (categorySlug: string): typeof PRICING.CAR_AD | typeof PRICING.TORGET_AD => {
-  if (categorySlug === 'biler') {
+  const normalized = categorySlug.toLowerCase()
+  // Godta både 'bil' (hovedkategori) og 'biler' (DB/visningsnavn)
+  if (normalized === 'biler' || normalized === 'bil') {
     return PRICING.CAR_AD
   }
   return PRICING.TORGET_AD

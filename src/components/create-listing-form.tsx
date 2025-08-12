@@ -35,27 +35,15 @@ const listingSchema = z.object({
 
 type ListingFormData = z.infer<typeof listingSchema>
 
-// Mock kategorier (senere hentes fra database)
-const categories = [
-  { value: 'biler', label: 'Biler' },
-  { value: 'mobler', label: 'Møbler' },
-  { value: 'elektronikk', label: 'Elektronikk' },
-  { value: 'eiendom', label: 'Eiendom' },
-  { value: 'jobb', label: 'Jobb' },
-  { value: 'klaer-og-mote', label: 'Klær og mote' },
-  { value: 'sport-og-fritid', label: 'Sport og fritid' },
-  { value: 'hage-og-utendors', label: 'Hage og utendørs' },
-  { value: 'hobby-og-musikk', label: 'Hobby og musikk' },
-  { value: 'barn-og-baby', label: 'Barn og baby' },
-  { value: 'kjaledyr', label: 'Kjæledyr' },
-  { value: 'diverse', label: 'Diverse' },
-]
+interface UiCategory { value: string; label: string }
 
 export default function CreateListingForm() {
   const router = useRouter()
   const { data: session } = useSession()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadedImages, setUploadedImages] = useState([])
+  const [categories, setCategories] = useState<UiCategory[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
 
   const [showVehicleFields, setShowVehicleFields] = useState(false)
   const [vehicleData, setVehicleData] = useState<any>(null)
@@ -79,7 +67,27 @@ export default function CreateListingForm() {
 
   const selectedCategory = watch('category')
 
-  // Automatisk fylle inn kontaktinformasjon fra Clerk
+  // Last kategorier fra API (DB) for å sikre at UI alltid samsvarer med databasen
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setIsLoadingCategories(true)
+      try {
+        const res = await fetch('/api/kategorier', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Kunne ikke hente kategorier')
+        const data = await res.json()
+        const items: UiCategory[] = data.map((c: any) => ({ value: c.slug, label: c.name }))
+        setCategories(items)
+      } catch (e) {
+        console.error(e)
+        setCategories([])
+      } finally {
+        setIsLoadingCategories(false)
+      }
+    }
+    fetchCategories()
+  }, [])
+
+  // Automatisk fylle inn kontaktinformasjon fra session
   useEffect(() => {
     if (session?.user) {
       // Fyller inn navn (først og sist navn, eller bare firstName hvis det er alt som finnes)
@@ -274,11 +282,14 @@ export default function CreateListingForm() {
 
                 <div>
                   <Label htmlFor="category">Kategori *</Label>
-                  <Select onValueChange={handleCategoryChange}>
+                   <Select onValueChange={handleCategoryChange}>
                     <SelectTrigger className={errors.category ? 'border-red-500' : ''}>
-                      <SelectValue placeholder="Velg kategori" />
+                      <SelectValue placeholder={isLoadingCategories ? 'Laster kategorier...' : 'Velg kategori'} />
                     </SelectTrigger>
                     <SelectContent>
+                      {categories.length === 0 && !isLoadingCategories && (
+                        <div className="px-3 py-2 text-sm text-gray-500">Ingen kategorier tilgjengelig</div>
+                      )}
                       {categories.map((category) => (
                         <SelectItem key={category.value} value={category.value}>
                           {category.label}

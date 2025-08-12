@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Edit, Trash2, Tag, Save, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +25,14 @@ export default function CategoryManager({ categories }: CategoryManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [editCategoryName, setEditCategoryName] = useState('')
+  const [items, setItems] = useState<Category[]>(categories || [])
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+
+  // Sync hvis server henter nye kategorier
+  useEffect(() => {
+    setItems(categories || [])
+  }, [categories])
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
@@ -34,14 +41,27 @@ export default function CategoryManager({ categories }: CategoryManagerProps) {
     }
 
     try {
-      // Mock API call - implementer ekte API senere
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      setIsLoading(true)
+      const res = await fetch('/api/kategorier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Kunne ikke legge til kategori')
+      }
       toast.success('Kategori lagt til')
+      setItems(prev => [{ id: data.id, name: data.name, _count: { listings: 0 } }, ...prev])
       setNewCategoryName('')
       setIsAdding(false)
       router.refresh()
     } catch (error) {
-      toast.error('Kunne ikke legge til kategori')
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Kunne ikke legge til kategori')
+    }
+    finally {
+      setIsLoading(false)
     }
   }
 
@@ -52,14 +72,27 @@ export default function CategoryManager({ categories }: CategoryManagerProps) {
     }
 
     try {
-      // Mock API call - implementer ekte API senere
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      setIsLoading(true)
+      const res = await fetch(`/api/kategorier/${categoryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editCategoryName })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Kunne ikke oppdatere kategori')
+      }
       toast.success('Kategori oppdatert')
+      setItems(prev => prev.map(c => c.id === categoryId ? { ...c, name: data.name } : c))
       setEditingId(null)
       setEditCategoryName('')
       router.refresh()
     } catch (error) {
-      toast.error('Kunne ikke oppdatere kategori')
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Kunne ikke oppdatere kategori')
+    }
+    finally {
+      setIsLoading(false)
     }
   }
 
@@ -74,12 +107,23 @@ export default function CategoryManager({ categories }: CategoryManagerProps) {
     }
 
     try {
-      // Mock API call - implementer ekte API senere
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      setIsLoading(true)
+      const res = await fetch(`/api/kategorier/${categoryId}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Kunne ikke slette kategori')
+      }
       toast.success('Kategori slettet')
+      setItems(prev => prev.filter(c => c.id !== categoryId))
       router.refresh()
     } catch (error) {
-      toast.error('Kunne ikke slette kategori')
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Kunne ikke slette kategori')
+    }
+    finally {
+      setIsLoading(false)
     }
   }
 
@@ -134,9 +178,9 @@ export default function CategoryManager({ categories }: CategoryManagerProps) {
       <div className="space-y-3">
         <h3 className="text-lg font-medium">Eksisterende kategorier</h3>
         
-        {categories.length > 0 ? (
+        {items.length > 0 ? (
           <div className="space-y-2">
-            {categories.map((category) => (
+            {items.map((category) => (
               <div 
                 key={category.id} 
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
