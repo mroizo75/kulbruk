@@ -39,10 +39,11 @@ export async function POST(request: NextRequest) {
     let amount: number
     let description: string
     let paymentType: 'LISTING_FEE' | 'SUBSCRIPTION'
+    let pricing: any = null
 
     if (type === 'listing') {
       // Annonse-betaling
-      const pricing = getListingPrice(categorySlug)
+      pricing = getListingPrice(categorySlug)
       amount = pricing.amount
       description = pricing.description
       paymentType = 'LISTING_FEE'

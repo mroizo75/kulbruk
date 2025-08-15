@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob: https:",
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
-      "frame-src https://www.google.com https://www.youtube.com https://player.vimeo.com",
+      "frame-src https://www.google.com https://www.youtube.com https://player.vimeo.com https://js.stripe.com",
     ]
     // Inntil vi setter opp nonce/hash: tillat inline/eval både dev og prod for å unngå blokkering + Stripe
     const scriptDirectives = [
