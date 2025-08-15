@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import ImageGallery from '@/components/image-gallery'
+import VehicleSpecifications from '@/components/vehicle-specifications'
 import { 
   MapPin, 
   Calendar, 
@@ -394,101 +395,21 @@ export default async function ListingDetailPage({ params }: PageProps) {
             )}
 
             {/* Vegvesen data (ikon-liste) */}
-            {listing.category.slug === 'biler' && vegvesen && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Data fra Vegvesen</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center gap-3">
-                        <CarIcon className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-600">Merke / Modell</p>
-                          <p className="font-medium">{vegvesen.make} {vegvesen.model}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-600">Årsmodell</p>
-                          <p className="font-medium">{vegvesen.year ?? '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Fuel className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-600">Drivstoff</p>
-                          <p className="font-medium">{vegvesen.fuelType ?? '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Cog className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-600">Girkasse</p>
-                          <p className="font-medium">{vegvesen.transmission ?? '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Gauge className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-600">Effekt</p>
-                          <p className="font-medium">{vegvesen.maxPower ? `${vegvesen.maxPower} hk` : '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Droplet className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-600">CO₂ (blandet)</p>
-                          <p className="font-medium">{vegvesen.co2Emissions ?? '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <User className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-600">Sitteplasser</p>
-                          <p className="font-medium">{vegvesen.seats ?? '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-600">EU-kontroll</p>
-                          <p className="font-medium">{vegvesen.lastApprovedInspection ?? vegvesen.lastInspection ?? '—'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      {vegvesen.tires && vegvesen.tires.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold mb-2">Dekk og felg</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            {vegvesen.tires.map((t: any, i: number) => (
-                              <div key={i} className="flex justify-between bg-gray-50 rounded p-2">
-                                <span>{t.dimension}</span>
-                                <span>{t.rimSize}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {vegvesen.remarks && vegvesen.remarks.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold mb-2">Merknader</h4>
-                          <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1">
-                            {vegvesen.remarks.map((m: string, i: number) => (
-                              <li key={i}>{m}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Komplett bil-spesifikasjon */}
+            {listing.category.slug === 'biler' && listing.vehicleSpec && (
+              <VehicleSpecifications 
+                vehicleSpec={{
+                  ...listing.vehicleSpec,
+                  additionalEquipment: Array.isArray(listing.vehicleSpec.additionalEquipment) 
+                    ? listing.vehicleSpec.additionalEquipment as string[]
+                    : [],
+                  remarks: [],
+                  firstRegistrationDate: undefined,
+                  lastInspection: undefined,
+                  nextInspection: listing.vehicleSpec.nextInspection?.toISOString(),
+                }}
+                listingPrice={Number(listing.price)}
+              />
             )}
 
             {/* Service og ekstrautstyr */}

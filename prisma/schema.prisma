@@ -244,6 +244,47 @@ model VehicleSpec {
   serviceHistory     String?   @db.Text
   modifications      String?   @db.Text
   additionalEquipment Json?
+  
+  // Utvidede Vegvesen-felt for full spesifikasjon
+  bodyType           String?   // Karosseri (Sedan, SUV, osv)
+  engineSize         Float?    // Slagvolum i liter
+  cylinderCount      Int?      // Antall sylindre
+  maxSpeed           Int?      // Toppfart km/t
+  length             Int?      // Lengde i cm
+  width              Int?      // Bredde i cm
+  height             Int?      // Høyde i cm
+  weight             Int?      // Egenvekt i kg
+  maxWeight          Int?      // Totalvekt i kg
+  payload            Int?      // Nyttelast i kg
+  roofLoad           Int?      // Taklast i kg
+  trailerWeightBraked    Int?  // Tilhengervekt med brems i kg
+  trailerWeightUnbraked  Int?  // Tilhengervekt uten brems i kg
+  seats              Int?      // Antall seter
+  frontSeats         Int?      // Antall forseter
+  doors              Int?      // Antall dører
+  trunkCapacity      Int?      // Bagasjerom i liter
+  euroClass          String?   // Euro-klasse (Euro 5, Euro 6, osv)
+  wheelDrive         String?   // Hjuldrift (Forhjul, Bakhjul, Firehjul)
+  vin                String?   // Chassis nummer
+  firstRegistrationDate DateTime? // 1. gang registrert
+  lastInspection     DateTime? // Sist EU-godkjent
+  registrationStatus String?   // Status i motorvognregisteret
+  vehicleGroup       String?   // Kjøretøygruppe
+  technicalCode      String?   // Teknisk kode
+  remarks            Json?     // Merknader fra Vegvesen som array
+  
+  // Drivstoff-forbruk
+  fuelConsumptionCombined Float? // Blandet kjøring L/100km
+  fuelConsumptionCity     Float? // Bykjøring L/100km  
+  fuelConsumptionHighway  Float? // Landeveiskjøring L/100km
+  
+  // Dekk og felg
+  tireSpecs          Json?     // Dekk-spesifikasjoner som JSON array
+  
+  // Sikkerhet
+  abs                Boolean?  // ABS
+  airbags            Boolean?  // Airbags
+  
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   listingId          String    @unique

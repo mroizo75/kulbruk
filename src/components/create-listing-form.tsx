@@ -94,9 +94,9 @@ export default function CreateListingForm() {
   useEffect(() => {
     if (session?.user) {
       // Fyller inn navn (først og sist navn, eller bare firstName hvis det er alt som finnes)
-      const fullName = session.user.firstName && session.user.lastName 
-        ? `${session.user.firstName} ${session.user.lastName}` 
-        : session.user.firstName || session.user.name || ''
+      const fullName = (session.user as any).firstName && (session.user as any).lastName 
+        ? `${(session.user as any).firstName} ${(session.user as any).lastName}` 
+        : (session.user as any).firstName || (session.user as any).name || ''
       
       setValue('contactName', fullName)
       
@@ -104,8 +104,8 @@ export default function CreateListingForm() {
       setValue('contactEmail', session.user.email || '')
       
       // Fyller inn telefon hvis tilgjengelig
-      if (session.user.phone) {
-        setValue('contactPhone', session.user.phone)
+      if ((session.user as any).phone) {
+        setValue('contactPhone', (session.user as any).phone)
       }
     }
   }, [session, setValue])
@@ -125,7 +125,7 @@ export default function CreateListingForm() {
   }
 
   // Håndter bildeopplasting
-  const handleImagesChange = (images: any[]) => {
+  const handleImagesChange = (images: any) => {
     setUploadedImages(images)
   }
 
@@ -198,11 +198,11 @@ export default function CreateListingForm() {
           }
         } : {}),
         showAddress,
-        images: uploadedImages.filter(img => img.uploaded).map(img => ({ 
+        images: uploadedImages.filter((img: any) => img.uploaded).map((img: any) => ({ 
           url: img.url, 
           altText: img.name,
-          sortOrder: uploadedImages.indexOf(img),
-          isMain: uploadedImages.indexOf(img) === 0 
+          sortOrder: uploadedImages.indexOf(img as never),
+          isMain: uploadedImages.indexOf(img as never) === 0 
         })),
         acceptedTermsAt: new Date().toISOString()
       }
@@ -453,14 +453,36 @@ export default function CreateListingForm() {
           <Card>
             <CardContent className="pt-6">
               <div className="mb-4">
-                <div className="flex items-start gap-3">
-                  <Checkbox id="acceptTerms" checked={termsAccepted} onCheckedChange={(v) => setTermsAccepted(!!v)} />
-                  <Label htmlFor="acceptTerms" className="text-sm text-gray-700">
-                    Jeg har lest og aksepterer {' '}
-                    <a className="text-[#af4c0f] hover:underline" href="/vilkar-og-betingelser" target="_blank" rel="noreferrer">vilkår og betingelser</a>
-                    {' '} og {' '}
-                    <a className="text-[#af4c0f] hover:underline" href="/personvern" target="_blank" rel="noreferrer">personvernerklæringen</a>.
-                  </Label>
+                <div className="flex items-start gap-3 w-full">
+                  <Checkbox 
+                    id="acceptTerms" 
+                    checked={termsAccepted} 
+                    onCheckedChange={(v) => setTermsAccepted(!!v)}
+                    className="mt-0.5 flex-shrink-0" 
+                  />
+                  <div className="flex-1 min-w-0">
+                    <Label htmlFor="acceptTerms" className="text-sm text-gray-700 leading-relaxed cursor-pointer block">
+                      Jeg har lest og aksepterer{' '}
+                      <a 
+                        className="text-[#af4c0f] hover:underline break-words" 
+                        href="/vilkar-og-betingelser" 
+                        target="_blank" 
+                        rel="noreferrer"
+                      >
+                        vilkår og betingelser
+                      </a>
+                      {' '}og{' '}
+                      <a 
+                        className="text-[#af4c0f] hover:underline break-words" 
+                        href="/personvern" 
+                        target="_blank" 
+                        rel="noreferrer"
+                      >
+                        personvernerklæringen
+                      </a>
+                      .
+                    </Label>
+                  </div>
                 </div>
               </div>
               {/* Prisinfo */}

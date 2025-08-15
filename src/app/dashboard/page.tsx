@@ -13,11 +13,11 @@ export default async function DashboardPage() {
   
   console.log('=== DASHBOARD ROUTING DEBUG ===')
   console.log('Session User ID:', session.user.id)
-  console.log('Session User Role:', session.user.role)
+  console.log('Session User Role:', (session.user as any).role)
   console.log('Session User Email:', session.user.email)
   
   // Hent brukerrolle fra session
-  let userRole = session.user.role || 'customer'
+  let userRole = (session.user as any).role || 'customer'
   
   try {
     const dbUser = await prisma.user.findUnique({
@@ -44,8 +44,8 @@ export default async function DashboardPage() {
         data: {
           email: session.user.email!,
           name: session.user.name,
-          firstName: session.user.firstName,
-          lastName: session.user.lastName,
+          firstName: (session.user as any).firstName,
+          lastName: (session.user as any).lastName,
           role: userRole,
           image: session.user.image,
         }

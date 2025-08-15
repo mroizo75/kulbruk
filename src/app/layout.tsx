@@ -1,5 +1,6 @@
 import { type Metadata, type Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { Suspense } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import ConditionalNavbar from '@/components/conditional-navbar'
 import ConditionalFooter from '@/components/conditional-footer'
@@ -44,11 +45,15 @@ export default function RootLayout({
     <html lang="no">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SessionProvider>
-          <ConditionalNavbar />
+          <Suspense fallback={null}>
+            <ConditionalNavbar />
+          </Suspense>
           <main className="min-h-screen">
             {children}
           </main>
-          <ConditionalFooter />
+          <Suspense fallback={null}>
+            <ConditionalFooter />
+          </Suspense>
           <Toaster position="top-right" richColors />
           <CookieConsent />
         </SessionProvider>

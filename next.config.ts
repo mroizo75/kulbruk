@@ -22,13 +22,13 @@ const nextConfig: NextConfig = {
       "font-src 'self' data:",
       "frame-src https://www.google.com https://www.youtube.com https://player.vimeo.com",
     ]
-    // Inntil vi setter opp nonce/hash: tillat inline/eval både dev og prod for å unngå blokkering
+    // Inntil vi setter opp nonce/hash: tillat inline/eval både dev og prod for å unngå blokkering + Stripe
     const scriptDirectives = [
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-      "script-src-elem 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com",
+      "script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
       "script-src-attr 'self' 'unsafe-inline'",
     ]
-    const connectDirectives = ["connect-src 'self' https: ws: wss:"]
+    const connectDirectives = ["connect-src 'self' https: ws: wss: https://api.stripe.com"]
 
     const csp = [...baseDirectives, ...scriptDirectives, ...connectDirectives].join('; ')
 

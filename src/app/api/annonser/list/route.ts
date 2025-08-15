@@ -52,11 +52,14 @@ export async function GET(request: NextRequest) {
     const transmission = searchParams.get('transmission')
     const ageRange = searchParams.get('ageRange')
     const kmRange = searchParams.get('kmRange')
-    const priceMin = searchParams.get('priceMin')
-    const priceMax = searchParams.get('priceMax')
-    const yearMin = searchParams.get('yearMin')
-    const yearMax = searchParams.get('yearMax')
-    const mileageMax = searchParams.get('mileageMax')
+    const priceMin = searchParams.get('priceMin') || searchParams.get('minPrice')
+    const priceMax = searchParams.get('priceMax') || searchParams.get('maxPrice')
+    const yearMin = searchParams.get('yearMin') || searchParams.get('yearFrom')
+    const yearMax = searchParams.get('yearMax') || searchParams.get('yearTo')
+    const mileageMin = searchParams.get('mileageMin') || searchParams.get('mileageFrom')
+    const mileageMax = searchParams.get('mileageMax') || searchParams.get('mileageTo')
+    const color = searchParams.get('color')
+    const wheelDrive = searchParams.get('wheelDrive')
     const propertyType = searchParams.get('propertyType')
     const rooms = searchParams.get('rooms')
     const area = searchParams.get('area')
@@ -143,69 +146,57 @@ export async function GET(request: NextRequest) {
       if (priceMax) where.price.lte = parseFloat(priceMax)
     }
 
-    // Kategori-spesifikke filtre
-    if (category === 'bil') {
-      // Bil-spesifikke filtre basert på søketerm og filtre
-      if (shouldFilter(make)) {
-        where.OR = where.OR || []
-        where.OR.push(
-          { title: { contains: make, mode: 'insensitive' } },
-          { description: { contains: make, mode: 'insensitive' } }
-        )
-      }
-      
-      if (shouldFilter(model)) {
-        where.OR = where.OR || []
-        where.OR.push(
-          { title: { contains: model, mode: 'insensitive' } },
-          { description: { contains: model, mode: 'insensitive' } }
-        )
-      }
-      
-      if (shouldFilter(fuelType)) {
-        where.OR = where.OR || []
-        where.OR.push(
-          { title: { contains: fuelType, mode: 'insensitive' } },
-          { description: { contains: fuelType, mode: 'insensitive' } }
-        )
-      }
-      
-      if (shouldFilter(transmission)) {
-        where.OR = where.OR || []
-        where.OR.push(
-          { title: { contains: transmission, mode: 'insensitive' } },
-          { description: { contains: transmission, mode: 'insensitive' } }
-        )
-      }
+    // VehicleSpec filtre for bil-kategorien
+    const vehicleSpecWhere: any = {}
+    let hasVehicleSpecFilter = false
 
-      // År-filtering (estimert fra tittel/beskrivelse)
-      if (yearMin || yearMax) {
-        const yearFilters = []
-        for (let year = parseInt(yearMin || '1990'); year <= parseInt(yearMax || '2024'); year++) {
-          yearFilters.push(
-            { title: { contains: year.toString() } },
-            { description: { contains: year.toString() } }
-          )
-        }
-        if (yearFilters.length > 0) {
-          where.OR = where.OR || []
-          where.OR.push(...yearFilters)
-        }
-      }
+    if (shouldFilter(make)) {
+      vehicleSpecWhere.make = { contains: make, mode: 'insensitive' }
+      hasVehicleSpecFilter = true
+    }
+    
+    if (shouldFilter(fuelType)) {
+      vehicleSpecWhere.fuelType = { contains: fuelType, mode: 'insensitive' }
+      hasVehicleSpecFilter = true
+    }
+    
+    if (shouldFilter(transmission)) {
+      vehicleSpecWhere.transmission = { contains: transmission, mode: 'insensitive' }
+      hasVehicleSpecFilter = true
+    }
 
-      // Kilometertall (søk i beskrivelse)
-      if (mileageMax) {
-        // Søk etter km-angivelser under maks
-        where.AND = where.AND || []
-        where.AND.push({
-          OR: [
-            { description: { contains: 'lav km', mode: 'insensitive' } },
-            { description: { contains: 'få km', mode: 'insensitive' } },
-            // Kan utvides med mer sofistikert km-parsing
-          ]
-        })
-      }
-    } else if (category === 'eiendom') {
+    if (shouldFilter(color)) {
+      vehicleSpecWhere.color = { contains: color, mode: 'insensitive' }
+      hasVehicleSpecFilter = true
+    }
+
+    if (shouldFilter(wheelDrive)) {
+      vehicleSpecWhere.wheelDrive = { contains: wheelDrive, mode: 'insensitive' }
+      hasVehicleSpecFilter = true
+    }
+
+    // År-filtering basert på VehicleSpec.year
+    if (yearMin || yearMax) {
+      vehicleSpecWhere.year = {}
+      if (yearMin) vehicleSpecWhere.year.gte = parseInt(yearMin)
+      if (yearMax) vehicleSpecWhere.year.lte = parseInt(yearMax)
+      hasVehicleSpecFilter = true
+    }
+
+    // Kilometertall-filtering basert på VehicleSpec.mileage
+    if (mileageMin || mileageMax) {
+      vehicleSpecWhere.mileage = {}
+      if (mileageMin) vehicleSpecWhere.mileage.gte = parseInt(mileageMin)
+      if (mileageMax) vehicleSpecWhere.mileage.lte = parseInt(mileageMax)
+      hasVehicleSpecFilter = true
+    }
+
+    // Legg til VehicleSpec-filter i hovedwhere
+    if (hasVehicleSpecFilter) {
+      where.vehicleSpec = vehicleSpecWhere
+    }
+
+    if (category === 'eiendom') {
       // TODO: Implementer eiendom-spesifikke filtre når vi har felter for dem
     } else if (category === 'torget') {
       if (shouldFilter(condition)) {

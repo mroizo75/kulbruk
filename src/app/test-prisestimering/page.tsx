@@ -1,11 +1,8 @@
 "use client"
-import Navbar from '@/components/navbar'
 import PriceEstimation from '@/components/price-estimation'
 
 export default function TestPricestimatePage() {
   return (
-    <>
-    <Navbar />
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="mb-8 text-center">
@@ -90,6 +87,5 @@ export default function TestPricestimatePage() {
         </div>
       </div>
     </div>
-    </>
   )
 }

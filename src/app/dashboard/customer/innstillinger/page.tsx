@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import DashboardLayout from '@/components/dashboard-layout'
+import DeleteAccountButton from '@/components/delete-account-button'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -197,34 +198,5 @@ export default async function SettingsPage() {
         </div>
       </div>
     </DashboardLayout>
-  )
-}
-
-function DeleteAccountButton() {
-  return (
-    <button
-      onClick={async () => {
-        const ok = confirm('Er du sikker på at du vil slette kontoen? Dette kan ikke angres.')
-        if (!ok) return
-        try {
-          const res = await fetch('/api/user/delete-account', { method: 'POST' })
-          if (res.ok) {
-            // Vis toast og redirect hjem
-            if (typeof window !== 'undefined') {
-              // Enkel toast via alert hvis sonner ikke er tilgjengelig i denne ruten
-              try { (window as any).sonner?.toast?.success?.('Kontoen er slettet') } catch {}
-            }
-            window.location.href = '/sign-out?callbackUrl=/'
-          } else {
-            alert('Kunne ikke slette kontoen. Prøv igjen senere.')
-          }
-        } catch {
-          alert('Nettverksfeil. Prøv igjen senere.')
-        }
-      }}
-      className="inline-flex items-center px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
-    >
-      <Trash2 className="h-4 w-4 mr-2" /> Slett konto
-    </button>
   )
 }
