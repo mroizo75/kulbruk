@@ -20,6 +20,7 @@ import VehicleInfoForm from './vehicle-info-form'
 import PriceEstimation from './price-estimation'
 import ImageUpload from '@/components/image-upload'
 import PaymentForm from '@/components/payment-form'
+import CarPriceDisplay from '@/components/car-price-display'
 import { getListingPrice } from '@/lib/stripe-shared'
 
 // Validering schema
@@ -467,6 +468,16 @@ export default function CreateListingForm() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Totalpris for bil-annonser */}
+          {watch('category') && watch('price') && (
+            <CarPriceDisplay
+              salesPrice={Number(watch('price')) || 0}
+              categorySlug={watch('category')}
+              registrationFee={vehicleData?.omregistreringsavgift || null}
+              showBreakdown={true}
+            />
+          )}
 
           {/* Submit knapp */}
           <Card>

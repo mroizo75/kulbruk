@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { MapPin, Calendar, Eye, Heart } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { calculateCarTotalPrice, formatCarPrice, isCarCategory } from '@/lib/car-pricing'
 
 interface ListingCardProps {
   id: string
@@ -21,6 +22,7 @@ interface ListingCardProps {
   isFeatured?: boolean
   isFavorited?: boolean
   onFavoriteChange?: (isFav: boolean) => void
+  registrationFee?: number | null // For bil-annonser
 }
 
 const statusConfig = {
@@ -46,6 +48,7 @@ export default function ListingCard({
   isFeatured = false,
   isFavorited,
   onFavoriteChange,
+  registrationFee,
 }: ListingCardProps) {
   const statusInfo = statusConfig[status]
   const isClickable = status === 'APPROVED'
@@ -154,9 +157,34 @@ export default function ListingCard({
         </h3>
 
         {/* Pris */}
-        <p className="text-2xl font-bold text-primary mb-2">
-          {price === 0 ? 'Gratis' : `${price.toLocaleString('no-NO')} kr`}
-        </p>
+        <div className="mb-2">
+          {price === 0 ? (
+            <p className="text-2xl font-bold text-primary">Gratis</p>
+          ) : isCarCategory(category) ? (
+            // Bil-annonser: vis totalpris
+            (() => {
+              const pricing = calculateCarTotalPrice(price, registrationFee)
+              return (
+                <div>
+                  <p className="text-2xl font-bold text-primary">
+                    {formatCarPrice(pricing.totalPrice)}
+                  </p>
+                  <div className="text-sm text-gray-600 flex items-center gap-2">
+                    <span>Inkl. omreg.</span>
+                    {pricing.isEstimated && (
+                      <Badge variant="outline" className="text-xs">Estimat</Badge>
+                    )}
+                  </div>
+                </div>
+              )
+            })()
+          ) : (
+            // Andre kategorier: vis vanlig pris
+            <p className="text-2xl font-bold text-primary">
+              {price.toLocaleString('no-NO')} kr
+            </p>
+          )}
+        </div>
 
         {/* Lokasjon */}
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
