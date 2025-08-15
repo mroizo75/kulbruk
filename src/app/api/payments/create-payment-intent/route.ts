@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { categorySlug, listingId, type } = body
+    const { categorySlug, listingId, type, pendingListingData } = body
 
     console.log('🚀 Payment Intent: Mottatt forespørsel:', {
       categorySlug,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Valider at listing eksisterer og tilhører brukeren
+      // Valider at listing eksisterer og tilhører brukeren (kun hvis listingId er gitt)
       if (listingId) {
         const listing = await prisma.listing.findFirst({
           where: {
@@ -77,6 +77,8 @@ export async function POST(request: NextRequest) {
         if (!listing) {
           return NextResponse.json({ error: 'Annonse ikke funnet' }, { status: 404 })
         }
+      } else {
+        console.log('⏳ Payment Intent: Ingen listingId - betaling før opprettelse av annonse')
       }
     } else {
       return NextResponse.json({ error: 'Ugyldig betalingstype' }, { status: 400 })
@@ -105,6 +107,13 @@ export async function POST(request: NextRequest) {
       },
       automatic_payment_methods: {
         enabled: true,
+        allow_redirects: 'never', // Kun kort-betalinger
+      },
+      // Spesifiser at dette er for Norge
+      payment_method_options: {
+        card: {
+          setup_future_usage: 'off_session',
+        },
       },
     })
 
@@ -114,6 +123,13 @@ export async function POST(request: NextRequest) {
       amount: paymentIntent.amount,
       hasClientSecret: !!paymentIntent.client_secret
     })
+
+    // Lagre annonse-data i metadata for webhook bruk
+    let paymentMetadata: any = { 
+      categorySlug, 
+      stripeClientSecret: paymentIntent.client_secret,
+      ...(pendingListingData && { pendingListingData: JSON.stringify(pendingListingData) })
+    }
 
     // Lagre betalingsinformasjon i database
     const payment = await prisma.payment.create({
@@ -126,7 +142,7 @@ export async function POST(request: NextRequest) {
         type: paymentType,
         listingId: listingId || null,
         status: 'PENDING',
-        metadata: JSON.stringify({ categorySlug, stripeClientSecret: paymentIntent.client_secret }),
+        metadata: JSON.stringify(paymentMetadata),
       },
     })
 

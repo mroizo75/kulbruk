@@ -131,8 +131,13 @@ export default function CreateListingForm() {
 
   // Håndter vellykket betaling
   const handlePaymentSuccess = () => {
+    // Tøm lagret annonse-data
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('pendingListingData')
+    }
+    
     setShowPayment(false)
-    toast.success('Betaling fullført! Annonsen er nå publisert.')
+    toast.success('Betaling fullført! Annonsen blir opprettet og publisert.')
     router.push('/dashboard/customer/annonser')
   }
 
@@ -210,32 +215,46 @@ export default function CreateListingForm() {
       // NextAuth håndterer automatisk autentisering
       console.log('Bruker autentisert:', !!session)
       
-      // Send til API (NextAuth session sendes automatisk)
-      const createResponse = await fetch('/api/annonser', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include', // Inkluderer cookies som backup
-        body: JSON.stringify(apiData)
-      })
-      
-      if (!createResponse.ok) {
-        const errorData = await createResponse.json()
-        throw new Error(errorData.error || 'Kunne ikke opprette annonse')
-      }
-      
-      const result = await createResponse.json()
-      
       // Sjekk om annonsen krever betaling
       const pricing = getListingPrice(data.category)
       
       if (pricing.amount > 0) {
-        // Vis betalingsskjema
-        setCreatedListingId(result.id)
+        // BETALINGSPLIKTIGE annonser: Gå til betaling FØRST
+        console.log('💳 Betaling kreves, lagrer data og går til betaling...')
+        
+        // Lagre annonse-data midlertidig for etter betaling
+        const pendingListingData = {
+          ...apiData,
+          categorySlug: data.category // Trengs for betalingsflyt
+        }
+        
+        localStorage.setItem('pendingListingData', JSON.stringify(pendingListingData))
+        
+        // Vis betalingsskjema UTEN å opprette annonse først
         setShowPayment(true)
-        toast.success(`Annonse opprettet (#${result.shortCode || result.id})! Fullfør betaling for å publisere.`)
+        toast.success('Fullfør betaling for å publisere annonsen.')
+        
       } else {
+        // GRATIS annonser: Opprett direkte
+        console.log('✅ Gratis annonse, oppretter direkte...')
+        
+        // Send til API (NextAuth session sendes automatisk)
+        const createResponse = await fetch('/api/annonser', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify(apiData)
+        })
+        
+        if (!createResponse.ok) {
+          const errorData = await createResponse.json()
+          throw new Error(errorData.error || 'Kunne ikke opprette annonse')
+        }
+        
+        const result = await createResponse.json()
+        
         // Gratis annonse - gå direkte til dashboard
         toast.success(`Annonse opprettet (#${result.shortCode || result.id})! Venter på godkjenning.`)
         router.push('/dashboard/customer/annonser')
@@ -544,7 +563,7 @@ export default function CreateListingForm() {
               amount={getListingPrice(watch('category')).amount}
               description={getListingPrice(watch('category')).description}
               categorySlug={watch('category')}
-              listingId={createdListingId}
+              listingId={null} // Ingen listing ID siden annonsen ikke er opprettet enda
               onSuccess={handlePaymentSuccess}
               onError={handlePaymentError}
             />

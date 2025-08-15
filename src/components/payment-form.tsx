@@ -14,14 +14,16 @@ import { Badge } from '@/components/ui/badge'
 import { Loader2, CreditCard, CheckCircle, AlertCircle } from 'lucide-react'
 import { formatPrice } from '@/lib/stripe-shared'
 
-// Initialiser Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+// Initialiser Stripe med norsk locale
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!, {
+  locale: 'nb', // Norsk bokmål
+})
 
 interface PaymentFormProps {
   amount: number // I øre
   description: string
   categorySlug?: string
-  listingId?: string
+  listingId?: string | null // Kan være null hvis annonse ikke er opprettet enda
   onSuccess?: () => void
   onError?: (error: string) => void
 }
@@ -60,16 +62,27 @@ const CheckoutForm = ({
       return
     }
 
-    const result = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: {
-        card: cardElement,
-        billing_details: {
-          // For norske betalinger
-          address: {
-            country: 'NO', // Norge
-          },
+    // For norske betalinger - få postnummer fra card element
+    const { error: cardError, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+      billing_details: {
+        address: {
+          country: 'NO', // Norge
         },
-      }
+      },
+    })
+
+    if (cardError) {
+      console.error('Payment method error:', cardError)
+      onError?.(cardError.message || 'Feil ved opprettelse av betalingsmetode')
+      setIsProcessing(false)
+      return
+    }
+
+    // Nå bekreft betalingen med den opprettede betalingsmetoden
+    const result = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: paymentMethod.id,
     })
 
     if (result.error) {
@@ -144,8 +157,8 @@ const CheckoutForm = ({
             <div className="flex items-start gap-2">
               <div className="text-blue-600 mt-0.5">ℹ️</div>
               <div>
-                <p className="font-medium text-blue-800">Tips for norske kort:</p>
-                <p className="text-blue-700">Fyll inn ditt norske postnummer (f.eks. 0150) for å fullføre betalingen.</p>
+                <p className="font-medium text-blue-800">Norske postnummer:</p>
+                <p className="text-blue-700">Bruk ditt 4-sifrede norske postnummer (f.eks. 3616 eller 0150). Ikke legg til ekstra siffer!</p>
               </div>
             </div>
           </div>
@@ -201,6 +214,16 @@ export default function PaymentForm(props: PaymentFormProps) {
         description: props.description
       })
 
+      // Hent pending listing data fra localStorage hvis ingen listingId
+      let pendingListingData = null
+      if (!props.listingId && typeof window !== 'undefined') {
+        const storedData = localStorage.getItem('pendingListingData')
+        if (storedData) {
+          pendingListingData = JSON.parse(storedData)
+          console.log('📦 PaymentForm: Hentet pending listing data fra localStorage')
+        }
+      }
+
       const response = await fetch('/api/payments/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,6 +231,7 @@ export default function PaymentForm(props: PaymentFormProps) {
           categorySlug: props.categorySlug,
           listingId: props.listingId,
           type: 'listing',
+          pendingListingData, // Send annonse-data hvis det ikke er listingId
         }),
       })
 
@@ -334,7 +358,16 @@ export default function PaymentForm(props: PaymentFormProps) {
 
   // Vis betalingsskjema
   return (
-    <Elements stripe={stripePromise}>
+    <Elements 
+      stripe={stripePromise}
+      options={{
+        // Konfigurer for Norge
+        locale: 'nb',
+        appearance: {
+          theme: 'stripe',
+        },
+      }}
+    >
       <CheckoutForm
         {...props}
         clientSecret={clientSecret}

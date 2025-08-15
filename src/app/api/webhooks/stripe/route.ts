@@ -79,6 +79,8 @@ export async function POST(request: NextRequest) {
 // Handler-funksjoner
 async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   try {
+    console.log('✅ Webhook: Betaling vellykket, oppretter annonse...', paymentIntent.id)
+
     // Oppdater betaling i database
     const payment = await prisma.payment.update({
       where: { stripePaymentIntentId: paymentIntent.id },
@@ -86,40 +88,134 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
         status: 'SUCCEEDED',
         stripeChargeId: paymentIntent.latest_charge as string,
       },
-      include: { listingPayment: true },
     })
 
-    // Hvis det er en annonse-betaling, marker annonsen som betalt
-    if (payment.type === 'LISTING_FEE' && payment.listingId) {
-      await prisma.listingPayment.upsert({
-        where: { listingId: payment.listingId },
-        create: {
-          listingId: payment.listingId,
-          paymentId: payment.id,
-          type: 'CAR_AD', // Basert på at kun bil-annonser koster penger foreløpig
-          amount: payment.amount,
-          isPaid: true,
-          paidAt: new Date(),
-        },
-        update: {
-          isPaid: true,
-          paidAt: new Date(),
-        },
-      })
+    // Hvis det er en annonse-betaling uten eksisterende listing, opprett annonsen nå
+    if (payment.type === 'LISTING_FEE') {
+      if (payment.listingId) {
+        // GAMMEL flyt: annonse eksisterer allerede, bare godkjenn den
+        console.log('📝 Webhook: Godkjenner eksisterende annonse...', payment.listingId)
+        
+        await prisma.listingPayment.upsert({
+          where: { listingId: payment.listingId },
+          create: {
+            listingId: payment.listingId,
+            paymentId: payment.id,
+            type: 'CAR_AD',
+            amount: payment.amount,
+            isPaid: true,
+            paidAt: new Date(),
+          },
+          update: {
+            isPaid: true,
+            paidAt: new Date(),
+          },
+        })
 
-      // Godkjenn annonsen automatisk etter betaling
-      await prisma.listing.update({
-        where: { id: payment.listingId },
-        data: { 
-          status: 'APPROVED',
-          publishedAt: new Date(),
-        },
-      })
+        await prisma.listing.update({
+          where: { id: payment.listingId },
+          data: { 
+            status: 'APPROVED',
+            publishedAt: new Date(),
+          },
+        })
+
+      } else {
+        // NY flyt: Opprett annonse etter vellykket betaling
+        console.log('🆕 Webhook: Oppretter ny annonse etter betaling...')
+        
+        // Hent annonse-data fra Payment metadata
+        const paymentMetadata = JSON.parse(payment.metadata as string || '{}')
+        
+        if (!paymentMetadata.pendingListingData) {
+          console.error('❌ Webhook: Mangler pendingListingData i payment metadata')
+          return
+        }
+
+        const listingData = JSON.parse(paymentMetadata.pendingListingData)
+        
+        // Opprett shortCode for annonsen
+        const shortCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+        
+        // Opprett annonsen
+        const listing = await prisma.listing.create({
+          data: {
+            shortCode,
+            title: listingData.title,
+            description: listingData.description,
+            price: listingData.price,
+            categoryId: listingData.categoryId,
+            location: listingData.location,
+            contactEmail: listingData.contactEmail,
+            contactPhone: listingData.contactPhone,
+            contactName: listingData.contactName,
+            showAddress: listingData.showAddress,
+            userId: payment.userId,
+            status: 'APPROVED', // Automatisk godkjent etter betaling
+            publishedAt: new Date(),
+            // Bil-spesifikke felt
+            ...(listingData.vehicleSpec ? {
+              vehicleSpec: {
+                create: listingData.vehicleSpec
+              }
+            } : {}),
+          }
+        })
+
+        // Opprett bilder
+        if (listingData.images && listingData.images.length > 0) {
+          const imagePromises = listingData.images.map((image: any, index: number) => 
+            prisma.image.create({
+              data: {
+                url: image.url,
+                altText: image.altText || `Bilde ${index + 1}`,
+                sortOrder: image.sortOrder || index,
+                isMain: image.isMain || index === 0,
+                listingId: listing.id
+              }
+            })
+          )
+          await Promise.all(imagePromises)
+        }
+
+        // Opprett betaling-kobling
+        await prisma.listingPayment.create({
+          data: {
+            listingId: listing.id,
+            paymentId: payment.id,
+            type: 'CAR_AD',
+            amount: payment.amount,
+            isPaid: true,
+            paidAt: new Date(),
+          }
+        })
+
+        // Oppdater payment med listing ID
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: { listingId: listing.id }
+        })
+
+        // Audit: logg aksept av vilkår
+        if (listingData.acceptedTermsAt) {
+          await prisma.auditLog.create({
+            data: {
+              actorId: payment.userId,
+              action: 'ACCEPT_TERMS_AND_CREATE_LISTING',
+              targetType: 'Listing',
+              targetId: listing.id,
+              details: JSON.stringify({ acceptedTermsAt: listingData.acceptedTermsAt }),
+            }
+          })
+        }
+
+        console.log(`✅ Webhook: Annonse opprettet og publisert: ${listing.shortCode} (${listing.id})`)
+      }
     }
 
-    console.log(`Betaling vellykket: ${paymentIntent.id}`)
+    console.log(`✅ Webhook: Betaling fullført: ${paymentIntent.id}`)
   } catch (error) {
-    console.error('Feil ved håndtering av vellykket betaling:', error)
+    console.error('❌ Webhook: Feil ved håndtering av vellykket betaling:', error)
   }
 }
 
