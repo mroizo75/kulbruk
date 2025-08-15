@@ -63,6 +63,12 @@ const CheckoutForm = ({
     const result = await stripe.confirmCardPayment(clientSecret, {
       payment_method: {
         card: cardElement,
+        billing_details: {
+          // For norske betalinger
+          address: {
+            country: 'NO', // Norge
+          },
+        },
       }
     })
 
@@ -125,8 +131,23 @@ const CheckoutForm = ({
                     color: '#9e2146',
                   },
                 },
+                // Konfigurer for Norge - postnummer er påkrevd
+                hidePostalCode: false, // Vis postnummer-felt
+                iconStyle: 'default',
+                // Norske kort krever postnummer
+                disabled: false,
               }}
             />
+          </div>
+          
+          <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+            <div className="flex items-start gap-2">
+              <div className="text-blue-600 mt-0.5">ℹ️</div>
+              <div>
+                <p className="font-medium text-blue-800">Tips for norske kort:</p>
+                <p className="text-blue-700">Fyll inn ditt norske postnummer (f.eks. 0150) for å fullføre betalingen.</p>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
