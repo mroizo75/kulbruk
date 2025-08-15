@@ -1,5 +1,3 @@
-'use client'
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -17,6 +15,11 @@ import {
   Mail,
   Clock
 } from 'lucide-react'
+
+export const metadata = {
+  title: 'Vilkår og betingelser – Kulbruk',
+  description: 'Vilkår for bruk av Kulbruk.no',
+}
 
 export default function TermsPage() {
   return (
@@ -387,6 +390,12 @@ export default function TermsPage() {
                 <h4 className="font-semibold text-gray-900 mb-2">7.3 Forbrukerrettigheter</h4>
                 <p className="text-gray-600 text-sm">
                   Disse vilkårene begrenser ikke dine rettigheter som forbruker etter gjeldende norsk lov.
+                </p>
+              </div>
+              <div>
+                <h4 className="text-gray-900 font-semibold mb-2">7.4 Cookies og preferanser</h4>
+                <p className="text-gray-600 text-sm">
+                  For informasjon om cookies og for å endre dine preferanser, se vår dedikerte side <a className="text-blue-600 underline" href="/cookies">/cookies</a>.
                 </p>
               </div>
             </CardContent>

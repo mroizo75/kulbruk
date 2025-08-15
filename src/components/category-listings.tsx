@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -136,6 +136,7 @@ export default function CategoryListings({ category }: CategoryListingsProps) {
   const [totalCount, setTotalCount] = useState(0)
   const [filters, setFilters] = useState({})
   const [sortBy, setSortBy] = useState('nyeste')
+  const currentQueryJson = useMemo(() => JSON.stringify({ category, filters, sortBy }), [category, filters, sortBy])
 
   const config = categoryConfig[category]
 
@@ -180,6 +181,23 @@ export default function CategoryListings({ category }: CategoryListingsProps) {
 
   const handleSearch = () => {
     fetchListings()
+    try {
+      // Lokal lagring av siste søk (GDPR: kun på enheten)
+      const record = { when: Date.now(), category, filters, sortBy }
+      const key = 'kulbruk:lastSearch'
+      const existing = typeof window !== 'undefined' ? localStorage.getItem(key) : null
+      const arr = existing ? JSON.parse(existing) as any[] : []
+      arr.unshift(record)
+      // Behold siste 20
+      const trimmed = arr.slice(0, 20)
+      localStorage.setItem(key, JSON.stringify(trimmed))
+    } catch {}
+  }
+
+  async function saveCurrentSearch() {
+    try {
+      await fetch('/api/saved-searches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `Søk ${new Date().toLocaleString('no-NO')}`, queryJson: currentQueryJson }) })
+    } catch {}
   }
 
   if (isLoading) {
@@ -240,9 +258,10 @@ export default function CategoryListings({ category }: CategoryListingsProps) {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span className="text-sm text-gray-600">Live data</span>
+              <button onClick={saveCurrentSearch} className="text-sm text-blue-600 hover:underline">Lagre søk</button>
               <Button
                 onClick={fetchListings}
                 variant="outline"
@@ -315,6 +334,7 @@ export default function CategoryListings({ category }: CategoryListingsProps) {
                     images={undefined}
                     views={listing.views}
                     createdAt={new Date(listing.createdAt)}
+                    isFavorited={(listing as any).isFavorited === true}
                   />
                 </a>
               )

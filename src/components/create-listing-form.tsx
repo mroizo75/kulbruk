@@ -52,6 +52,7 @@ export default function CreateListingForm() {
   const [showPayment, setShowPayment] = useState(false)
   const [createdListingId, setCreatedListingId] = useState<string | null>(null)
   const [showAddress, setShowAddress] = useState<boolean>(false)
+  const [termsAccepted, setTermsAccepted] = useState<boolean>(false)
 
   const {
     register,
@@ -152,6 +153,12 @@ export default function CreateListingForm() {
     }
     
     try {
+      // Krav: vilkår må være akseptert
+      if (!termsAccepted) {
+        toast.error('Du må akseptere vilkår og personvern for å opprette annonse')
+        setIsSubmitting(false)
+        return
+      }
       // Sjekk at bruker er logget inn
       if (!session?.user) {
         toast.error('Du må være logget inn for å legge ut en annonse')
@@ -186,10 +193,8 @@ export default function CreateListingForm() {
             nextInspection: vehicleData.nextInspection || null,
             accidents: vehicleData.hasAccidents || false,
             serviceHistory: vehicleData.serviceHistory || '',
-            modifications: [
-              vehicleData.modifications || '',
-              ...(vehicleData.additionalEquipment || [])
-            ].filter(Boolean).join(', ')
+            modifications: vehicleData.modifications || '',
+            additionalEquipment: vehicleData.additionalEquipment || []
           }
         } : {}),
         showAddress,
@@ -198,7 +203,8 @@ export default function CreateListingForm() {
           altText: img.name,
           sortOrder: uploadedImages.indexOf(img),
           isMain: uploadedImages.indexOf(img) === 0 
-        }))
+        })),
+        acceptedTermsAt: new Date().toISOString()
       }
       
       // NextAuth håndterer automatisk autentisering
@@ -228,10 +234,10 @@ export default function CreateListingForm() {
         // Vis betalingsskjema
         setCreatedListingId(result.id)
         setShowPayment(true)
-        toast.success('Annonse opprettet! Fullfør betaling for å publisere.')
+        toast.success(`Annonse opprettet (#${result.shortCode || result.id})! Fullfør betaling for å publisere.`)
       } else {
         // Gratis annonse - gå direkte til dashboard
-        toast.success('Annonse opprettet! Venter på godkjenning.')
+        toast.success(`Annonse opprettet (#${result.shortCode || result.id})! Venter på godkjenning.`)
         router.push('/dashboard/customer/annonser')
       }
       
@@ -446,6 +452,17 @@ export default function CreateListingForm() {
           {/* Submit knapp */}
           <Card>
             <CardContent className="pt-6">
+              <div className="mb-4">
+                <div className="flex items-start gap-3">
+                  <Checkbox id="acceptTerms" checked={termsAccepted} onCheckedChange={(v) => setTermsAccepted(!!v)} />
+                  <Label htmlFor="acceptTerms" className="text-sm text-gray-700">
+                    Jeg har lest og aksepterer {' '}
+                    <a className="text-[#af4c0f] hover:underline" href="/vilkar-og-betingelser" target="_blank" rel="noreferrer">vilkår og betingelser</a>
+                    {' '} og {' '}
+                    <a className="text-[#af4c0f] hover:underline" href="/personvern" target="_blank" rel="noreferrer">personvernerklæringen</a>.
+                  </Label>
+                </div>
+              </div>
               {/* Prisinfo */}
               {watch('category') && (
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg">

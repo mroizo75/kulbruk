@@ -71,6 +71,19 @@ interface AdvancedFiltersProps {
 
 export default function AdvancedFilters({ category, onFiltersChange, onSearch }: AdvancedFiltersProps) {
   const [filters, setFilters] = useState<FilterState>({})
+  // Prefyll fra URL
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const next: FilterState = {}
+      const keys: (keyof FilterState)[] = ['search','location','priceRange','make','fuel','transmission','ageRange','kmRange','propertyType','rooms','area','plotSize','buildYear','condition','subcategory']
+      keys.forEach((k) => {
+        const v = params.get(k)
+        if (v) (next as any)[k] = v
+      })
+      if (Object.keys(next).length) setFilters(next)
+    } catch {}
+  }, [])
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
 

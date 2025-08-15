@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Search, Plus, User, Menu, X } from 'lucide-react'
+import { Search, Plus, User, Menu, X, Bell, MessageSquare } from 'lucide-react'
 import { useSession, signOut } from 'next-auth/react'
 
 export default function Navbar() {
@@ -39,39 +39,6 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-6">
-            <Link 
-              href="/annonser" 
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Alle annonser
-            </Link>
-            <Link 
-              href="/reiser" 
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              🛫 Reiser
-            </Link>
-            <Link 
-              href="/annonser/bil" 
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Biler
-            </Link>
-            <Link 
-              href="/annonser/eiendom" 
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Eiendom
-            </Link>
-            <Link 
-              href="/annonser/torget" 
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Torget
-            </Link>
-          </div>
 
           {/* Desktop Search - Hidden on mobile/tablet */}
           <div className="hidden lg:flex flex-1 max-w-md mx-6">
@@ -97,7 +64,7 @@ export default function Navbar() {
               className="hidden lg:flex items-center space-x-2 bg-[#af4c0f] text-white px-4 py-2 rounded-lg hover:bg-[#af4c0f]/90 transition-colors"
             >
               <Plus className="h-4 w-4" />
-              <span>Legg ut annonse</span>
+              <span>Ny annonse</span>
             </Link>
 
             {/* Tablet: Shortened button */}
@@ -121,13 +88,20 @@ export default function Navbar() {
             {/* Auth section */}
             {session ? (
               <>
-                {/* Dashboard link - hidden on mobile */}
+                {/* Meldinger og varsler */}
+                <Link href="/dashboard/customer/meldinger" className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 transition-colors px-2 py-1" title="Meldinger">
+                  <MessageSquare className="h-5 w-5" />
+                </Link>
+                <Link href="/dashboard/business/varsler" className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 transition-colors px-2 py-1" title="Varsler">
+                  <Bell className="h-5 w-5" />
+                </Link>
+                {/* Min side */}
                 <Link 
                   href="/dashboard"
                   className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 transition-colors px-2 py-1"
                 >
                   <User className="h-4 w-4 mr-1" />
-                  <span className="hidden lg:block">Dashboard</span>
+                  <span className="hidden lg:block">Min side</span>
                 </Link>
                 
                 {/* User menu button */}
@@ -190,10 +164,10 @@ export default function Navbar() {
             >
               {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
-          </div>
-        </div>
+          </div> 
 
-        {/* Mobile/Tablet Search Bar */}
+
+          {/* Mobile/Tablet Search Bar */}
         <div className="lg:hidden px-4 pb-3">
           <form onSubmit={handleSearch}>
             <div className="relative">
@@ -213,50 +187,30 @@ export default function Navbar() {
         {isMobileMenuOpen && (
           <div className="lg:hidden border-t border-gray-200 bg-white">
             <div className="px-2 pt-2 pb-3 space-y-1">
-              <Link 
-                href="/annonser" 
-                className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Alle annonser
-              </Link>
-              <Link 
-                href="/reiser" 
-                className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                🛫 Reiser
-              </Link>
-              <Link 
-                href="/annonser/bil" 
-                className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Biler
-              </Link>
-              <Link 
-                href="/annonser/eiendom" 
-                className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Eiendom
-              </Link>
-              <Link 
-                href="/annonser/torget" 
-                className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Torget
-              </Link>
+              {/* Fjernet navigasjonslenker for katalogsider for å forenkle toppnavigasjonen */}
               
               {session ? (
                 <div className="border-t border-gray-200 pt-2 mt-2">
+                  <Link
+                    href="/dashboard/customer/meldinger"
+                    className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    💬 Meldinger
+                  </Link>
+                  <Link
+                    href="/dashboard/business/varsler"
+                    className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    🔔 Varsler
+                  </Link>
                   <Link
                     href="/dashboard"
                     className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    📊 Dashboard
+                    👤 Min side
                   </Link>
                   <button
                     onClick={() => {
@@ -289,6 +243,7 @@ export default function Navbar() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </nav>
   )

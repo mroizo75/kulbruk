@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import DashboardLayout from '@/components/dashboard-layout'
+import { prisma } from '@/lib/prisma'
 
 export default async function MyListingsPage() {
   const session = await auth()
@@ -14,42 +15,16 @@ export default async function MyListingsPage() {
     redirect('/sign-in?redirectUrl=/dashboard/customer/annonser')
   }
 
-  // Mock data - senere hentes fra database
-  const listings = [
-    {
-      id: '1',
-      title: 'BMW X5 2019 - Lav kilometerstand',
-      price: 450000,
-      location: 'Oslo',
-      category: 'Biler',
-      status: 'APPROVED',
-      views: 127,
-      createdAt: new Date('2024-01-15'),
-      images: ['/api/placeholder/300x200']
+  const userId = (session.user as any).id as string
+
+  const listings = await prisma.listing.findMany({
+    where: { userId },
+    include: {
+      images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+      category: true,
     },
-    {
-      id: '2',
-      title: 'MacBook Pro M3 14" - nesten ny i eske',
-      price: 25000,
-      location: 'Bergen',
-      category: 'Elektronikk',
-      status: 'PENDING',
-      views: 0,
-      createdAt: new Date('2024-01-20'),
-      images: []
-    },
-    {
-      id: '3',
-      title: 'Design sofa fra HAG - perfekt stand',
-      price: 8500,
-      location: 'Trondheim',
-      category: 'Møbler',
-      status: 'REJECTED',
-      views: 0,
-      createdAt: new Date('2024-01-18'),
-      images: ['/api/placeholder/300x200']
-    }
-  ]
+    orderBy: { createdAt: 'desc' },
+  })
 
   const statusConfig = {
     PENDING: { label: 'Venter godkjenning', icon: Clock, color: 'bg-yellow-500' },
@@ -138,7 +113,7 @@ export default async function MyListingsPage() {
                       <div className="sm:w-48 h-32 sm:h-auto bg-gray-200 flex items-center justify-center">
                         {listing.images.length > 0 ? (
                           <img
-                            src={listing.images[0]}
+                            src={(listing.images[0] as any).url || listing.images[0]}
                             alt={listing.title}
                             className="w-full h-full object-cover"
                           />
@@ -154,12 +129,17 @@ export default async function MyListingsPage() {
                             <div className="flex items-center gap-3 mb-2">
                               <h3 className="text-lg font-semibold text-gray-900">{listing.title}</h3>
                               <Badge variant="secondary" className="text-xs">
-                                {listing.category}
+                                {(listing as any).category?.name || 'Kategori'}
                               </Badge>
+                              {listing.shortCode && (
+                                <Badge className="text-xs bg-blue-600 text-white" title="Kortkode">
+                                  #{listing.shortCode}
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
                               <span className="font-bold text-xl text-blue-600">
-                                {listing.price.toLocaleString('no-NO')} kr
+                                {Number(listing.price).toLocaleString('no-NO')} kr
                               </span>
                               <span>📍 {listing.location}</span>
                               <span className="flex items-center gap-1">
@@ -171,7 +151,7 @@ export default async function MyListingsPage() {
                               <StatusIcon className={`h-4 w-4 text-white rounded-full p-0.5 ${statusInfo.color}`} />
                               <span className="text-sm font-medium">{statusInfo.label}</span>
                               <span className="text-xs text-gray-500">
-                                • Opprettet {listing.createdAt.toLocaleDateString('no-NO')}
+                                • Opprettet {new Date(listing.createdAt).toLocaleDateString('no-NO')}
                               </span>
                             </div>
                           </div>

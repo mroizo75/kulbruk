@@ -5,6 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Search, Car, Home, ShoppingBag, Plus, TrendingUp, Clock, MapPin } from 'lucide-react'
+import CategoriesStrip from '@/components/homepage/categories-strip'
+import RecommendedListings from '@/components/homepage/recommended-listings'
+import RecentlyViewedStrip from '@/components/homepage/recently-viewed-strip'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 
@@ -161,55 +164,10 @@ export default function HeroSection() {
         </div>
       </section>
 
-      {/* Kategori-oversikt */}
-      <section className="py-6 sm:py-8 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Kategorier</h2>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {mainCategories.map((category) => {
-              const IconComponent = category.icon
-              return (
-                <Link key={category.id} href={category.href}>
-                  <Card className="hover:shadow-md transition-all duration-200 cursor-pointer group h-full border border-gray-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-[#af4c0f] rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
-                            <IconComponent className="h-6 w-6 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-[#af4c0f] transition-colors">
-                              {category.title}
-                            </h3>
-                            <p className="text-sm text-gray-600">{category.description}</p>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-[#af4c0f] border-[#af4c0f]/20">
-                          {category.count}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2">
-                        {category.subcategories.map((sub, index) => (
-                          <span 
-                            key={index}
-                            className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full"
-                          >
-                            {sub}
-                          </span>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      </section>
+      {/* Kategorier som ikon-stripe */}
+      <CategoriesStrip />
 
-      {/* Anbefalte annonser */}
+      {/* Anbefalte annonser – 10 og 10, maks 50 */}
       <section className="py-6 sm:py-8 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
@@ -218,55 +176,15 @@ export default function HeroSection() {
               <p className="text-xs sm:text-sm text-gray-600 mt-1">Basert på dine tidligere søk og interesse</p>
             </div>
             <Button asChild variant="outline" className="border-[#af4c0f] text-[#af4c0f] hover:bg-[#af4c0f]/5 w-full sm:w-auto">
-              <Link href="/annonser">
-                Se alle annonser
-              </Link>
+              <Link href="/annonser">Se alle annonser</Link>
             </Button>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {recommendedListings.map((listing) => (
-              <Link key={listing.id} href={`/annonser/detaljer/${listing.id}`}>
-                <Card className="hover:shadow-md transition-all duration-200 cursor-pointer group overflow-hidden">
-                  <div className="aspect-[4/3] bg-gray-200 relative overflow-hidden">
-                    {/* Placeholder for bilde */}
-                    <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                      <span className="text-gray-400 text-sm">Ingen bilde</span>
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="mb-2">
-                      <Badge variant="secondary" className="text-xs mb-2">
-                        {listing.category}
-                      </Badge>
-                      <h3 className="font-medium text-gray-900 group-hover:text-[#af4c0f] transition-colors line-clamp-2">
-                        {listing.title}
-                      </h3>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <p className="text-lg font-bold text-[#af4c0f]">
-                        {listing.price} kr
-                      </p>
-                      
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          <span>{listing.location}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{listing.timeAgo}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
+          <RecommendedListings />
         </div>
       </section>
+
+      {/* Du så nylig */}
+      <RecentlyViewedStrip />
 
       {/* Statistikk */}
       <section className="py-6 sm:py-8 bg-[#af4c0f]/5">

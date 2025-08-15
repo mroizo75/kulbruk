@@ -34,6 +34,17 @@ model User {
   subscription   Subscription?
   accounts       Account[]
   sessions       Session[]
+  // Relasjoner for meldinger/vurderinger
+  conversationsAsBuyer  Conversation[] @relation("BuyerConversations")
+  conversationsAsSeller Conversation[] @relation("SellerConversations")
+  messages              Message[]
+  reviewsWritten        Review[]       @relation("ReviewsWritten")
+  reviewsReceived       Review[]       @relation("ReviewsReceived")
+  reportsReported       Report[]       @relation("ReportsByUser")
+  reportsHandled        Report[]       @relation("ReportsHandledBy")
+  favorites             Favorite[]
+  savedSearches         SavedSearch[]
+  auditLogs             AuditLog[]
 
   @@map("users")
 }
@@ -95,6 +106,7 @@ model Category {
 
 model Listing {
   id                 String           @id @default(cuid())
+  shortCode          String?          @unique
   title              String
   description        String           @db.Text
   price              Decimal          @db.Decimal(10, 2)
@@ -128,9 +140,17 @@ model Listing {
   auction            Auction?
   bids               Bid[]
   listingPayment     ListingPayment?
+  // Relasjoner for meldinger/rapporter/vurderinger
+  conversations      Conversation[]
+  reports            Report[]
+  reviews            Review[]
+  favorites          Favorite[]
 
   @@index([categoryId], map: "listings_categoryId_fkey")
   @@index([userId], map: "listings_userId_fkey")
+  @@index([categoryId, status, isActive, expiresAt])
+  @@index([status, isActive, expiresAt])
+  @@fulltext([title])
   @@map("listings")
 }
 
@@ -223,6 +243,7 @@ model VehicleSpec {
   accidents          Boolean?
   serviceHistory     String?   @db.Text
   modifications      String?   @db.Text
+  additionalEquipment Json?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   listingId          String    @unique
@@ -447,4 +468,155 @@ enum SubscriptionStatus {
 enum ListingPaymentType {
   CAR_AD
   TORGET_AD
+}
+
+// --------- Favoritter ---------
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+  @@map("favorites")
+}
+
+// --------- Lagrede søk ---------
+
+model SavedSearch {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String?
+  queryJson  String   @db.LongText
+  frequency  String   @default("daily")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_searches")
+}
+
+// --------- Audit log ---------
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String
+  action      String
+  targetType  String
+  targetId    String
+  details     String?  @db.LongText
+  createdAt   DateTime @default(now())
+  actor       User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@map("audit_logs")
+}
+
+// --------- Meldinger ---------
+
+model Conversation {
+  id            String   @id @default(cuid())
+  listingId     String
+  buyerId       String
+  sellerId      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastMessageAt DateTime @default(now())
+  messages      Message[]
+  listing       Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer         User     @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller        User     @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, buyerId, sellerId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([listingId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String        @db.Text
+  status         MessageStatus @default(SENT)
+  readAt         DateTime?
+  createdAt      DateTime      @default(now())
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@map("messages")
+}
+
+enum MessageStatus {
+  SENT
+  READ
+}
+
+// --------- Rapporter ---------
+
+model Report {
+  id          String       @id @default(cuid())
+  listingId   String
+  reporterId  String
+  reason      ReportReason
+  comment     String?
+  status      ReportStatus @default(OPEN)
+  handledById String?
+  handledAt   DateTime?
+  createdAt   DateTime     @default(now())
+  listing     Listing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter    User         @relation("ReportsByUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  handledBy   User?        @relation("ReportsHandledBy", fields: [handledById], references: [id])
+
+  @@index([listingId])
+  @@index([reporterId])
+  @@index([handledById])
+  @@index([status])
+  @@map("reports")
+}
+
+enum ReportReason {
+  SCAM
+  WRONG_CATEGORY
+  OFFENSIVE
+  SPAM
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+// --------- Vurderinger ---------
+
+model Review {
+  id          String   @id @default(cuid())
+  revieweeId  String
+  reviewerId  String
+  listingId   String?
+  rating      Int
+  comment     String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reviewee    User     @relation("ReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+  reviewer    User     @relation("ReviewsWritten", fields: [reviewerId], references: [id], onDelete: Cascade)
+  listing     Listing? @relation(fields: [listingId], references: [id])
+
+  @@unique([reviewerId, revieweeId, listingId])
+  @@index([revieweeId])
+  @@index([reviewerId])
+  @@map("reviews")
 }

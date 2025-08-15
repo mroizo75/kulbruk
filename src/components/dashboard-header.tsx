@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { Shield, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -7,6 +8,31 @@ interface DashboardHeaderProps {
 }
 
 export default function DashboardHeader({ userRole = 'customer' }: DashboardHeaderProps) {
+  const [unread, setUnread] = useState<number | null>(null)
+  useEffect(() => {
+    let active = true
+    fetch('/api/messages/unread-count')
+      .then(r => r.ok ? r.json() : { count: 0 })
+      .then(d => { if (active) setUnread(d.count) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
+  // Live-oppdater ulest teller via SSE for kunder/bedrifter
+  useEffect(() => {
+    if (userRole === 'admin' || userRole === 'moderator') return
+    const es = new EventSource('/api/user/notifications/stream')
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data?.type === 'message') {
+          setUnread((prev) => (typeof prev === 'number' ? prev + 1 : 1))
+        }
+      } catch {}
+    }
+    es.onerror = () => es.close()
+    return () => es.close()
+  }, [userRole])
   const getRoleDisplay = () => {
     switch (userRole) {
       case 'admin':
@@ -43,6 +69,9 @@ export default function DashboardHeader({ userRole = 'customer' }: DashboardHead
 
         {/* Navigasjon */}
         <div className="flex items-center space-x-4">
+          {typeof unread === 'number' && unread > 0 && (
+            <div className="text-sm text-blue-600">Uleste meldinger: {unread}</div>
+          )}
           <Link href="/" className="flex items-center space-x-1 text-sm text-gray-500 hover:text-gray-700 transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Tilbake til forsiden</span>

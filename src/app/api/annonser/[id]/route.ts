@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
+import { auth } from '@/lib/auth'
 
 const prisma = new PrismaClient()
 
@@ -11,9 +10,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const listing = await prisma.listing.findUnique({
-      where: { id },
+  const { id } = await params
+  // Støtt enten intern id eller kortkode
+  const listing = await prisma.listing.findFirst({
+      where: { OR: [ { id }, { shortCode: id } ] },
       include: {
         user: {
           select: {
@@ -63,7 +63,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
+    const session = await auth()
+    const userId = session?.user?.id
     
     if (!userId) {
       return NextResponse.json(
@@ -95,31 +96,78 @@ export async function PUT(
       )
     }
 
-    // Oppdater annonse
-    const updatedListing = await prisma.listing.update({
-      where: { id: id },
-      data: {
-        title: data.title,
-        description: data.description,
-        price: data.price ? parseFloat(data.price) : undefined,
-        location: data.location,
-        contactEmail: data.contactEmail,
-        contactPhone: data.contactPhone,
-        contactName: data.contactName,
-        showAddress: typeof data.showAddress === 'boolean' ? data.showAddress : undefined,
-        // Status settes tilbake til PENDING hvis innhold endres
-        status: data.title || data.description || data.price ? 'PENDING' : undefined
-      },
-      include: {
-        category: true,
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true
+    // Oppdater annonse (og relasjoner) i en transaksjon
+    const updatedListing = await prisma.$transaction(async (tx) => {
+      const listing = await tx.listing.update({
+        where: { id },
+        data: {
+          title: data.title,
+          description: data.description,
+          price: typeof data.price === 'number' ? data.price : (data.price ? parseFloat(String(data.price)) : undefined),
+          location: data.location,
+          contactEmail: data.contactEmail,
+          contactPhone: data.contactPhone,
+          contactName: data.contactName,
+          showAddress: typeof data.showAddress === 'boolean' ? data.showAddress : undefined,
+          // Kunde: merk som solgt
+          ...(data?.markAsSold === true ? { status: 'SOLD', soldAt: new Date() } : {}),
+          // Kunde: toggle visning
+          ...(typeof data?.isActive === 'boolean' ? { isActive: data.isActive } : {}),
+          // Status settes tilbake til PENDING hvis innhold endres
+          status: (data.title || data.description || data.price || data.vehicleSpec) ? 'PENDING' : undefined
+        },
+        include: {
+          category: true,
+          user: {
+            select: { id: true, firstName: true, lastName: true }
           }
         }
+      })
+
+      // Oppdater/erstatt bilder dersom sendt inn
+      if (Array.isArray(data.images)) {
+        await tx.image.deleteMany({ where: { listingId: id } })
+        for (let index = 0; index < data.images.length; index++) {
+          const image = data.images[index]
+          await tx.image.create({
+            data: {
+              url: image.url,
+              altText: image.altText || `Bilde ${index + 1}`,
+              sortOrder: typeof image.sortOrder === 'number' ? image.sortOrder : index,
+              isMain: typeof image.isMain === 'boolean' ? image.isMain : index === 0,
+              listingId: id
+            }
+          })
+        }
       }
+
+      // Oppdater vehicleSpec dersom sendt inn
+      if (data.vehicleSpec) {
+        await tx.vehicleSpec.upsert({
+          where: { listingId: id },
+          update: {
+            registrationNumber: data.vehicleSpec.registrationNumber ?? undefined,
+            mileage: data.vehicleSpec.mileage ?? undefined,
+            nextInspection: data.vehicleSpec.nextInspection ? new Date(data.vehicleSpec.nextInspection) : undefined,
+            accidents: typeof data.vehicleSpec.accidents === 'boolean' ? data.vehicleSpec.accidents : undefined,
+            serviceHistory: data.vehicleSpec.serviceHistory ?? undefined,
+            modifications: data.vehicleSpec.modifications ?? undefined,
+            additionalEquipment: Array.isArray(data.vehicleSpec.additionalEquipment) ? data.vehicleSpec.additionalEquipment : undefined,
+          },
+          create: {
+            listingId: id,
+            registrationNumber: data.vehicleSpec.registrationNumber || null,
+            mileage: data.vehicleSpec.mileage || null,
+            nextInspection: data.vehicleSpec.nextInspection ? new Date(data.vehicleSpec.nextInspection) : null,
+            accidents: data.vehicleSpec.accidents ?? null,
+            serviceHistory: data.vehicleSpec.serviceHistory || null,
+            modifications: data.vehicleSpec.modifications || null,
+            additionalEquipment: Array.isArray(data.vehicleSpec.additionalEquipment) ? data.vehicleSpec.additionalEquipment : undefined,
+          }
+        })
+      }
+
+      return listing
     })
 
     return NextResponse.json({

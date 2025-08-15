@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -26,14 +27,49 @@ import {
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import ContactSeller from '@/components/contact-seller'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import ListingCard, { ListingGrid } from '@/components/listing-card'
+import ListingCard from '@/components/listing-card'
 import LoanCalculator from '@/components/loan-calculator'
+import ReviewSummary from '@/components/reviews/review-summary'
+import ReviewForm from '@/components/reviews/review-form'
+import RecentlyViewedRecorder from '@/components/recently-viewed-recorder'
 // Address map uses a simple Google Maps embed per your preference
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params
+  // Hent listing tittel/bilde for OG
+  try {
+    const item = await prisma.listing.findFirst({
+      where: { OR: [{ id }, { shortCode: id }] },
+      include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+    })
+    const title = item?.title ? `${item.title} – Kulbruk` : 'Annonse – Kulbruk'
+    const description = item?.description?.slice(0, 160) || 'Se detaljer for annonsen på Kulbruk.'
+    const ogImage = item?.images?.[0]?.url
+    return {
+      metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
+      title,
+      description,
+      alternates: { canonical: `/annonser/detaljer/${id}` },
+      openGraph: {
+        title,
+        description,
+        type: 'article',
+        images: ogImage ? [{ url: ogImage }] : undefined,
+      },
+    }
+  } catch {
+    return {
+      metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
+      title: 'Annonse – Kulbruk',
+      description: 'Se detaljer for annonsen på Kulbruk.',
+    }
+  }
+}
 
 interface PageProps {
   params: Promise<{
@@ -127,7 +163,17 @@ async function getVegvesenData(regNumber: string | null | undefined) {
 export default async function ListingDetailPage({ params }: PageProps) {
   const session = await auth()
   const { id } = await params
-  const listing = await getListing(id)
+  const listingById = await getListing(id)
+  // Hvis ikke funnet med id, forsøk kortkode (shortCode)
+  const listing = listingById || await prisma.listing.findFirst({
+    where: { shortCode: id },
+    include: {
+      user: { select: { id: true, firstName: true, lastName: true, createdAt: true } },
+      category: true,
+      images: { orderBy: { sortOrder: 'asc' } },
+      vehicleSpec: true,
+    }
+  })
   
   if (!listing) {
     redirect('/annonser')
@@ -199,6 +245,14 @@ export default async function ListingDetailPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <RecentlyViewedRecorder 
+          id={listing.id}
+          title={listing.title}
+          mainImage={listing.images?.[0]?.url || null}
+          price={Number(listing.price)}
+          location={listing.location}
+          createdAt={listing.createdAt}
+        />
         {/* Tilbake-knapp */}
         <div className="mb-6">
           <Link href={referer} className="inline-flex items-center text-gray-600 hover:text-gray-900">
@@ -253,11 +307,19 @@ export default async function ListingDetailPage({ params }: PageProps) {
                   </div>
                 </div>
                 
-                <div className="text-4xl font-bold text-blue-600 mb-4">
+                <div className="text-4xl font-bold text-blue-600 mb-2">
                   {Number(listing.price).toLocaleString('no-NO')} kr
                 </div>
+                <div className="mb-4">
+                  <ReviewSummary userId={listing.user.id} />
+                </div>
                 
-                <Badge className="mb-4">{listing.category.name}</Badge>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge>{listing.category.name}</Badge>
+                  {listing.shortCode && (
+                    <Badge variant="outline">Annonsenr: {listing.shortCode}</Badge>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -457,6 +519,23 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 </CardContent>
               </Card>
             )}
+
+            {/* Vurdering av selger */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Vurder selger</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {session?.user ? (
+                  <ReviewForm revieweeId={listing.user.id} listingId={listing.id} />
+                ) : (
+                  <div className="text-sm text-gray-600">
+                    Du må være innlogget for å legge igjen vurdering. {' '}
+                    <Link className="underline" href="/sign-in">Logg inn</Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Sidebar */}
@@ -480,10 +559,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
                         Ring {listing.contactPhone}
                       </Button>
                       
-                      <Button variant="outline" className="w-full">
-                        <Mail className="h-4 w-4 mr-2" />
-                        Send melding
-                      </Button>
+                      <ContactSeller listingId={listing.id} sellerId={listing.user.id} />
                     </div>
                     
                     <Separator />
@@ -581,7 +657,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
         {similar && similar.length > 0 && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <h2 className="text-2xl font-bold mb-4">Mer som dette</h2>
-            <ListingGrid>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {similar.map((s: any) => (
                 <ListingCard
                   key={s.id}
@@ -597,7 +673,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
                   createdAt={s.createdAt}
                 />
               ))}
-            </ListingGrid>
+            </div>
           </div>
         )}
       </div>

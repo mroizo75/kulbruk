@@ -53,6 +53,58 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// POST: Konverter en eksisterende annonse til auksjon (for selger)
+export async function POST(request: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
+    }
+
+    const { listingId, endTime, reservePrice } = await request.json()
+    if (!listingId) {
+      return NextResponse.json({ error: 'Mangler listingId' }, { status: 400 })
+    }
+
+    const prisma = new PrismaClient()
+    const listing = await prisma.listing.findUnique({ where: { id: listingId } })
+    if (!listing) {
+      return NextResponse.json({ error: 'Annonse ikke funnet' }, { status: 404 })
+    }
+
+    if (listing.userId !== (session.user as any).id) {
+      return NextResponse.json({ error: 'Ikke autorisert' }, { status: 403 })
+    }
+
+    const updated = await prisma.listing.update({
+      where: { id: listingId },
+      data: {
+        listingType: 'AUCTION',
+        auction: {
+          upsert: {
+            create: {
+              endTime: endTime ? new Date(endTime) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              reservePrice: reservePrice ? Number(reservePrice) : null,
+              status: 'ACTIVE'
+            },
+            update: {
+              endTime: endTime ? new Date(endTime) : undefined,
+              reservePrice: reservePrice ? Number(reservePrice) : undefined,
+              status: 'ACTIVE'
+            }
+          }
+        }
+      },
+      include: { auction: true }
+    })
+
+    return NextResponse.json({ success: true, listing: updated })
+  } catch (error) {
+    console.error('Feil ved konvertering til auksjon:', error)
+    return NextResponse.json({ error: 'Kunne ikke konvertere til auksjon' }, { status: 500 })
+  }
+}
+
 async function generateMockAuctionsWithAIPricing(businessUserId: string) {
   const mockVehicles = [
     {

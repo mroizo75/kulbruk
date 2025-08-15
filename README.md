@@ -98,13 +98,15 @@ Opprett `.env.local` fil:
 # Database
 DATABASE_URL="mysql://username:password@localhost:3306/kulbruk"
 
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard
-NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/dashboard
+# Base URL
+NEXT_PUBLIC_BASE_URL=https://www.kulbruk.no
+
+# Epost (Postmark)
+POSTMARK_API_KEY=your_postmark_key
+POSTMARK_FROM="Kulbruk <no-reply@kulbruk.no>"
+POSTMARK_STREAM=outbound
+# Admin-eposter for rapportvarsler (kommaseparert)
+SMTP_ADMIN=admin@kulbruk.no
 
 # External APIs
 VEGVESEN_API_KEY=your_vegvesen_api_key
@@ -130,6 +132,9 @@ npm run dev
 ```
 
 Applikasjonen kjører nå på `http://localhost:3000`
+
+### **Cron/Scheduler**
+- Kall daglig: `GET /api/cron/listings-expiring` (Vercel Scheduler eller GitHub Actions)
 
 ## 📁 Prosjektstruktur
 

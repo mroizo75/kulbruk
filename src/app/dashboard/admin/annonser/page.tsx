@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { CheckCircle, XCircle, Eye, Clock, User, MapPin, Calendar, Euro } from 'lucide-react'
+import { CheckCircle, XCircle, Eye, Clock, User, MapPin, Calendar, Euro, Trash2, Search } from 'lucide-react'
 import Link from 'next/link'
 import DashboardLayout from '@/components/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,37 +9,87 @@ import { Badge } from '@/components/ui/badge'
 import { PrismaClient } from '@prisma/client'
 import ApprovalActions from '@/components/approval-actions'
 import AdminAnnonserClient from '@/components/admin-annonser-client'
+import AdminShortcodeSearch from '@/components/admin/admin-shortcode-search'
+import AdminDeleteListingButton from '@/components/admin/admin-delete-listing-button'
+import AdminListingsTable from '@/components/admin/admin-listings-table'
+import AdminListingsFilters from '@/components/admin/admin-listings-filters'
 
 const prisma = new PrismaClient()
 
-export default async function AdminListingsPage() {
+export default async function AdminListingsPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const session = await auth()
   
   if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/admin/annonser')
   }
 
-  // Hent alle ventende annonser
-  const pendingListings = await prisma.listing.findMany({
-    where: { status: 'PENDING' },
-    include: {
-      user: { 
-        select: { 
-          id: true,
-          firstName: true, 
-          lastName: true, 
-          email: true,
-          role: true
-        } 
+  // Les query
+  const q = typeof searchParams?.q === 'string' ? searchParams?.q : ''
+  const status = typeof searchParams?.status === 'string' ? searchParams?.status : 'ALL'
+  const categoryId = typeof searchParams?.categoryId === 'string' ? searchParams?.categoryId : ''
+  const page = Math.max(1, parseInt((searchParams?.page as string) || '1'))
+  const pageSize = Math.min(100, Math.max(10, parseInt((searchParams?.pageSize as string) || '20')))
+
+  // Hent kategorier + lister for moderering og administrasjon
+  const [categories, pendingListings, totalCount, allListings] = await Promise.all([
+    prisma.category.findMany({ where: { isActive: true }, select: { id: true, name: true } }),
+    prisma.listing.findMany({
+      where: { status: 'PENDING' },
+      include: {
+        user: { 
+          select: { 
+            id: true,
+            firstName: true, 
+            lastName: true, 
+            email: true,
+            role: true
+          } 
+        },
+        category: { select: { name: true } },
+        images: { 
+          orderBy: { sortOrder: 'asc' },
+          take: 1 
+        }
       },
-      category: { select: { name: true } },
-      images: { 
-        orderBy: { sortOrder: 'asc' },
-        take: 1 
+      orderBy: { createdAt: 'desc' }
+    }),
+    prisma.listing.count({
+      where: {
+        ...(status !== 'ALL' ? { status: status as any } : {}),
+        ...(categoryId ? { categoryId } : {}),
+        ...(q ? { OR: [
+          { title: { contains: q } },
+          { shortCode: { contains: q } }
+        ] } : {}),
       }
-    },
-    orderBy: { createdAt: 'desc' }
-  })
+    }),
+    prisma.listing.findMany({
+      where: {
+        ...(status !== 'ALL' ? { status: status as any } : {}),
+        ...(categoryId ? { categoryId } : {}),
+        ...(q ? { OR: [
+          { title: { contains: q } },
+          { shortCode: { contains: q } }
+        ] } : {}),
+      },
+      include: {
+        user: { 
+          select: { 
+            id: true,
+            firstName: true, 
+            lastName: true, 
+            email: true,
+            role: true
+          } 
+        },
+        category: { select: { name: true } },
+        images: { orderBy: { sortOrder: 'asc' }, take: 1 }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    })
+  ])
 
   function getTimeAgo(date: Date) {
     const now = new Date()
@@ -67,6 +117,16 @@ export default async function AdminListingsPage() {
             {pendingListings.length} annonser venter på godkjenning
           </p>
         </div>
+
+        {/* Søk etter kortkode */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Search className="h-5 w-5" /> Søk etter annonsenummer</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AdminShortcodeSearch />
+          </CardContent>
+        </Card>
 
         {/* Live oppdatering status */}
         <AdminAnnonserClient pendingCount={pendingListings.length} />
@@ -110,7 +170,7 @@ export default async function AdminListingsPage() {
           </Card>
         </div>
 
-        {/* Annonser liste */}
+        {/* Ventende annonser */}
         {pendingListings.length > 0 ? (
           <div className="grid grid-cols-1 gap-6">
             {pendingListings.map((listing) => (
@@ -214,6 +274,49 @@ export default async function AdminListingsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Alle annonser (admin kan slette) */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Alle annonser</h2>
+          <div className="mb-4">
+            <AdminListingsFilters
+              initialStatus={status}
+              initialQuery={q}
+              initialCategoryId={categoryId}
+              initialPageSize={pageSize}
+              categories={categories}
+            />
+          </div>
+          <AdminListingsTable rows={allListings.map(l => ({
+            id: l.id,
+            title: l.title,
+            price: Number(l.price),
+            location: l.location,
+            createdAt: l.createdAt.toISOString(),
+            categoryName: l.category.name,
+            status: l.status,
+            shortCode: l.shortCode || null,
+            imageUrl: l.images[0]?.url || null,
+          }))} />
+          <div className="flex justify-between items-center mt-4 text-sm text-gray-600">
+            <div>Totalt: {totalCount}</div>
+            <div className="flex items-center gap-2">
+              <span>Side {page} av {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
+              <div className="flex gap-1">
+                {page > 1 && (
+                  <Link href={`/dashboard/admin/annonser?${new URLSearchParams({ ...((q && { q }) || {}), ...((status !== 'ALL' && { status }) || {}), ...((categoryId && { categoryId }) || {}), page: String(page - 1), pageSize: String(pageSize) }).toString()}`}>
+                    <Button size="sm" variant="outline">Forrige</Button>
+                  </Link>
+                )}
+                {(page * pageSize) < totalCount && (
+                  <Link href={`/dashboard/admin/annonser?${new URLSearchParams({ ...((q && { q }) || {}), ...((status !== 'ALL' && { status }) || {}), ...((categoryId && { categoryId }) || {}), page: String(page + 1), pageSize: String(pageSize) }).toString()}`}>
+                    <Button size="sm" variant="outline">Neste</Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   )

@@ -1,7 +1,8 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Settings, User, Bell, Shield, CreditCard, Eye } from 'lucide-react'
+import { Settings, User, Bell, Shield, Trash2, Download } from 'lucide-react'
+import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -174,11 +175,56 @@ export default async function SettingsPage() {
                     <p className="text-sm text-gray-600 mb-3">Legg til ekstra sikkerhet til kontoen din</p>
                     <Button variant="outline">Aktiver 2FA</Button>
                   </div>
+
+                  <div className="border rounded-lg p-4">
+                    <h3 className="text-base font-medium mb-2">Dataeksport</h3>
+                    <p className="text-sm text-gray-600 mb-3">Last ned en kopi av dataene dine (JSON)</p>
+                    <Button asChild variant="outline">
+                      <a href="/api/user/data-export">
+                        <Download className="h-4 w-4 mr-2" /> Last ned data
+                      </a>
+                    </Button>
+                  </div>
+
+                  <div className="border rounded-lg p-4 bg-red-50">
+                    <h3 className="text-base font-medium mb-2 text-red-700">Slett konto</h3>
+                    <p className="text-sm text-red-700 mb-3">Dette vil deaktivere annonsene dine og anonymisere profildata. Handlingen kan ikke angres.</p>
+                    <DeleteAccountButton />
+                  </div>
                 </div>
               </CardContent>
             </Card>
         </div>
       </div>
     </DashboardLayout>
+  )
+}
+
+function DeleteAccountButton() {
+  return (
+    <button
+      onClick={async () => {
+        const ok = confirm('Er du sikker på at du vil slette kontoen? Dette kan ikke angres.')
+        if (!ok) return
+        try {
+          const res = await fetch('/api/user/delete-account', { method: 'POST' })
+          if (res.ok) {
+            // Vis toast og redirect hjem
+            if (typeof window !== 'undefined') {
+              // Enkel toast via alert hvis sonner ikke er tilgjengelig i denne ruten
+              try { (window as any).sonner?.toast?.success?.('Kontoen er slettet') } catch {}
+            }
+            window.location.href = '/sign-out?callbackUrl=/'
+          } else {
+            alert('Kunne ikke slette kontoen. Prøv igjen senere.')
+          }
+        } catch {
+          alert('Nettverksfeil. Prøv igjen senere.')
+        }
+      }}
+      className="inline-flex items-center px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
+    >
+      <Trash2 className="h-4 w-4 mr-2" /> Slett konto
+    </button>
   )
 }

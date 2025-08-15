@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 import { findMainCategory, getCategoryNamesForMain, isValidMainCategory } from '@/lib/category-mapper'
 
 // Helper funksjon for å parse prisområder
@@ -32,6 +33,8 @@ function parsePriceRange(priceRange: string) {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth()
+    const userId = (session?.user as any)?.id as string | undefined
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
     const search = searchParams.get('search')
@@ -233,7 +236,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Hent annonser med kategori og bruker info
-    const [listings, totalCount, categories] = await Promise.all([
+    const [listings, totalCount, categories, favs] = await Promise.all([
       prisma.listing.findMany({
         where,
         include: {
@@ -268,10 +271,12 @@ export async function GET(request: NextRequest) {
           }
         },
         orderBy: { sortOrder: 'asc' }
-      })
+      }),
+      userId ? prisma.favorite.findMany({ where: { userId }, select: { listingId: true } }) : Promise.resolve([] as { listingId: string }[])
     ])
 
     // Map data til frontend format
+    const favSet = new Set((favs as { listingId: string }[]).map(f => f.listingId))
     const mappedListings = listings.map(listing => ({
       id: listing.id,
       title: listing.title,
@@ -279,6 +284,7 @@ export async function GET(request: NextRequest) {
       price: listing.price ? Number(listing.price) : null,
       location: listing.location,
       category: listing.category?.name || 'Ukjent',
+      categorySlug: listing.category?.slug || null,
       status: listing.status,
       // Hvis ingen bilde i DB, ikke bruk uimplementert /api/placeholder. La UI håndtere fallback.
       mainImage: listing.images?.[0]?.url || '',
@@ -286,6 +292,7 @@ export async function GET(request: NextRequest) {
       views: listing.views,
       createdAt: listing.createdAt,
       isFeatured: listing.isFeatured,
+      isFavorited: userId ? favSet.has(listing.id) : false,
       listingType: listing.listingType,
       registrationNumber: listing.registrationNumber,
       mileage: listing.mileage,
@@ -309,7 +316,7 @@ export async function GET(request: NextRequest) {
       isActive: cat.isActive
     }))
 
-    return NextResponse.json({
+    const body = {
       listings: mappedListings,
       totalCount,
       categories: mappedCategories,
@@ -324,7 +331,16 @@ export async function GET(request: NextRequest) {
         category: category || null,
         search: search || null
       }
-    })
+    }
+    const res = NextResponse.json(body)
+    // Cache offentlige listekall kort i edge-cache, mens innloggede brukere får privat svar
+    if (!userId) {
+      res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+    } else {
+      res.headers.set('Cache-Control', 'private, max-age=0, must-revalidate')
+    }
+    res.headers.set('Vary', 'Authorization, Cookie')
+    return res
 
   } catch (error) {
     console.error('Feil ved henting av annonser:', error)

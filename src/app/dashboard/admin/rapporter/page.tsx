@@ -6,10 +6,9 @@ import DashboardLayout from '@/components/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import ReportActions from '@/components/report-actions'
 
-const prisma = new PrismaClient()
 
 export default async function AdminReportsPage() {
   const session = await auth()
@@ -27,48 +26,13 @@ export default async function AdminReportsPage() {
     redirect('/dashboard')
   }
 
-  // Hent alle rapporter (mock data for nå siden vi ikke har Report model ennå)
-  const mockReports = [
-    {
-      id: '1',
-      listingId: 'listing_1',
-      listingTitle: '2020 Tesla Model 3 - Perfekt stand',
-      reportReason: 'Feil pris',
-      reportDescription: 'Denne bilen er priset alt for lavt. Mistenker svindel.',
-      reporterName: 'Ole Hansen',
-      reporterEmail: 'ole@example.com',
-      status: 'PENDING',
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 timer siden
-      severity: 'HIGH'
-    },
-    {
-      id: '2', 
-      listingId: 'listing_2',
-      listingTitle: 'Moderne leilighet i Oslo sentrum',
-      reportReason: 'Støtende innhold',
-      reportDescription: 'Innholdet i annonsen er støtende og upassende.',
-      reporterName: 'Kari Nordmann',
-      reporterEmail: 'kari@example.com',
-      status: 'PENDING',
-      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 timer siden
-      severity: 'MEDIUM'
-    },
-    {
-      id: '3',
-      listingId: 'listing_3', 
-      listingTitle: 'Brukt iPhone 14 Pro',
-      reportReason: 'Spam/dubletter',
-      reportDescription: 'Samme annonse er lagt ut flere ganger.',
-      reporterName: 'Per Petersen',
-      reporterEmail: 'per@example.com',
-      status: 'RESOLVED',
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 dag siden
-      severity: 'LOW'
-    }
-  ]
+  const reports = await prisma.report.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: { listing: { select: { title: true } }, reporter: { select: { email: true, firstName: true, lastName: true } } }
+  })
 
-  const pendingReports = mockReports.filter(r => r.status === 'PENDING')
-  const resolvedToday = mockReports.filter(r => 
+  const pendingReports = reports.filter(r => r.status === 'OPEN')
+  const resolvedToday = reports.filter(r => 
     r.status === 'RESOLVED' && 
     new Date(r.createdAt).toDateString() === new Date().toDateString()
   )
@@ -172,7 +136,7 @@ export default async function AdminReportsPage() {
         </div>
 
         {/* Ventende rapporter */}
-        <Card>
+          <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
@@ -188,25 +152,27 @@ export default async function AdminReportsPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-semibold text-gray-900">
-                            {report.listingTitle}
+                          {report.listing?.title || report.listingId}
                           </h3>
                           <Badge variant="outline" className={getSeverityColor(report.severity)}>
-                            {report.severity}
+                             {report.status}
                           </Badge>
                           <Badge variant="outline" className={getStatusColor(report.status)}>
-                            {report.status}
+                             {report.reason}
                           </Badge>
                         </div>
                         
                         <div className="mb-3">
-                          <p className="text-sm text-gray-600 mb-1">
-                            <strong>Rapportert for:</strong> {report.reportReason}
-                          </p>
-                          <p className="text-sm text-gray-700">{report.reportDescription}</p>
+                           <p className="text-sm text-gray-600 mb-1">
+                             <strong>Rapportert for:</strong> {report.reason}
+                           </p>
+                           {report.comment && (
+                             <p className="text-sm text-gray-700">{report.comment}</p>
+                           )}
                         </div>
                         
                         <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>Rapportert av: {report.reporterName}</span>
+                           <span>Rapportert av: {report.reporter?.email}</span>
                           <span>•</span>
                           <span>{getTimeAgo(report.createdAt)}</span>
                         </div>

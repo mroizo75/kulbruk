@@ -1,0 +1,19 @@
+name: Saved Search Digest (Daily)
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-daily-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call daily digest endpoint
+        run: |
+          curl -sS -X GET "$BASE_URL/api/cron/saved-search-digest?period=daily" -H "X-CRON-KEY: $CRON_SECRET"
+        env:
+          BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+

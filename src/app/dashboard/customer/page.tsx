@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { PlusCircle, Package, Heart, Settings, TrendingUp, Eye, Clock, Plus, AlertCircle } from 'lucide-react'
+import { PlusCircle, Package, Heart, Settings, TrendingUp, Eye, Clock, Plus, AlertCircle, Edit } from 'lucide-react'
 import Link from 'next/link'
 import DashboardLayout from '@/components/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,11 +42,25 @@ export default async function CustomerDashboard() {
     role: dbUser.role
   }
 
+  // Hent statistikk og siste annonser
+  const [totalListings, activeListings, favoritesCount, viewsAgg, recentListings] = await Promise.all([
+    prisma.listing.count({ where: { userId: user.id } }),
+    prisma.listing.count({ where: { userId: user.id, status: 'APPROVED', isActive: true } }),
+    prisma.favorite.count({ where: { userId: user.id } }),
+    prisma.listing.aggregate({ _sum: { views: true }, where: { userId: user.id } }),
+    prisma.listing.findMany({
+      where: { userId: user.id },
+      include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    })
+  ])
+
   const stats = [
-    { title: 'Mine annonser', value: '3', icon: Package, color: 'bg-blue-500' },
-    { title: 'Aktive annonser', value: '2', icon: TrendingUp, color: 'bg-green-500' },
-    { title: 'Favoritter', value: '8', icon: Heart, color: 'bg-red-500' },
-    { title: 'Visninger i dag', value: '24', icon: Eye, color: 'bg-purple-500' },
+    { title: 'Mine annonser', value: String(totalListings), icon: Package, color: 'bg-blue-500' },
+    { title: 'Aktive annonser', value: String(activeListings), icon: TrendingUp, color: 'bg-green-500' },
+    { title: 'Favoritter', value: String(favoritesCount), icon: Heart, color: 'bg-red-500' },
+    { title: 'Visninger totalt', value: String(viewsAgg._sum.views || 0), icon: Eye, color: 'bg-purple-500' },
   ]
 
   const recentActivity = [
@@ -174,20 +188,62 @@ export default async function CustomerDashboard() {
             <CardTitle>Dine annonser</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8">
-              <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Ingen annonser ennå</h3>
-              <p className="text-gray-600 mb-4">
-                Kom i gang med å selge ved å legge ut din første annonse
-              </p>
-              <Link 
-                href="/opprett"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Legg ut annonse
-              </Link>
-            </div>
+            {recentListings.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Ingen annonser ennå</h3>
+                <p className="text-gray-600 mb-4">
+                  Kom i gang med å selge ved å legge ut din første annonse
+                </p>
+                <Link 
+                  href="/opprett"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Legg ut annonse
+                </Link>
+              </div>
+            ) : (
+              <div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {recentListings.map((l) => (
+                    <div key={l.id} className="border rounded-lg overflow-hidden">
+                      <div className="h-36 bg-gray-100">
+                        {l.images.length > 0 ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={(l.images[0] as any).url || ''} alt={l.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">Ingen bilde</div>
+                        )}
+                      </div>
+                      <div className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-gray-900 line-clamp-1">{l.title}</h3>
+                          {l.shortCode && (
+                            <span className="text-xs bg-blue-600 text-white rounded px-2 py-0.5">#{l.shortCode}</span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          <span className="font-semibold text-blue-600">{Number(l.price).toLocaleString('no-NO')} kr</span>
+                          <span className="ml-2">• {l.status === 'APPROVED' ? 'Aktiv' : l.status === 'PENDING' ? 'Venter' : l.status === 'REJECTED' ? 'Avvist' : l.status === 'SOLD' ? 'Solgt' : l.status}</span>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <Link href={`/dashboard/customer/annonser/${l.id}/rediger`} className="inline-flex items-center text-sm px-2 py-1 border rounded hover:bg-gray-50">
+                            <Edit className="h-3 w-3 mr-1" /> Rediger
+                          </Link>
+                          <Link href={`/annonser/detaljer/${l.id}`} className="inline-flex items-center text-sm px-2 py-1 border rounded hover:bg-gray-50">
+                            Se
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right mt-4">
+                  <Link href="/dashboard/customer/annonser" className="text-sm text-blue-600 hover:underline">Se alle mine annonser →</Link>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

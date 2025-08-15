@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { prisma } from '@/lib/prisma'
 import { Heart, Eye, MapPin, Calendar, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,43 +15,12 @@ export default async function FavoritesPage() {
   if (!session) {
     redirect('/sign-in?redirectUrl=/dashboard/customer/favoritter')
   }
-
-  // Mock data - favorittannonser
-  const favorites = [
-    {
-      id: '1',
-      title: 'Tesla Model Y Long Range',
-      price: 520000,
-      location: 'Oslo',
-      category: 'Biler',
-      savedAt: new Date('2024-01-18'),
-      images: ['/api/placeholder/300x200'],
-      views: 234,
-      isActive: true
-    },
-    {
-      id: '2',
-      title: 'iPhone 15 Pro Max 256GB',
-      price: 15000,
-      location: 'Bergen',
-      category: 'Elektronikk',
-      savedAt: new Date('2024-01-16'),
-      images: ['/api/placeholder/300x200'],
-      views: 89,
-      isActive: true
-    },
-    {
-      id: '3',
-      title: 'Vintage Eames stol - Original',
-      price: 12000,
-      location: 'Trondheim',
-      category: 'Møbler',
-      savedAt: new Date('2024-01-14'),
-      images: [],
-      views: 156,
-      isActive: false // Annonse er ikke lenger aktiv
-    }
-  ]
+  const userId = (session.user as any).id as string
+  const favorites = await prisma.favorite.findMany({
+    where: { userId },
+    include: { listing: { include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } } } },
+    orderBy: { createdAt: 'desc' },
+  })
 
   return (
     <DashboardLayout userRole="customer">
@@ -84,21 +54,20 @@ export default async function FavoritesPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {favorites.map((favorite) => (
+              {favorites.map((f) => {
+                const l = f.listing
+                const isActive = l.status === 'APPROVED' && l.isActive
+                return (
                 <Card 
-                  key={favorite.id} 
+                  key={f.id} 
                   className={`overflow-hidden transition-all duration-200 hover:shadow-lg ${
-                    !favorite.isActive ? 'opacity-75 bg-gray-50' : 'hover:scale-[1.02]'
+                    !isActive ? 'opacity-75 bg-gray-50' : 'hover:scale-[1.02]'
                   }`}
                 >
                   {/* Bilde */}
                   <div className="relative aspect-video bg-gray-200">
-                    {favorite.images.length > 0 ? (
-                      <img
-                        src={favorite.images[0]}
-                        alt={favorite.title}
-                        className="w-full h-full object-cover"
-                      />
+                    {l.images.length > 0 ? (
+                      <img src={l.images[0].url} alt={l.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex items-center justify-center h-full text-gray-400">
                         <span className="text-sm">Ingen bilde</span>
@@ -107,7 +76,7 @@ export default async function FavoritesPage() {
                     
                     {/* Status badge */}
                     <div className="absolute top-2 right-2">
-                      {favorite.isActive ? (
+                      {isActive ? (
                         <Badge className="bg-green-500 text-white">
                           Aktiv
                         </Badge>
@@ -120,9 +89,11 @@ export default async function FavoritesPage() {
 
                     {/* Favoritt hjerte */}
                     <div className="absolute top-2 left-2">
-                      <button className="p-1 bg-white/80 rounded-full hover:bg-white transition-colors">
-                        <Heart className="h-4 w-4 text-red-500 fill-red-500" />
-                      </button>
+                      <form action={`/api/favorites?listingId=${encodeURIComponent(l.id)}`} method="post" onSubmit={(e) => { e.preventDefault(); fetch(`/api/favorites?listingId=${encodeURIComponent(l.id)}`, { method: 'DELETE' }).then(() => location.reload()) }}>
+                        <button className="p-1 bg-white/80 rounded-full hover:bg-white transition-colors" title="Fjern favoritt">
+                          <Heart className="h-4 w-4 text-red-500 fill-red-500" />
+                        </button>
+                      </form>
                     </div>
                   </div>
 
@@ -130,41 +101,41 @@ export default async function FavoritesPage() {
                     {/* Kategori og lagret dato */}
                     <div className="flex justify-between items-center mb-2">
                       <Badge variant="secondary" className="text-xs">
-                        {favorite.category}
+                        {l.categoryId}
                       </Badge>
                       <span className="text-xs text-gray-500 flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        Lagret {favorite.savedAt.toLocaleDateString('no-NO', { day: 'numeric', month: 'short' })}
+                        Lagret {new Date(f.createdAt).toLocaleDateString('no-NO', { day: 'numeric', month: 'short' })}
                       </span>
                     </div>
 
                     {/* Tittel */}
                     <h3 className="font-semibold text-lg leading-tight mb-2 max-h-[3.5rem] overflow-hidden">
-                      {favorite.title}
+                      {l.title}
                     </h3>
 
                     {/* Pris */}
                     <p className="text-2xl font-bold text-blue-600 mb-2">
-                      {favorite.price.toLocaleString('no-NO')} kr
+                      {Number(l.price).toLocaleString('no-NO')} kr
                     </p>
 
                     {/* Lokasjon og visninger */}
                     <div className="flex justify-between items-center text-sm text-gray-600 mb-4">
                       <div className="flex items-center gap-1">
                         <MapPin className="h-4 w-4" />
-                        <span>{favorite.location}</span>
+                        <span>{l.location}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Eye className="h-4 w-4" />
-                        <span>{favorite.views} visninger</span>
+                        <span>{l.views} visninger</span>
                       </div>
                     </div>
 
                     {/* Handlinger */}
                     <div className="flex gap-2">
-                      {favorite.isActive ? (
+                      {isActive ? (
                         <Button size="sm" asChild className="flex-1">
-                          <Link href={`/annonser/detaljer/${favorite.id}`}>
+                          <Link href={`/annonser/detaljer/${l.id}`}>
                             Se annonse
                           </Link>
                         </Button>
@@ -177,13 +148,14 @@ export default async function FavoritesPage() {
                         size="sm" 
                         variant="outline"
                         className="text-red-600 hover:text-red-700"
+                        onClick={() => fetch(`/api/favorites?listingId=${encodeURIComponent(l.id)}`, { method: 'DELETE' }).then(() => location.reload())}
                       >
                         <Heart className="h-4 w-4" />
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              )})}
             </div>
           )}
         </div>

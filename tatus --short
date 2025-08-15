@@ -1,5 +1,0 @@
-[33mdd99f51[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Professional fix: Implementert sikker brukersynkronisering
-[33m04b5a23[m Fix: Fikset 500-feil på customer dashboard og responsivitet
-[33m91ecf36[m Mobilvisning av sidene
-[33mdd66dbc[m Fikset alle TypeScript build errors og aktivert ignoreBuildErrors i Next.js config
-[33mfdd91a8[m 🚀 Implementer komplett Stripe betalingsløsning

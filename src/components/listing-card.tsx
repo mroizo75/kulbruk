@@ -1,7 +1,9 @@
+'use client'
+
 import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { MapPin, Calendar, Eye } from 'lucide-react'
+import { MapPin, Calendar, Eye, Heart } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
@@ -15,8 +17,10 @@ interface ListingCardProps {
   mainImage?: string
   images?: Array<{ url: string; altText?: string }>
   views?: number
-  createdAt: Date
+  createdAt: Date | string
   isFeatured?: boolean
+  isFavorited?: boolean
+  onFavoriteChange?: (isFav: boolean) => void
 }
 
 const statusConfig = {
@@ -39,10 +43,26 @@ export default function ListingCard({
   images,
   views = 0,
   createdAt,
-  isFeatured = false
+  isFeatured = false,
+  isFavorited,
+  onFavoriteChange,
 }: ListingCardProps) {
   const statusInfo = statusConfig[status]
   const isClickable = status === 'APPROVED'
+  async function toggleFavorite(e: React.MouseEvent) {
+    e.preventDefault()
+    try {
+      if (isFavorited) {
+        const res = await fetch(`/api/favorites?listingId=${encodeURIComponent(id)}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Fav-feil')
+        onFavoriteChange && onFavoriteChange(false)
+      } else {
+        const res = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: id }) })
+        if (!res.ok) throw new Error('Fav-feil')
+        onFavoriteChange && onFavoriteChange(true)
+      }
+    } catch {}
+  }
   
   const cardContent = (
     <Card className={`overflow-hidden transition-all duration-200 ${
@@ -90,9 +110,14 @@ export default function ListingCard({
           </Badge>
         </div>
         
+        {/* Favorite */}
+        <button onClick={toggleFavorite} className="absolute top-2 right-2 p-1 bg-white/80 rounded-full hover:bg-white">
+          <Heart className={`h-4 w-4 ${isFavorited ? 'text-red-500 fill-red-500' : 'text-red-500'}`} />
+        </button>
+
         {/* Featured badge */}
         {isFeatured && (
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-2 right-10">
             <Badge className="bg-yellow-500 text-yellow-900 text-xs">
               Fremhevet
             </Badge>
@@ -116,7 +141,7 @@ export default function ListingCard({
           </span>
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            {createdAt.toLocaleDateString('no-NO', { 
+            {new Date(createdAt as any).toLocaleDateString('no-NO', { 
               day: 'numeric', 
               month: 'short' 
             })}

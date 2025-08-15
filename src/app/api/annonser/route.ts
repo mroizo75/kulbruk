@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { notifyNewListing } from '@/lib/notification-manager'
+import { generateShortCode } from '@/lib/utils'
 
 // Bruk delt Prisma-klient
 
@@ -154,6 +155,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Håndhev vilkår-samtykke
+    if (!data.acceptedTermsAt) {
+      return NextResponse.json(
+        { error: 'Mangler aksept av vilkår/personvern' },
+        { status: 400 }
+      )
+    }
+
     // Enricher vehicleSpec fra Vegvesen hvis registreringsnummer er oppgitt
     let enrichedVehicleSpec: any = null
     if (data?.vehicleSpec?.registrationNumber) {
@@ -173,6 +182,7 @@ export async function POST(request: NextRequest) {
               accidents: data.vehicleSpec.accidents ?? null,
               serviceHistory: data.vehicleSpec.serviceHistory ?? null,
               modifications: data.vehicleSpec.modifications ?? null,
+              additionalEquipment: data.vehicleSpec.additionalEquipment ?? null,
               // Fra Vegvesen
               make: carData.make ?? null,
               model: carData.model ?? null,
@@ -191,12 +201,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Opprett annonse
+    // Generer kort kode og sikre unikhet enkelt (retry ved kollisjon)
+    let shortCode = generateShortCode()
+    for (let i = 0; i < 3; i++) {
+      const exists = await prisma.listing.findUnique({ where: { shortCode } as any }).catch(() => null)
+      if (!exists) break
+      shortCode = generateShortCode()
+    }
+
     const listing = await prisma.listing.create({
       data: {
+        shortCode,
         title: data.title,
         description: data.description,
         price: typeof data.price === 'number' ? data.price : parseFloat(String(data.price)),
         location: data.location,
+        // varighet 1 måned
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         categoryId: data.categoryId,
         userId: dbUserId, // Bruker database user ID, ikke Clerk ID
         contactEmail: data.contactEmail,
@@ -215,6 +236,7 @@ export async function POST(request: NextRequest) {
                 accidents: data.vehicleSpec.accidents ?? null,
                 serviceHistory: data.vehicleSpec.serviceHistory || null,
                 modifications: data.vehicleSpec.modifications || null,
+                additionalEquipment: data.vehicleSpec.additionalEquipment ?? null,
                 fuelType: data.vehicleSpec.fuelType || null,
                 transmission: data.vehicleSpec.transmission || null,
                 color: data.vehicleSpec.color || null,
@@ -236,6 +258,21 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    // Audit: logg aksept av vilkår ved opprettelse
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: dbUserId,
+          action: 'ACCEPT_TERMS_AND_CREATE_LISTING',
+          targetType: 'Listing',
+          targetId: listing.id,
+          details: JSON.stringify({ acceptedTermsAt: data.acceptedTermsAt }),
+        }
+      })
+    } catch (e) {
+      console.warn('Kunne ikke skrive audit-logg for vilkårssamtykke', e)
+    }
 
     // Håndter bildeopplasting
     if (data.images && data.images.length > 0) {
@@ -281,7 +318,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      listing,
+      id: listing.id,
+      shortCode: listing.shortCode,
       message: 'Annonse opprettet vellykket! Den vil bli gjennomgått av våre moderatorer.'
     }, { status: 201 })
 

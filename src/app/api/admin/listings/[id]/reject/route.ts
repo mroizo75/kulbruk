@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
+import { sendEmail, listingRejectedTemplate } from '@/lib/email'
+import { prisma as prismaClient } from '@/lib/prisma'
+import { safeStringify } from '@/lib/utils'
 
 const prisma = new PrismaClient()
 
@@ -66,6 +69,27 @@ export async function POST(
     })
 
     console.log(`Admin ${dbUser.email} avslo annonse: ${updatedListing.title}`)
+    try {
+      await prismaClient.auditLog.create({
+        data: {
+          actorId: (session.user as any).id,
+          action: 'ADMIN_LISTING_REJECT',
+          targetType: 'Listing',
+          targetId: updatedListing.id,
+          details: safeStringify({ category: updatedListing.category?.name })
+        }
+      })
+    } catch {}
+
+    // Send e-post til eier
+    try {
+      if (updatedListing.user?.email) {
+        const tpl = listingRejectedTemplate({ title: updatedListing.title })
+        await sendEmail({ to: updatedListing.user.email, subject: tpl.subject, html: tpl.html })
+      }
+    } catch (e) {
+      console.warn('Kunne ikke sende avvisnings-epost:', e)
+    }
 
     return NextResponse.json({
       success: true,

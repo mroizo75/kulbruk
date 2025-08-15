@@ -1,5 +1,3 @@
-'use client'
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -16,6 +14,11 @@ import {
   Globe,
   Settings
 } from 'lucide-react'
+
+export const metadata = {
+  title: 'Personvernerklæring – Kulbruk',
+  description: 'Hvordan Kulbruk.no behandler personopplysninger',
+}
 
 export default function PrivacyPage() {
   return (
@@ -242,6 +245,9 @@ export default function PrivacyPage() {
                   <p className="text-xs text-gray-600">Anonymiserte data for forbedringer</p>
                 </div>
               </div>
+              <p className="text-sm text-gray-600">
+                Du kan når som helst endre dine cookie‑preferanser på siden <a className="text-blue-600 underline" href="/cookies">/cookies</a>.
+              </p>
             </CardContent>
           </Card>
 

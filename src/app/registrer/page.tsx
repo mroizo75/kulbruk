@@ -5,14 +5,18 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Building2, User, ArrowRight, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function RegisterPage() {
   const router = useRouter()
   const [selectedType, setSelectedType] = useState<'customer' | 'business' | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   const handleSelection = (type: 'customer' | 'business') => {
+    if (!termsAccepted) return
     if (type === 'customer') {
       router.push('/sign-up?role=customer')
     } else {
@@ -29,6 +33,18 @@ export default function RegisterPage() {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Velg kontotype som passer best for deg og kom i gang med trygg handel
           </p>
+        </div>
+
+        {/* Vilkår og samtykke */}
+        <div className="max-w-2xl mx-auto mb-6">
+          <div className="flex items-start gap-3">
+            <Checkbox id="acceptTerms" checked={termsAccepted} onCheckedChange={(v) => setTermsAccepted(!!v)} />
+            <Label htmlFor="acceptTerms" className="text-sm text-gray-700">
+              Jeg har lest og aksepterer
+              {' '}<Link className="text-[#af4c0f] hover:underline" href="/vilkar-og-betingelser">vilkår og betingelser</Link>
+              {' '}samt <Link className="text-[#af4c0f] hover:underline" href="/personvern">personvernerklæringen</Link>.
+            </Label>
+          </div>
         </div>
 
         {/* Type selection */}
@@ -73,6 +89,7 @@ export default function RegisterPage() {
               <Button 
                 onClick={() => handleSelection('customer')}
                 className="w-full bg-[#af4c0f] hover:bg-[#af4c0f]/90 text-white"
+                disabled={!termsAccepted}
               >
                 Registrer som privatkunde
                 <ArrowRight className="h-4 w-4 ml-2" />
@@ -122,6 +139,7 @@ export default function RegisterPage() {
               <Button 
                 onClick={() => handleSelection('business')}
                 className="w-full bg-gradient-to-r from-[#af4c0f] to-[#af4c0f]/90 hover:from-[#af4c0f]/90 hover:to-[#af4c0f]/80 text-white"
+                disabled={!termsAccepted}
               >
                 Registrer bedrift
                 <ArrowRight className="h-4 w-4 ml-2" />

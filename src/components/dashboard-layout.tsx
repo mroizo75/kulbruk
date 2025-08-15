@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
@@ -12,6 +12,8 @@ import {
   Users, 
   AlertTriangle, 
   BarChart3,
+  MessageSquare,
+  Search,
   Menu,
   X,
   Shield,
@@ -23,9 +25,12 @@ import {
   Database
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useSession, signOut } from 'next-auth/react'
 import AdminNotificationBell from './admin-notification-bell'
+import DashboardFooter from './dashboard-footer'
+import Image from 'next/image'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -36,13 +41,38 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
   const { data: session } = useSession()
+  const [unreadMessages, setUnreadMessages] = useState<number>(0)
+
+  // Uleste meldinger badge for sidebar (kunde)
+  // Hent initial teller og oppdater via SSE
+  React.useEffect(() => {
+    if (userRole !== 'customer') return
+    let active = true
+    fetch('/api/messages/unread-count')
+      .then(r => r.ok ? r.json() : { count: 0 })
+      .then(d => { if (active) setUnreadMessages(d.count || 0) })
+      .catch(() => {})
+    const es = new EventSource('/api/user/notifications/stream')
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data?.type === 'message') {
+          setUnreadMessages(prev => (typeof prev === 'number' ? prev + 1 : 1))
+        }
+      } catch {}
+    }
+    es.onerror = () => es.close()
+    return () => { active = false; es.close() }
+  }, [userRole])
 
   // Navigasjonsmenyer basert på brukerrolle
   const customerNavigation = [
     { name: 'Dashboard', href: '/dashboard/customer', icon: Home },
     { name: 'Legg ut annonse', href: '/opprett', icon: Plus },
     { name: 'Mine annonser', href: '/dashboard/customer/annonser', icon: FileText },
+    { name: 'Meldinger', href: '/dashboard/customer/meldinger', icon: MessageSquare },
     { name: 'Favoritter', href: '/dashboard/customer/favoritter', icon: Heart },
+    { name: 'Lagrede søk', href: '/dashboard/customer/lagrede-sok', icon: Search },
     { name: 'Innstillinger', href: '/dashboard/customer/innstillinger', icon: Settings },
   ]
 
@@ -54,6 +84,7 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
     { name: 'Brukere', href: '/dashboard/admin/brukere', icon: Users },
     { name: 'Statistikk', href: '/dashboard/admin/statistikk', icon: BarChart3 },
     { name: 'Innstillinger', href: '/dashboard/admin/innstillinger', icon: Settings },
+    { name: 'Audit‑logg', href: '/dashboard/admin/audit-logg', icon: Shield },
   ]
 
   const moderatorNavigation = [
@@ -93,10 +124,10 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold mr-2">
-                K
+              <div className="flex items-center justify-center mr-2">
+                <Image src="/logo.svg" alt="Kulbruk.no" width={75} height={75} />
               </div>
-              <span className="text-lg font-bold text-gray-900">Kulbruk.no</span>
+              
             </Link>
             {userRole === 'admin' && (
               <div className="ml-2 flex items-center space-x-1">
@@ -153,7 +184,10 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
               )}
             >
               <item.icon className="mr-3 h-5 w-5" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {userRole === 'customer' && item.name === 'Meldinger' && unreadMessages > 0 && (
+                <Badge variant="outline" className="ml-2">{unreadMessages > 99 ? '99+' : unreadMessages}</Badge>
+              )}
             </Link>
           )
         })}
@@ -231,6 +265,7 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
         {/* Page content */}
         <main className="px-4 py-8 lg:px-8">
           {children}
+          <DashboardFooter />
         </main>
       </div>
     </div>

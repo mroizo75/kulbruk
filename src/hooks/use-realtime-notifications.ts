@@ -57,9 +57,10 @@ export function useRealtimeNotifications(userRole: string) {
     setConnectionStatus('connecting')
     console.log('SSE: Kobler til real-time notifikasjoner...')
 
-    const eventSource = new EventSource('/api/admin/notifications/stream', {
-      withCredentials: true
-    })
+    const url = (userRole === 'admin' || userRole === 'moderator')
+      ? '/api/admin/notifications/stream'
+      : '/api/user/notifications/stream'
+    const eventSource = new EventSource(url, { withCredentials: true })
 
     eventSource.onopen = () => {
       console.log('SSE: Tilkoblet real-time notifikasjoner')
@@ -159,11 +160,6 @@ export function useRealtimeNotifications(userRole: string) {
   }
 
   useEffect(() => {
-    if (userRole !== 'admin' && userRole !== 'moderator') {
-      cleanup()
-      return
-    }
-
     // Start SSE connection
     setupSSE()
 

@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth-edge"
 import { NextRequest, NextResponse } from 'next/server'
 import { getCategoryRedirect } from './lib/category-mapper'
+import * as Sentry from '@sentry/nextjs'
 
 // Ruter som krever autentisering
 const protectedRoutes = [
@@ -11,9 +12,13 @@ const protectedRoutes = [
 
 export default auth((req) => {
   // Håndter kategori-redirects først
-  const categoryRedirect = handleCategoryRedirects(req)
-  if (categoryRedirect) {
-    return categoryRedirect
+  try {
+    const categoryRedirect = handleCategoryRedirects(req)
+    if (categoryRedirect) {
+      return categoryRedirect
+    }
+  } catch (err) {
+    Sentry.captureException(err)
   }
 
   // Beskytt ruter manuelt: hvis match på protectedRoutes og ikke session -> redirect
@@ -26,7 +31,12 @@ export default auth((req) => {
     return NextResponse.redirect(url)
   }
 
-  return NextResponse.next()
+  try {
+    return NextResponse.next()
+  } catch (err) {
+    Sentry.captureException(err)
+    return NextResponse.next()
+  }
 })
 
 function handleCategoryRedirects(req: NextRequest): NextResponse | null {

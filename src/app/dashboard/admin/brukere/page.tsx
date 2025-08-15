@@ -138,11 +138,16 @@ export default async function AdminUsersPage() {
         </div>
 
         {/* Brukere liste */}
-        <Card>
+          <Card>
           <CardHeader>
             <CardTitle>Alle brukere</CardTitle>
           </CardHeader>
           <CardContent>
+            {users.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-600">Ingen brukere funnet.</p>
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -201,6 +206,7 @@ export default async function AdminUsersPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </CardContent>
         </Card>
       </div>

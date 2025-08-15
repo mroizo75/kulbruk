@@ -16,6 +16,7 @@ interface VehicleInfoFormProps {
   onVehicleDataChange?: (data: VehicleFormData) => void
   showAuctionOption?: boolean
   className?: string
+  defaultValues?: Partial<VehicleFormData>
 }
 
 interface VehicleFormData {
@@ -117,12 +118,21 @@ const commonEquipment = [
 export default function VehicleInfoForm({ 
   onVehicleDataChange, 
   showAuctionOption = false,
-  className = '' 
+  className = '',
+  defaultValues = {}
 }: VehicleInfoFormProps) {
   const [step, setStep] = useState<'input' | 'loading' | 'loaded'>('input')
   const [carData, setCarData] = useState<CarData | null>(null)
   const [formData, setFormData] = useState<VehicleFormData>({
-    additionalEquipment: []
+    additionalEquipment: defaultValues.additionalEquipment || [],
+    registrationNumber: defaultValues.registrationNumber,
+    mileage: defaultValues.mileage,
+    condition: defaultValues.condition,
+    nextInspection: defaultValues.nextInspection,
+    hasAccidents: defaultValues.hasAccidents,
+    serviceHistory: defaultValues.serviceHistory,
+    modifications: defaultValues.modifications,
+    isAuction: defaultValues.isAuction,
   })
 
   const handleRegNumberBlur = async () => {

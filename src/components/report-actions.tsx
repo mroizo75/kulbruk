@@ -28,21 +28,14 @@ export default function ReportActions({ reportId, listingId, severity }: ReportA
     setIsProcessing(true)
     
     try {
-      // Mock API call - implementer ekte API senere
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      switch (action) {
-        case 'resolve':
-          toast.success('Rapport markert som løst')
-          break
-        case 'dismiss':
-          toast.success('Rapport avvist')
-          break
-        case 'escalate':
-          toast.success('Rapport eskalert til høy prioritet')
-          break
-      }
-      
+      const status = action === 'resolve' ? 'RESOLVED' : action === 'dismiss' ? 'REJECTED' : 'IN_REVIEW'
+      const res = await fetch(`/api/reports/${reportId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) throw new Error('Kunne ikke oppdatere rapport')
+      toast.success(action === 'resolve' ? 'Rapport markert som løst' : action === 'dismiss' ? 'Rapport avvist' : 'Rapport satt til gjennomgang')
       router.refresh()
       
     } catch (error) {
@@ -60,8 +53,10 @@ export default function ReportActions({ reportId, listingId, severity }: ReportA
     setIsProcessing(true)
     
     try {
-      // Mock API call til å fjerne annonsen
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const del = await fetch(`/api/admin/listings/${listingId}/delete`, { method: 'DELETE' })
+      if (!del.ok) throw new Error('Sletting feilet')
+      // Marker rapport som løst
+      await fetch(`/api/reports/${reportId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'RESOLVED' }) })
       toast.success('Annonse fjernet og rapport løst')
       router.refresh()
     } catch (error) {
