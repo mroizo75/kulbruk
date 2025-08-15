@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Filter, MapPin, Car, Tag, ChevronDown, X, Calendar, Gauge, Fuel, Settings } from 'lucide-react'
+import { Search, Filter, MapPin, Car, Tag, ChevronDown, X, Calendar, Gauge, Fuel, Settings, Home, ShoppingBag, Users, Ruler } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -47,6 +47,7 @@ function ListingsContent() {
   const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '')
   const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '')
   
+  // Kategori-spesifikke filtre (basert på valgt kategori)
   // Bil-spesifikke filtre
   const [make, setMake] = useState(searchParams.get('make') || 'alle-merker')
   const [fuelType, setFuelType] = useState(searchParams.get('fuelType') || 'alle-drivstoff')
@@ -57,22 +58,26 @@ function ListingsContent() {
   const [mileageTo, setMileageTo] = useState(searchParams.get('mileageTo') || '')
   const [color, setColor] = useState(searchParams.get('color') || 'alle-farger')
   const [wheelDrive, setWheelDrive] = useState(searchParams.get('wheelDrive') || 'alle-hjuldrift')
-  const [showFilters, setShowFilters] = useState(false)
 
-  // Fetch categories
+  // Eiendom-spesifikke filtre
+  const [propertyType, setPropertyType] = useState(searchParams.get('propertyType') || 'alle-typer')
+  const [rooms, setRooms] = useState(searchParams.get('rooms') || '')
+  const [area, setArea] = useState(searchParams.get('area') || '')
+  const [plotSize, setPlotSize] = useState(searchParams.get('plotSize') || '')
+  const [buildYear, setBuildYear] = useState(searchParams.get('buildYear') || '')
+
+  // Torget-spesifikke filtre
+  const [condition, setCondition] = useState(searchParams.get('condition') || 'alle-tilstander')
+  const [brand, setBrand] = useState(searchParams.get('brand') || '')
+
+  // Set main categories directly (mapping to database categories)
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await fetch('/api/kategorier')
-        if (res.ok) {
-          const data = await res.json()
-          setCategories(data)
-        }
-      } catch (error) {
-        console.error('Feil ved henting av kategorier:', error)
-      }
-    }
-    fetchCategories()
+    const mainCategories = [
+      { id: 'bil', name: 'Biler', slug: 'bil' },
+      { id: 'eiendom', name: 'Eiendom', slug: 'eiendom' },
+      { id: 'torget', name: 'Torget', slug: 'torget' }
+    ]
+    setCategories(mainCategories)
   }, [])
 
   // Fetch listings
@@ -89,16 +94,30 @@ function ListingsContent() {
         if (minPrice) params.set('minPrice', minPrice)
         if (maxPrice) params.set('maxPrice', maxPrice)
         
-        // Bil-spesifikke parametre
-        if (make && !make.startsWith('alle-')) params.set('make', make)
-        if (fuelType && !fuelType.startsWith('alle-')) params.set('fuelType', fuelType)
-        if (transmission && !transmission.startsWith('alle-')) params.set('transmission', transmission)
-        if (yearFrom) params.set('yearFrom', yearFrom)
-        if (yearTo) params.set('yearTo', yearTo)
-        if (mileageFrom) params.set('mileageFrom', mileageFrom)
-        if (mileageTo) params.set('mileageTo', mileageTo)
-        if (color && !color.startsWith('alle-')) params.set('color', color)
-        if (wheelDrive && !wheelDrive.startsWith('alle-')) params.set('wheelDrive', wheelDrive)
+        // Kategori-spesifikke parametre basert på valgt kategori
+        if (category === 'bil') {
+          // Bil-spesifikke parametre
+          if (make && !make.startsWith('alle-')) params.set('make', make)
+          if (fuelType && !fuelType.startsWith('alle-')) params.set('fuelType', fuelType)
+          if (transmission && !transmission.startsWith('alle-')) params.set('transmission', transmission)
+          if (yearFrom) params.set('yearFrom', yearFrom)
+          if (yearTo) params.set('yearTo', yearTo)
+          if (mileageFrom) params.set('mileageFrom', mileageFrom)
+          if (mileageTo) params.set('mileageTo', mileageTo)
+          if (color && !color.startsWith('alle-')) params.set('color', color)
+          if (wheelDrive && !wheelDrive.startsWith('alle-')) params.set('wheelDrive', wheelDrive)
+        } else if (category === 'eiendom') {
+          // Eiendom-spesifikke parametre
+          if (propertyType && !propertyType.startsWith('alle-')) params.set('propertyType', propertyType)
+          if (rooms) params.set('rooms', rooms)
+          if (area) params.set('area', area)
+          if (plotSize) params.set('plotSize', plotSize)
+          if (buildYear) params.set('buildYear', buildYear)
+        } else if (category === 'torget') {
+          // Torget-spesifikke parametre
+          if (condition && !condition.startsWith('alle-')) params.set('condition', condition)
+          if (brand) params.set('brand', brand)
+        }
 
         const res = await fetch(`/api/annonser/list?${params.toString()}`)
         if (res.ok) {
@@ -114,7 +133,7 @@ function ListingsContent() {
     }
 
     fetchListings()
-  }, [currentPage, search, category, location, minPrice, maxPrice, make, fuelType, transmission, yearFrom, yearTo, mileageFrom, mileageTo, color, wheelDrive])
+  }, [currentPage, search, category, location, minPrice, maxPrice, make, fuelType, transmission, yearFrom, yearTo, mileageFrom, mileageTo, color, wheelDrive, propertyType, rooms, area, plotSize, buildYear, condition, brand])
 
   // Update URL params
   const updateUrlParams = () => {
@@ -125,16 +144,27 @@ function ListingsContent() {
     if (minPrice) params.set('minPrice', minPrice)
     if (maxPrice) params.set('maxPrice', maxPrice)
     
-    // Bil-spesifikke parametre  
-    if (make && !make.startsWith('alle-')) params.set('make', make)
-    if (fuelType && !fuelType.startsWith('alle-')) params.set('fuelType', fuelType)
-    if (transmission && !transmission.startsWith('alle-')) params.set('transmission', transmission)
-    if (yearFrom) params.set('yearFrom', yearFrom)
-    if (yearTo) params.set('yearTo', yearTo)
-    if (mileageFrom) params.set('mileageFrom', mileageFrom)
-    if (mileageTo) params.set('mileageTo', mileageTo)
-    if (color && !color.startsWith('alle-')) params.set('color', color)
-    if (wheelDrive && !wheelDrive.startsWith('alle-')) params.set('wheelDrive', wheelDrive)
+    // Kategori-spesifikke parametre
+    if (category === 'bil') {
+      if (make && !make.startsWith('alle-')) params.set('make', make)
+      if (fuelType && !fuelType.startsWith('alle-')) params.set('fuelType', fuelType)
+      if (transmission && !transmission.startsWith('alle-')) params.set('transmission', transmission)
+      if (yearFrom) params.set('yearFrom', yearFrom)
+      if (yearTo) params.set('yearTo', yearTo)
+      if (mileageFrom) params.set('mileageFrom', mileageFrom)
+      if (mileageTo) params.set('mileageTo', mileageTo)
+      if (color && !color.startsWith('alle-')) params.set('color', color)
+      if (wheelDrive && !wheelDrive.startsWith('alle-')) params.set('wheelDrive', wheelDrive)
+    } else if (category === 'eiendom' || category === 'eiendommer') {
+      if (propertyType && !propertyType.startsWith('alle-')) params.set('propertyType', propertyType)
+      if (rooms) params.set('rooms', rooms)
+      if (area) params.set('area', area)
+      if (plotSize) params.set('plotSize', plotSize)
+      if (buildYear) params.set('buildYear', buildYear)
+    } else if (category === 'torget') {
+      if (condition && !condition.startsWith('alle-')) params.set('condition', condition)
+      if (brand) params.set('brand', brand)
+    }
     
     const newUrl = `/annonser${params.toString() ? `?${params.toString()}` : ''}`
     router.push(newUrl, { scroll: false })
@@ -158,34 +188,59 @@ function ListingsContent() {
     setMileageTo('')
     setColor('alle-farger')
     setWheelDrive('alle-hjuldrift')
+    // Eiendom-spesifikke filtre
+    setPropertyType('alle-typer')
+    setRooms('')
+    setArea('')
+    setPlotSize('')
+    setBuildYear('')
+    // Torget-spesifikke filtre
+    setCondition('alle-tilstander')
+    setBrand('')
     router.push('/annonser', { scroll: false })
     setCurrentPage(1)
   }
 
   // Count active filters
-  const activeFiltersCount = [
-    search, 
-    category && category !== 'alle' ? category : null, 
-    location, 
-    minPrice, 
-    maxPrice,
-    make && !make.startsWith('alle-') ? make : null,
-    fuelType && !fuelType.startsWith('alle-') ? fuelType : null,
-    transmission && !transmission.startsWith('alle-') ? transmission : null,
-    yearFrom,
-    yearTo,
-    mileageFrom,
-    mileageTo,
-    color && !color.startsWith('alle-') ? color : null,
-    wheelDrive && !wheelDrive.startsWith('alle-') ? wheelDrive : null
-  ].filter(Boolean).length
+  const getActiveFiltersCount = () => {
+    const baseFilters = [search, category && category !== 'alle' ? category : null, location, minPrice, maxPrice]
+    
+    if (category === 'bil') {
+      return [...baseFilters,
+        make && !make.startsWith('alle-') ? make : null,
+        fuelType && !fuelType.startsWith('alle-') ? fuelType : null,
+        transmission && !transmission.startsWith('alle-') ? transmission : null,
+        yearFrom, yearTo, mileageFrom, mileageTo,
+        color && !color.startsWith('alle-') ? color : null,
+        wheelDrive && !wheelDrive.startsWith('alle-') ? wheelDrive : null
+      ].filter(Boolean).length
+    }
+
+    if (category === 'eiendom') {
+      return [...baseFilters,
+        propertyType && !propertyType.startsWith('alle-') ? propertyType : null,
+        rooms, area, plotSize, buildYear
+      ].filter(Boolean).length
+    }
+
+    if (category === 'torget') {
+      return [...baseFilters,
+        condition && !condition.startsWith('alle-') ? condition : null,
+        brand
+      ].filter(Boolean).length
+    }
+
+    return baseFilters.filter(Boolean).length
+  }
+
+  const activeFiltersCount = getActiveFiltersCount()
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Alle annonser</h1>
-          <p className="text-gray-600">Finn det du leter etter blant tusenvis av annonser</p>
+          <p className="text-gray-600">Velg kategori og finn det du leter etter blant tusenvis av annonser</p>
         </div>
 
         <div className="flex gap-8">
@@ -277,12 +332,13 @@ function ListingsContent() {
             </div>
             </div>
 
-            {/* Bil-spesifikke filtre */}
-            <div className="bg-white rounded-lg border shadow-sm p-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Car className="h-5 w-5" />
-                Bil-spesifikasjoner
-              </h3>
+            {/* Kategori-spesifikke filtre */}
+            {category === 'bil' && (
+              <div className="bg-white rounded-lg border shadow-sm p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Car className="h-5 w-5" />
+                  Bil-spesifikasjoner
+                </h3>
               <div className="space-y-4">
                 {/* Merke */}
                 <div>
@@ -449,8 +505,137 @@ function ListingsContent() {
                     </SelectContent>
                   </Select>
                 </div>
-          </div>
-        </div>
+              </div>
+            </div>
+            )}
+
+            {/* Eiendom-spesifikke filtre */}
+            {category === 'eiendom' && (
+              <div className="bg-white rounded-lg border shadow-sm p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Home className="h-5 w-5" />
+                  Eiendom-spesifikasjoner
+                </h3>
+                <div className="space-y-4">
+                  {/* Eiendomstype */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2">Eiendomstype</label>
+                    <Select value={propertyType} onValueChange={setPropertyType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Alle typer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="alle-typer">Alle typer</SelectItem>
+                        <SelectItem value="Leilighet">Leilighet</SelectItem>
+                        <SelectItem value="Enebolig">Enebolig</SelectItem>
+                        <SelectItem value="Rekkehus">Rekkehus</SelectItem>
+                        <SelectItem value="Tomannsbolig">Tomannsbolig</SelectItem>
+                        <SelectItem value="Hytte">Hytte</SelectItem>
+                        <SelectItem value="Tomt">Tomt</SelectItem>
+                        <SelectItem value="Næring">Næring</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Antall rom */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      Antall rom
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="f.eks. 3"
+                      value={rooms}
+                      onChange={(e) => setRooms(e.target.value)}
+                      min="1"
+                      max="20"
+                    />
+                  </div>
+
+                  {/* Boligareal */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                      <Ruler className="h-4 w-4" />
+                      Boligareal (m²)
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="f.eks. 80"
+                      value={area}
+                      onChange={(e) => setArea(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Tomtestørrelse */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2">Tomtestørrelse (m²)</label>
+                    <Input
+                      type="number"
+                      placeholder="f.eks. 500"
+                      value={plotSize}
+                      onChange={(e) => setPlotSize(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Byggeår */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      Byggeår
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="f.eks. 1990"
+                      value={buildYear}
+                      onChange={(e) => setBuildYear(e.target.value)}
+                      min="1800"
+                      max="2025"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Torget-spesifikke filtre */}
+            {category === 'torget' && (
+              <div className="bg-white rounded-lg border shadow-sm p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <ShoppingBag className="h-5 w-5" />
+                  Produkt-spesifikasjoner
+                </h3>
+                <div className="space-y-4">
+                  {/* Tilstand */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2">Tilstand</label>
+                    <Select value={condition} onValueChange={setCondition}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Alle tilstander" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="alle-tilstander">Alle tilstander</SelectItem>
+                        <SelectItem value="Ny">Ny</SelectItem>
+                        <SelectItem value="Som ny">Som ny</SelectItem>
+                        <SelectItem value="Meget god">Meget god</SelectItem>
+                        <SelectItem value="God">God</SelectItem>
+                        <SelectItem value="Middels">Middels</SelectItem>
+                        <SelectItem value="Defekt">Defekt</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Merke/Produsent */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2">Merke/Produsent</label>
+                    <Input
+                      placeholder="f.eks. Apple, Samsung..."
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Filter actions */}
             <div className="bg-white rounded-lg border shadow-sm p-4">

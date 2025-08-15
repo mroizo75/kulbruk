@@ -197,10 +197,85 @@ export async function GET(request: NextRequest) {
     }
 
     if (category === 'eiendom') {
-      // TODO: Implementer eiendom-spesifikke filtre når vi har felter for dem
+      // Eiendom-spesifikke filtre
+      const eiendomFilters: any[] = []
+      
+      if (shouldFilter(propertyType)) {
+        eiendomFilters.push({
+          description: { contains: propertyType, mode: 'insensitive' }
+        })
+      }
+      
+      if (rooms) {
+        const roomsNum = parseInt(rooms)
+        if (!isNaN(roomsNum)) {
+          eiendomFilters.push({
+            description: { contains: `${roomsNum} rom`, mode: 'insensitive' }
+          })
+        }
+      }
+      
+      if (area) {
+        const areaNum = parseInt(area)
+        if (!isNaN(areaNum)) {
+          eiendomFilters.push({
+            description: { contains: `${areaNum} m`, mode: 'insensitive' }
+          })
+        }
+      }
+      
+      if (plotSize) {
+        const plotNum = parseInt(plotSize)
+        if (!isNaN(plotNum)) {
+          eiendomFilters.push({
+            description: { contains: `tomt`, mode: 'insensitive' }
+          })
+        }
+      }
+      
+      if (buildYear) {
+        const yearNum = parseInt(buildYear)
+        if (!isNaN(yearNum)) {
+          eiendomFilters.push({
+            OR: [
+              { title: { contains: buildYear, mode: 'insensitive' } },
+              { description: { contains: buildYear, mode: 'insensitive' } }
+            ]
+          })
+        }
+      }
+      
+      if (eiendomFilters.length > 0) {
+        if (!where.AND) where.AND = []
+        where.AND.push(...eiendomFilters)
+      }
+      
     } else if (category === 'torget') {
+      // Torget-spesifikke filtre
+      const torgetFilters: any[] = []
+      
       if (shouldFilter(condition)) {
-        where.description = { contains: condition, mode: 'insensitive' }
+        torgetFilters.push({
+          OR: [
+            { title: { contains: condition, mode: 'insensitive' } },
+            { description: { contains: condition, mode: 'insensitive' } }
+          ]
+        })
+      }
+      
+      const brand = searchParams.get('brand')
+      if (shouldFilter(brand)) {
+        torgetFilters.push({
+          OR: [
+            { title: { contains: brand, mode: 'insensitive' } },
+            { description: { contains: brand, mode: 'insensitive' } }
+          ]
+        })
+      }
+      
+      if (torgetFilters.length > 0) {
+        if (!where.AND) where.AND = []
+        where.AND.push(...torgetFilters)
       }
     }
 
