@@ -7,14 +7,23 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user) {
+      console.log('❌ Payment Intent: Ikke autentisert')
       return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
     }
 
     const body = await request.json()
     const { categorySlug, listingId, type } = body
 
+    console.log('🚀 Payment Intent: Mottatt forespørsel:', {
+      categorySlug,
+      listingId,
+      type,
+      userEmail: session.user.email
+    })
+
     // Valider input
     if (!categorySlug || !type) {
+      console.log('❌ Payment Intent: Mangler påkrevde felter:', { categorySlug, type })
       return NextResponse.json({ error: 'Mangler påkrevde felter' }, { status: 400 })
     }
 
@@ -38,8 +47,16 @@ export async function POST(request: NextRequest) {
       description = pricing.description
       paymentType = 'LISTING_FEE'
 
+      console.log('💰 Payment Intent: Prisberegning:', {
+        categorySlug,
+        pricing,
+        amount,
+        description
+      })
+
       // Hvis gratis annonse (Torget), ikke opprett Payment Intent
       if (amount === 0) {
+        console.log('✅ Payment Intent: Gratis annonse, returnerer success')
         return NextResponse.json({ 
           success: true, 
           isFree: true,
@@ -65,6 +82,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Opprett Stripe Payment Intent
+    console.log('🔄 Payment Intent: Oppretter Stripe Payment Intent...', {
+      amount,
+      currency: 'nok',
+      description,
+      userId: user.id,
+      stripeProductId: pricing.stripeProductId || 'ikke satt'
+    })
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: 'nok',
@@ -75,10 +100,18 @@ export async function POST(request: NextRequest) {
         type: paymentType,
         categorySlug,
         ...(listingId && { listingId }),
+        ...(pricing.stripeProductId && { productId: pricing.stripeProductId }),
       },
       automatic_payment_methods: {
         enabled: true,
       },
+    })
+
+    console.log('✅ Payment Intent: Stripe Payment Intent opprettet:', {
+      id: paymentIntent.id,
+      status: paymentIntent.status,
+      amount: paymentIntent.amount,
+      hasClientSecret: !!paymentIntent.client_secret
     })
 
     // Lagre betalingsinformasjon i database

@@ -284,6 +284,10 @@ model VehicleSpec {
   // Sikkerhet
   abs                Boolean?  // ABS
   airbags            Boolean?  // Airbags
+
+  // Omregistreringsavgift (fra Skatteetaten)
+  omregistreringsavgift    Int?      // Beløp i hele kroner
+  omregAvgiftDato          DateTime? // Dato avgiften gjelder for
   
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

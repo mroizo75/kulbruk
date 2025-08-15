@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { skatteetatClient } from '@/lib/skatteetaten-client'
 
 // GET - Hent bildata fra Vegvesen API
 export async function GET(request: NextRequest) {
@@ -180,12 +181,30 @@ export async function GET(request: NextRequest) {
       rawData: carData
     }
     
-    console.log('Vegvesen API respons:', mappedData)
+    // Hent omregistreringsavgift fra Skatteetaten
+    let omregistreringsData = null
+    try {
+      omregistreringsData = await skatteetatClient.getOmregistreringsavgift(regNumber)
+      if (omregistreringsData) {
+        console.log('Omregistreringsavgift hentet:', omregistreringsData)
+      }
+    } catch (error) {
+      console.warn('Kunne ikke hente omregistreringsavgift:', error)
+    }
+
+    // Legg til omregistreringsdata i responsen
+    const finalData = {
+      ...mappedData,
+      omregistreringsavgift: omregistreringsData?.avgift || null,
+      omregAvgiftDato: omregistreringsData?.dato || null
+    }
+    
+    console.log('Vegvesen API respons:', finalData)
     
     return NextResponse.json({
       success: true,
-      carData: mappedData,
-      message: 'Bildata hentet fra Vegvesen'
+      carData: finalData,
+      message: 'Bildata hentet fra Vegvesen og Skatteetaten'
     })
     
   } catch (error) {

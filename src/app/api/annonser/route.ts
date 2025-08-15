@@ -222,9 +222,12 @@ export async function POST(request: NextRequest) {
               fuelConsumptionCombined: carData.fuelConsumption?.combined ?? null,
               fuelConsumptionCity: carData.fuelConsumption?.city ?? null,
               fuelConsumptionHighway: carData.fuelConsumption?.highway ?? null,
-              tireSpecs: carData.tires ?? null,
-              abs: carData.abs ?? null,
-              airbags: carData.airbags ?? null,
+                                    tireSpecs: carData.tires ?? null,
+                      abs: carData.abs ?? null,
+                      airbags: carData.airbags ?? null,
+                      // Omregistreringsavgift fra Skatteetaten
+                      omregistreringsavgift: carData.omregistreringsavgift ?? null,
+                      omregAvgiftDato: carData.omregAvgiftDato ? new Date(carData.omregAvgiftDato) : null,
             }
           }
         }

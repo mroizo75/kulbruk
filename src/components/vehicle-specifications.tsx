@@ -74,6 +74,10 @@ interface VehicleSpec {
   abs?: boolean | null
   airbags?: boolean | null
   
+  // Omregistreringsavgift
+  omregistreringsavgift?: number | null
+  omregAvgiftDato?: string | null
+  
   // Tilstand og historikk
   accidents?: boolean | null
   serviceHistory?: string | null
@@ -100,8 +104,11 @@ export default function VehicleSpecifications({ vehicleSpec, listingPrice }: Veh
     return `${num.toLocaleString('no-NO')}${unit ? ` ${unit}` : ''}`
   }
 
-  const registrationFee = Math.round(listingPrice * 0.025) // Estimert 2.5% av pris
+  // Bruk faktisk omregistreringsavgift hvis tilgjengelig, ellers estimat
+  const actualRegistrationFee = vehicleSpec.omregistreringsavgift
+  const registrationFee = actualRegistrationFee || Math.round(listingPrice * 0.025) // Fallback estimat 2.5% av pris
   const priceExclReg = listingPrice - registrationFee
+  const totalPrice = listingPrice + registrationFee
 
   return (
     <Card>
@@ -114,14 +121,30 @@ export default function VehicleSpecifications({ vehicleSpec, listingPrice }: Veh
       <CardContent className="space-y-6">
         
         {/* Priser og avgifter */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-blue-50 rounded-lg">
           <div>
-            <div className="text-sm text-gray-600">Omregistrering</div>
-            <div className="font-semibold">{formatNumber(registrationFee, 'kr')} (avgifter)</div>
+            <div className="text-sm text-gray-600">Totalpris</div>
+            <div className="font-bold text-lg text-blue-600">{formatNumber(totalPrice, 'kr')}</div>
           </div>
           <div>
-            <div className="text-sm text-gray-600">Pris eksl. omreg.</div>
-            <div className="font-semibold">{formatNumber(priceExclReg, 'kr')}</div>
+            <div className="text-sm text-gray-600">Omregistrering</div>
+            <div className="font-semibold">
+              {formatNumber(registrationFee, 'kr')} 
+              {actualRegistrationFee ? (
+                <Badge variant="secondary" className="ml-2 text-xs">Offisiell</Badge>
+              ) : (
+                <Badge variant="outline" className="ml-2 text-xs">Estimat</Badge>
+              )}
+            </div>
+            {vehicleSpec.omregAvgiftDato && (
+              <div className="text-xs text-gray-500">
+                Avgift per {new Date(vehicleSpec.omregAvgiftDato).toLocaleDateString('no-NO')}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="text-sm text-gray-600">Annonsepr is</div>
+            <div className="font-semibold">{formatNumber(listingPrice, 'kr')}</div>
           </div>
           <div>
             <div className="text-sm text-gray-600">Årsavgift</div>

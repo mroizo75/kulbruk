@@ -173,6 +173,13 @@ export default function PaymentForm(props: PaymentFormProps) {
     setError(null)
 
     try {
+      console.log('🚀 PaymentForm: Initialiserer betaling...', {
+        categorySlug: props.categorySlug,
+        listingId: props.listingId,
+        amount: props.amount,
+        description: props.description
+      })
+
       const response = await fetch('/api/payments/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -184,19 +191,34 @@ export default function PaymentForm(props: PaymentFormProps) {
       })
 
       const data = await response.json()
+      console.log('💳 PaymentForm: API respons:', { status: response.status, data })
 
       if (!response.ok) {
+        console.error('❌ PaymentForm: API feil:', data)
         throw new Error(data.error || 'Feil ved opprettelse av betaling')
       }
 
       if (data.isFree) {
+        console.log('✅ PaymentForm: Gratis annonse, hopper over betaling')
         props.onSuccess?.()
         return
       }
 
+      if (!data.clientSecret) {
+        console.error('❌ PaymentForm: Mangler clientSecret i responsen')
+        throw new Error('Mangler clientSecret fra Stripe')
+      }
+
+      console.log('✅ PaymentForm: Payment Intent opprettet:', {
+        paymentId: data.paymentId,
+        amount: data.amount,
+        hasClientSecret: !!data.clientSecret
+      })
+
       setClientSecret(data.clientSecret)
       setPaymentId(data.paymentId)
     } catch (err: any) {
+      console.error('❌ PaymentForm: Feil ved initialisering:', err)
       setError(err.message)
       props.onError?.(err.message)
     } finally {

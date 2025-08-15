@@ -19,6 +19,10 @@ export const stripe = getStripe()
 // Re-eksporter pris og helpers fra klient-sikker modul
 export const PRICING = {
   ...SHARED_PRICING,
+  CAR_AD: {
+    ...SHARED_PRICING.CAR_AD,
+    stripeProductId: process.env.STRIPE_BASIC_ANNONSE_ID,
+  },
   BUSINESS_BASIC: {
     ...SHARED_PRICING.BUSINESS_BASIC,
     stripePriceId: process.env.STRIPE_BASIC_PRICE_ID,

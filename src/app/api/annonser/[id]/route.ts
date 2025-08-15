@@ -153,6 +153,9 @@ export async function PUT(
             serviceHistory: data.vehicleSpec.serviceHistory ?? undefined,
             modifications: data.vehicleSpec.modifications ?? undefined,
             additionalEquipment: Array.isArray(data.vehicleSpec.additionalEquipment) ? data.vehicleSpec.additionalEquipment : undefined,
+            // Omregistreringsavgift fra Skatteetaten
+            omregistreringsavgift: data.vehicleSpec.omregistreringsavgift ?? undefined,
+            omregAvgiftDato: data.vehicleSpec.omregAvgiftDato ? new Date(data.vehicleSpec.omregAvgiftDato) : undefined,
           },
           create: {
             listingId: id,
@@ -163,6 +166,9 @@ export async function PUT(
             serviceHistory: data.vehicleSpec.serviceHistory || null,
             modifications: data.vehicleSpec.modifications || null,
             additionalEquipment: Array.isArray(data.vehicleSpec.additionalEquipment) ? data.vehicleSpec.additionalEquipment : undefined,
+            // Omregistreringsavgift fra Skatteetaten
+            omregistreringsavgift: data.vehicleSpec.omregistreringsavgift || null,
+            omregAvgiftDato: data.vehicleSpec.omregAvgiftDato ? new Date(data.vehicleSpec.omregAvgiftDato) : null,
           }
         })
       }

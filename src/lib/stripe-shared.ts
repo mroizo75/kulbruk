@@ -8,6 +8,7 @@ export const PRICING = {
     amount: 4900, // 49 NOK i øre
     currency: 'nok',
     description: 'Bil-annonse (1 måned)',
+    stripeProductId: process.env.NEXT_PUBLIC_DUMMY ?? undefined, // Settes på server
   },
   TORGET_AD: {
     amount: 0, // Gratis
