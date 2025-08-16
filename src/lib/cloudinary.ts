@@ -1,18 +1,27 @@
 import { v2 as cloudinary } from 'cloudinary'
 
 // Konfigurer Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
+// Cloudinary kan konfigureres med enten CLOUDINARY_URL eller individuelle variabler
+if (process.env.CLOUDINARY_URL) {
+  // Automatisk parsing av CLOUDINARY_URL
+  cloudinary.config(process.env.CLOUDINARY_URL)
+} else {
+  // Manuell konfigurering med individuelle variabler
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  })
+}
 
 // Sjekk om Cloudinary er konfigurert
 export function isCloudinaryConfigured(): boolean {
+  // Sjekk enten CLOUDINARY_URL eller individuelle variabler
   return !!(
-    process.env.CLOUDINARY_CLOUD_NAME && 
-    process.env.CLOUDINARY_API_KEY && 
-    process.env.CLOUDINARY_API_SECRET
+    process.env.CLOUDINARY_URL || 
+    (process.env.CLOUDINARY_CLOUD_NAME && 
+     process.env.CLOUDINARY_API_KEY && 
+     process.env.CLOUDINARY_API_SECRET)
   )
 }
 
