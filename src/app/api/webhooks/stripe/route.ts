@@ -79,7 +79,13 @@ export async function POST(request: NextRequest) {
 // Handler-funksjoner
 async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   try {
-    console.log('✅ Webhook: Betaling vellykket, oppretter annonse...', paymentIntent.id)
+    console.log('✅ Webhook: Betaling vellykket...', paymentIntent.id)
+    
+    // Sjekk om dette er en Fort gjort betaling
+    if (paymentIntent.metadata.type === 'fort_gjort') {
+      await handleFortGjortPaymentSuccess(paymentIntent)
+      return
+    }
 
     // Oppdater betaling i database
     const payment = await prisma.payment.update({
@@ -310,6 +316,43 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     console.log(`Abonnement oppdatert: ${subscription.id}`)
   } catch (error) {
     console.error('Feil ved håndtering av abonnement oppdatering:', error)
+  }
+}
+
+async function handleFortGjortPaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
+  try {
+    console.log('🛡️ Webhook: Fort gjort betaling vellykket', paymentIntent.id)
+
+    // Oppdater SecureOrder med betaling vellykket
+    const order = await prisma.secureOrder.update({
+      where: { stripePaymentIntentId: paymentIntent.id },
+      data: { 
+        status: 'PAYMENT_CONFIRMED',
+        paidAt: new Date()
+      },
+      include: { 
+        listing: true,
+        buyer: true,
+        seller: true 
+      }
+    })
+
+    // Legg til status historie
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        status: 'PAYMENT_CONFIRMED',
+        note: 'Betaling bekreftet av Stripe',
+        createdBy: order.buyerId
+      }
+    })
+
+    // Send varsel til selger om ny ordre
+    // TODO: Implementer e-post varsling
+
+    console.log(`✅ Fort gjort ordre ${order.id} betaling bekreftet`)
+  } catch (error) {
+    console.error('Feil ved håndtering av Fort gjort betaling:', error)
   }
 }
 

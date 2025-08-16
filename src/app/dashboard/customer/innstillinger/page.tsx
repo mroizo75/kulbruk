@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Settings, User, Bell, Shield, Trash2, Download } from 'lucide-react'
+import { Settings, User, Bell, Shield, Trash2, Download, CreditCard } from 'lucide-react'
 import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import DashboardLayout from '@/components/dashboard-layout'
 import DeleteAccountButton from '@/components/delete-account-button'
+import StripeConnectSetup from '@/components/stripe-connect-setup'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -57,6 +58,13 @@ export default async function SettingsPage() {
             >
               <Bell className="mr-2 h-4 w-4 inline" />
               Varsler
+            </a>
+            <a
+              href="#betalinger"
+              className="py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            >
+              <CreditCard className="mr-2 h-4 w-4 inline" />
+              Betalinger
             </a>
             <a
               href="#sikkerhet"
@@ -154,6 +162,11 @@ export default async function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Betalinger */}
+            <section id="betalinger">
+              <StripeConnectSetup />
+            </section>
 
             {/* Sikkerhet */}
             <Card id="sikkerhet">

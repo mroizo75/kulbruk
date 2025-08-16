@@ -127,9 +127,28 @@ export default function FortGjortCard({ listing, currentUserId }: FortGjortCardP
         </div>
         
         <Button 
-          onClick={() => {
-            // TODO: Implementer Fort gjort checkout
-            console.log('Start Fort gjort kjøp for:', listing.id)
+          onClick={async () => {
+            try {
+              const response = await fetch('/api/fort-gjort/create-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ listingId: listing.id })
+              })
+              
+              const data = await response.json()
+              
+              if (!response.ok) {
+                alert(`Feil: ${data.error}`)
+                return
+              }
+              
+              // Redirect til checkout med clientSecret
+              const checkoutUrl = `/fort-gjort/checkout?clientSecret=${data.clientSecret}&orderId=${data.orderId}`
+              window.location.href = checkoutUrl
+            } catch (error) {
+              console.error('Fort gjort error:', error)
+              alert('Feil ved start av Fort gjort kjøp')
+            }
           }}
           className="w-full bg-green-600 hover:bg-green-700 text-white"
           size="lg"
