@@ -9,17 +9,6 @@ export async function GET(request: NextRequest) {
     const authRes = ensureCronAuthorized(request)
     if (authRes) return authRes
 
-    // Enkel test først - sjekk om Prisma connection fungerer
-    const totalOrders = await prisma.secureOrder.count()
-    
-    return NextResponse.json({
-      success: true,
-      message: `Fort gjort timeout cron test vellykket`,
-      totalOrdersInDB: totalOrders,
-      timestamp: new Date().toISOString()
-    })
-
-    /*
     const now = new Date()
     
     // Finn alle ordrer som har passert approval deadline
@@ -141,7 +130,6 @@ export async function GET(request: NextRequest) {
       expiredOrdersCount: expiredOrders.length,
       unshippedOrdersCount: unshippedOrders.length
     })
-    */
 
   } catch (error) {
     console.error('Fort gjort timeout cron error:', error)
