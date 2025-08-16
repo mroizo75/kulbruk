@@ -1,0 +1,77 @@
+name: Fort gjort Timeout Cron
+
+on:
+  schedule:
+    # Kjør hver time på minutt 15 (00:15, 01:15, 02:15, etc.)
+    - cron: '15 * * * *'
+  
+  # Tillat manuell kjøring for testing
+  workflow_dispatch:
+
+jobs:
+  fort-gjort-timeout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Call Fort gjort Timeout API
+        run: |
+          echo "🛡️ Starter Fort gjort timeout sjekk..."
+          
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/cron/fort-gjort-timeout")
+          
+          http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          if [ $http_code -eq 200 ]; then
+            echo "✅ Fort gjort timeout cron fullført"
+            echo "$body" | jq '.' || echo "$body"
+          else
+            echo "❌ Fort gjort timeout cron feilet"
+            echo "$body"
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "🚨 Fort gjort timeout cron feilet!"
+          # Her kan du legge til Slack/Discord/email varsling
+          
+  # Backup cron job som kjører 2 ganger daglig
+  fort-gjort-timeout-backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    if: always()
+    
+    steps:
+      - name: Backup timeout check
+        run: |
+          echo "🔄 Kjører backup timeout sjekk..."
+          
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/cron/fort-gjort-timeout")
+          
+          http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          
+          if [ $http_code -eq 200 ]; then
+            echo "✅ Backup timeout sjekk OK"
+          else
+            echo "⚠️ Backup timeout sjekk feilet, men fortsetter"
+          fi
+
+    # Kjør backup sjekk kl 08:00 og 20:00 UTC
+    # (09:00 og 21:00 norsk tid)
+    schedule:
+      - cron: '0 8,20 * * *'

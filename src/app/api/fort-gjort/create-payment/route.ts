@@ -59,8 +59,14 @@ export async function POST(request: NextRequest) {
     const kulbrukFee = calculateFortGjortFee(priceInOre)
     const totalAmount = priceInOre + kulbrukFee
     const sellerPayout = calculateSellerPayout(priceInOre)
+    
+    // Beregn deadlines
+    const now = new Date()
+    const deliveryDeadline = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 dager til levering
+    const approvalDeadline = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000) // 14 dager total for godkjenning
 
-    // Opprett Payment Intent med destination (Connect account)
+    // Opprett Payment Intent som holder pengene på platform account
+    // Pengene vil bli overført til selger når kjøper godkjenner eller ved timeout
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: 'nok',
@@ -73,11 +79,12 @@ export async function POST(request: NextRequest) {
         sellerStripeAccountId: listing.user.sellerStripeAccount.stripeAccountId,
         itemPrice: priceInOre.toString(),
         kulbrukFee: kulbrukFee.toString(),
-        sellerPayout: sellerPayout.toString()
+        sellerPayout: sellerPayout.toString(),
+        deliveryDeadline: deliveryDeadline.toISOString(),
+        approvalDeadline: approvalDeadline.toISOString()
       },
-      // Hold pengene på platform account først
-      // Vi bruker ikke `on_behalf_of` eller `transfer_data` her
-      // fordi vi vil holde pengene til godkjenning
+      // KRITISK: Ikke bruk transfer_data eller on_behalf_of
+      // Pengene holdes på platform account til manuell transfer
       automatic_payment_methods: {
         enabled: true,
         allow_redirects: 'never'
@@ -89,7 +96,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Opprett SecureOrder i database
+    // Opprett SecureOrder i database med deadlines
     const secureOrder = await prisma.secureOrder.create({
       data: {
         buyerId: buyer.id,
@@ -101,7 +108,9 @@ export async function POST(request: NextRequest) {
         kulbrukFee: kulbrukFee / 100, // Konverter til kroner
         totalAmount: totalAmount / 100,
         sellerPayout: sellerPayout / 100,
-        status: 'PAYMENT_PENDING'
+        status: 'PAYMENT_PENDING',
+        deliveryDeadline: deliveryDeadline,
+        approvalDeadline: approvalDeadline
       }
     })
 

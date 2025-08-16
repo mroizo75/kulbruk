@@ -1,0 +1,181 @@
+name: All Kulbruk Cron Jobs
+
+on:
+  schedule:
+    # Kjør alle cron jobs hver time på forskjellige tidspunkt for å spre lasten
+    - cron: '5 * * * *'   # Fort gjort timeout (hver time på minutt 5)
+    - cron: '15 8 * * *'  # Saved search digest (daglig kl 08:15 UTC = 09:15 norsk tid)
+    - cron: '30 9 * * *'  # Listings expiring (daglig kl 09:30 UTC = 10:30 norsk tid)
+  
+  # Tillat manuell kjøring
+  workflow_dispatch:
+    inputs:
+      job_type:
+        description: 'Velg hvilken cron job å kjøre'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'fort-gjort-timeout'
+          - 'saved-search-digest'
+          - 'listings-expiring'
+
+jobs:
+  determine-jobs:
+    runs-on: ubuntu-latest
+    outputs:
+      run-fort-gjort: ${{ steps.check.outputs.run-fort-gjort }}
+      run-saved-search: ${{ steps.check.outputs.run-saved-search }}
+      run-listings-expiring: ${{ steps.check.outputs.run-listings-expiring }}
+    steps:
+      - name: Determine which jobs to run
+        id: check
+        run: |
+          # For scheduled runs, sjekk hvilken cron som trigget
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "5 * * * *" ]; then
+              echo "run-fort-gjort=true" >> $GITHUB_OUTPUT
+              echo "run-saved-search=false" >> $GITHUB_OUTPUT
+              echo "run-listings-expiring=false" >> $GITHUB_OUTPUT
+            elif [ "${{ github.event.schedule }}" = "15 8 * * *" ]; then
+              echo "run-fort-gjort=false" >> $GITHUB_OUTPUT
+              echo "run-saved-search=true" >> $GITHUB_OUTPUT
+              echo "run-listings-expiring=false" >> $GITHUB_OUTPUT
+            elif [ "${{ github.event.schedule }}" = "30 9 * * *" ]; then
+              echo "run-fort-gjort=false" >> $GITHUB_OUTPUT
+              echo "run-saved-search=false" >> $GITHUB_OUTPUT
+              echo "run-listings-expiring=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For manuell kjøring
+            case "${{ inputs.job_type }}" in
+              "all")
+                echo "run-fort-gjort=true" >> $GITHUB_OUTPUT
+                echo "run-saved-search=true" >> $GITHUB_OUTPUT
+                echo "run-listings-expiring=true" >> $GITHUB_OUTPUT
+                ;;
+              "fort-gjort-timeout")
+                echo "run-fort-gjort=true" >> $GITHUB_OUTPUT
+                echo "run-saved-search=false" >> $GITHUB_OUTPUT
+                echo "run-listings-expiring=false" >> $GITHUB_OUTPUT
+                ;;
+              "saved-search-digest")
+                echo "run-fort-gjort=false" >> $GITHUB_OUTPUT
+                echo "run-saved-search=true" >> $GITHUB_OUTPUT
+                echo "run-listings-expiring=false" >> $GITHUB_OUTPUT
+                ;;
+              "listings-expiring")
+                echo "run-fort-gjort=false" >> $GITHUB_OUTPUT
+                echo "run-saved-search=false" >> $GITHUB_OUTPUT
+                echo "run-listings-expiring=true" >> $GITHUB_OUTPUT
+                ;;
+            esac
+          fi
+
+  fort-gjort-timeout:
+    needs: determine-jobs
+    if: needs.determine-jobs.outputs.run-fort-gjort == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Fort gjort timeout check
+        run: |
+          echo "🛡️ Kjører Fort gjort timeout sjekk..."
+          
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/cron/fort-gjort-timeout")
+          
+          http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
+          
+          echo "Status: $http_code"
+          echo "Response: $body"
+          
+          if [ $http_code -eq 200 ]; then
+            echo "✅ Fort gjort timeout OK"
+          else
+            echo "❌ Fort gjort timeout feilet"
+            exit 1
+          fi
+
+  saved-search-digest:
+    needs: determine-jobs
+    if: needs.determine-jobs.outputs.run-saved-search == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Saved search digest
+        run: |
+          echo "📧 Kjører saved search digest..."
+          
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/cron/saved-search-digest")
+          
+          http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
+          
+          echo "Status: $http_code"
+          echo "Response: $body"
+          
+          if [ $http_code -eq 200 ]; then
+            echo "✅ Saved search digest OK"
+          else
+            echo "❌ Saved search digest feilet"
+            exit 1
+          fi
+
+  listings-expiring:
+    needs: determine-jobs
+    if: needs.determine-jobs.outputs.run-listings-expiring == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Listings expiring check
+        run: |
+          echo "⏰ Kjører listings expiring sjekk..."
+          
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/cron/listings-expiring")
+          
+          http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
+          
+          echo "Status: $http_code"
+          echo "Response: $body"
+          
+          if [ $http_code -eq 200 ]; then
+            echo "✅ Listings expiring OK"
+          else
+            echo "❌ Listings expiring feilet"
+            exit 1
+          fi
+
+  notify-on-failure:
+    needs: [fort-gjort-timeout, saved-search-digest, listings-expiring]
+    if: always() && (needs.fort-gjort-timeout.result == 'failure' || needs.saved-search-digest.result == 'failure' || needs.listings-expiring.result == 'failure')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Send failure notification
+        run: |
+          echo "🚨 En eller flere cron jobs feilet!"
+          echo "Fort gjort: ${{ needs.fort-gjort-timeout.result }}"
+          echo "Saved search: ${{ needs.saved-search-digest.result }}"
+          echo "Listings expiring: ${{ needs.listings-expiring.result }}"
+          
+          # TODO: Legg til Slack/Discord/email varsling her
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"🚨 Kulbruk cron job feilet!"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

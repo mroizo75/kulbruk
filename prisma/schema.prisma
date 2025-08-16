@@ -683,11 +683,13 @@ model SecureOrder {
   buyerId                   String
   sellerId                  String
   stripePaymentIntentId     String?
-  stripeConnectedAccountId  String?
-  amount                    Int                        // Total beløp i øre
-  kulbrukFee                Int                        // Kulbruk sin andel i øre
-  sellerAmount              Int                        // Selger får utbetalt (amount - kulbrukFee)
-  status                    SecureOrderStatus          @default(PENDING_SHIPMENT)
+  sellerStripeAccountId     String?                    // Selger sin Stripe Connect account
+  itemPrice                 Float                      // Varepris i kroner
+  kulbrukFee                Float                      // Kulbruk sin andel i kroner  
+  totalAmount               Float                      // Total beløp i kroner
+  sellerPayout              Float                      // Selger får utbetalt i kroner
+  status                    SecureOrderStatus          @default(PAYMENT_PENDING)
+  paidAt                    DateTime?                  // Når betaling ble bekreftet
   trackingNumber            String?
   trackingUrl               String?
   shippingMethod            String?                    // Posten, Bring, etc.
@@ -717,7 +719,8 @@ model SecureOrder {
 }
 
 enum SecureOrderStatus {
-  PENDING_SHIPMENT    // Venter på at selger sender
+  PAYMENT_PENDING     // Venter på betaling fra kjøper
+  PAYMENT_CONFIRMED   // Betaling bekreftet, venter på sending
   SHIPPED             // Sendt av selger
   DELIVERED           // Levert til kjøper
   APPROVED            // Godkjent av kjøper
