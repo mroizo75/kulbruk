@@ -37,6 +37,7 @@ import ReviewSummary from '@/components/reviews/review-summary'
 import ReviewForm from '@/components/reviews/review-form'
 import RecentlyViewedRecorder from '@/components/recently-viewed-recorder'
 import FortGjortCard from '@/components/fort-gjort-card'
+import LoginToContactButton from '@/components/login-to-contact-button'
 // Address map uses a simple Google Maps embed per your preference
 
 export const dynamic = 'force-dynamic'
@@ -518,19 +519,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
                       <p className="text-sm text-yellow-800 mb-3">
                         Du må være innlogget for å se kontaktinformasjon
                       </p>
-                      <Button 
-                        className="w-full" 
-                        size="lg"
-                        onClick={() => {
-                          // Lagre current URL for å returnere hit etter innlogging
-                          if (typeof window !== 'undefined') {
-                            localStorage.setItem('postLoginRedirect', window.location.pathname)
-                            window.location.href = '/sign-in?redirect=' + encodeURIComponent(window.location.pathname)
-                          }
-                        }}
-                      >
-                        Logg inn for å kontakte
-                      </Button>
+                      <LoginToContactButton />
                     </div>
                     <Link href="/sign-up">
                       <Button variant="outline" className="w-full">
