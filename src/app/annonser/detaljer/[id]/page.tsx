@@ -36,6 +36,7 @@ import LoanCalculator from '@/components/loan-calculator'
 import ReviewSummary from '@/components/reviews/review-summary'
 import ReviewForm from '@/components/reviews/review-form'
 import RecentlyViewedRecorder from '@/components/recently-viewed-recorder'
+import FortGjortCard from '@/components/fort-gjort-card'
 // Address map uses a simple Google Maps embed per your preference
 
 export const dynamic = 'force-dynamic'
@@ -324,8 +325,10 @@ export default async function ListingDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
 
-            {/* Lånekalkulator */}
-            <LoanCalculator listingId={listing.id} priceNok={Number(listing.price)} />
+            {/* Lånekalkulator - kun for bil og eiendom */}
+            {(listing.category.slug === 'biler' || listing.category.slug === 'eiendom') && (
+              <LoanCalculator listingId={listing.id} priceNok={Number(listing.price)} />
+            )}
 
             {/* Beskrivelse */}
             <Card>
@@ -461,6 +464,25 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Fort gjort - kun for Torget-kategorien */}
+            <FortGjortCard 
+              listing={{
+                id: listing.id,
+                title: listing.title,
+                price: Number(listing.price),
+                category: { slug: listing.category.slug },
+                status: listing.status,
+                userId: listing.userId,
+                listingType: listing.listingType,
+                enableFortGjort: listing.enableFortGjort,
+                user: {
+                  firstName: listing.user.firstName || undefined,
+                  lastName: listing.user.lastName || undefined
+                }
+              }}
+              currentUserId={session?.user?.id}
+            />
+
             {/* Kontaktinformasjon */}
             <Card>
               <CardHeader>

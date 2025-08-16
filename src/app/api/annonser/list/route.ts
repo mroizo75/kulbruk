@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get('sort') || 'nyeste'
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
+    const ids = searchParams.get('ids') // For recently viewed lookup
     
     // Nye filter-parametere
     const location = searchParams.get('location')
@@ -74,7 +75,16 @@ export async function GET(request: NextRequest) {
       isActive: true
     }
 
-    if (category && category !== 'alle') {
+    // If specific IDs requested (for recently viewed), override filters
+    if (ids) {
+      const idList = ids.split(',').filter(id => id.trim())
+      if (idList.length > 0) {
+        where.id = { in: idList }
+        // Skip other filters when fetching specific IDs
+      }
+    }
+
+    if (!ids && category && category !== 'alle') {
       // Valider at kategorien er gyldig
       if (!isValidMainCategory(category)) {
         return NextResponse.json(
@@ -107,11 +117,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (search && search.trim()) {
+    if (!ids && search && search.trim()) {
       where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { location: { contains: search, mode: 'insensitive' } }
+        { title: { contains: search } },
+        { description: { contains: search } },
+        { location: { contains: search } },
+        { shortCode: { contains: search } }
       ]
     }
 
@@ -128,7 +139,7 @@ export async function GET(request: NextRequest) {
 
     // Lokasjon filter
     if (shouldFilter(location)) {
-      where.location = { contains: location, mode: 'insensitive' }
+      where.location = { contains: location }
     }
 
     // Pris filter
@@ -363,6 +374,8 @@ export async function GET(request: NextRequest) {
       registrationNumber: listing.registrationNumber,
       mileage: listing.mileage,
       condition: listing.condition,
+      enableFortGjort: listing.enableFortGjort,
+      userId: listing.userId,
       contactName: listing.contactName,
       contactEmail: listing.contactEmail,
       contactPhone: listing.contactPhone,

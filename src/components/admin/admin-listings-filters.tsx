@@ -43,7 +43,7 @@ export default function AdminListingsFilters({
 		const params = new URLSearchParams(searchParams?.toString() || '')
 		if (status && status !== 'ALL') params.set('status', status); else params.delete('status')
 		if (q && q.trim().length > 0) params.set('q', q.trim()); else params.delete('q')
-		if (categoryId) params.set('categoryId', categoryId); else params.delete('categoryId')
+		if (categoryId && categoryId !== 'alle-kategorier') params.set('categoryId', categoryId); else params.delete('categoryId')
 		params.set('page', '1')
 		params.set('pageSize', String(pageSize))
 		router.push(`/dashboard/admin/annonser?${params.toString()}`)
@@ -72,7 +72,7 @@ export default function AdminListingsFilters({
 				<Select value={categoryId} onValueChange={(v) => setCategoryId(v)}>
 					<SelectTrigger><SelectValue placeholder="Kategori" /></SelectTrigger>
 					<SelectContent>
-						<SelectItem value="">Alle kategorier</SelectItem>
+						<SelectItem value="alle-kategorier">Alle kategorier</SelectItem>
 						{categories.map(c => (
 							<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
 						))}

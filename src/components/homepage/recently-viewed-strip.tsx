@@ -15,19 +15,57 @@ type ViewedItem = {
   url?: string
 }
 
+type FullListing = {
+  id: string
+  title: string
+  price: number
+  location: string
+  category: string
+  categorySlug?: string
+  status: string
+  mainImage: string
+  images?: { url: string; altText?: string }[]
+  views: number
+  createdAt: string
+  enableFortGjort?: boolean
+  listingType?: string
+  userId?: string
+}
+
 export default function RecentlyViewedStrip() {
   const [items, setItems] = useState<ViewedItem[]>([])
+  const [fullListings, setFullListings] = useState<FullListing[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('kulbruk:recentlyViewed')
-      const list = raw ? (JSON.parse(raw) as ViewedItem[]) : []
-      setItems(Array.isArray(list) ? list.slice(0, 12) : [])
-    } catch {
-      setItems([])
+    async function loadRecentlyViewed() {
+      try {
+        const raw = localStorage.getItem('kulbruk:recentlyViewed')
+        const list = raw ? (JSON.parse(raw) as ViewedItem[]) : []
+        const viewedItems = Array.isArray(list) ? list.slice(0, 12) : []
+        setItems(viewedItems)
+
+        if (viewedItems.length > 0) {
+          // Fetch full listing data from API for Fort gjort support
+          const ids = viewedItems.map(item => item.id).join(',')
+          const response = await fetch(`/api/annonser/list?ids=${ids}&limit=50`)
+          if (response.ok) {
+            const data = await response.json()
+            setFullListings(data.listings || [])
+          }
+        }
+      } catch {
+        setItems([])
+        setFullListings([])
+      } finally {
+        setLoading(false)
+      }
     }
+    
+    loadRecentlyViewed()
   }, [])
 
+  if (loading) return null
   if (!items || items.length === 0) return null
 
   return (
@@ -49,22 +87,30 @@ export default function RecentlyViewedStrip() {
           </Button>
         </div>
         <ListingGrid>
-          {items.map((it) => (
-            <a key={it.id} href={it.url || `/annonser/detaljer/${it.id}`}>
-              <ListingCard
-                id={it.id}
-                title={it.title}
-                price={it.price || 0}
-                location={it.location || ''}
-                category={''}
-                status={'APPROVED' as any}
-                mainImage={it.mainImage || ''}
-                images={undefined}
-                views={0}
-                createdAt={it.createdAt ? new Date(it.createdAt) : new Date()}
-              />
-            </a>
-          ))}
+          {items.map((it) => {
+            // Find full listing data for this item
+            const fullListing = fullListings.find(fl => fl.id === it.id)
+            
+            return (
+              <a key={it.id} href={it.url || `/annonser/detaljer/${it.id}`}>
+                <ListingCard
+                  id={it.id}
+                  title={fullListing?.title || it.title}
+                  price={fullListing?.price || it.price || 0}
+                  location={fullListing?.location || it.location || ''}
+                  category={fullListing?.categorySlug || fullListing?.category || ''}
+                  status={(fullListing?.status as any) || 'APPROVED'}
+                  mainImage={fullListing?.mainImage || it.mainImage || ''}
+                  images={fullListing?.images}
+                  views={fullListing?.views || 0}
+                  createdAt={fullListing?.createdAt ? new Date(fullListing.createdAt) : (it.createdAt ? new Date(it.createdAt) : new Date())}
+                  enableFortGjort={fullListing?.enableFortGjort}
+                  listingType={fullListing?.listingType}
+                  userId={fullListing?.userId}
+                />
+              </a>
+            )
+          })}
         </ListingGrid>
       </div>
     </section>

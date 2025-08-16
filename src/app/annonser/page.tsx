@@ -19,9 +19,13 @@ interface Listing {
   location: string
   createdAt: string
   images: { url: string }[]
-  category: { name: string, slug: string }
+  category: string
+  categorySlug?: string
   user: { firstName?: string, lastName?: string }
   views: number
+  enableFortGjort?: boolean
+  listingType?: string
+  userId?: string
 }
 
 interface Category {
@@ -123,6 +127,7 @@ function ListingsContent() {
         const res = await fetch(`/api/annonser/list?${params.toString()}`)
         if (res.ok) {
           const data = await res.json()
+
           setListings(data.listings)
           setTotalPages(data.pagination.pages)
         }
@@ -717,11 +722,14 @@ function ListingsContent() {
                       title={listing.title}
                       price={listing.price}
                       location={listing.location}
-                      category={listing.category.name}
+                      category={listing.categorySlug || listing.category}
                       status="APPROVED"
                       images={listing.images}
                       views={listing.views}
                       createdAt={listing.createdAt}
+                      enableFortGjort={listing.enableFortGjort}
+                      listingType={listing.listingType}
+                      userId={listing.userId}
                     />
                   ))}
                 </div>

@@ -7,6 +7,7 @@ import { MapPin, Calendar, Eye, Heart } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { calculateCarTotalPrice, formatCarPrice, isCarCategory } from '@/lib/car-pricing'
+import { FortGjortBadge } from '@/components/fort-gjort-card'
 
 interface ListingCardProps {
   id: string
@@ -23,6 +24,9 @@ interface ListingCardProps {
   isFavorited?: boolean
   onFavoriteChange?: (isFav: boolean) => void
   registrationFee?: number | null // For bil-annonser
+  listingType?: string
+  userId?: string
+  enableFortGjort?: boolean
 }
 
 const statusConfig = {
@@ -49,6 +53,9 @@ export default function ListingCard({
   isFavorited,
   onFavoriteChange,
   registrationFee,
+  listingType,
+  userId,
+  enableFortGjort,
 }: ListingCardProps) {
   const statusInfo = statusConfig[status]
   const isClickable = status === 'APPROVED'
@@ -184,6 +191,23 @@ export default function ListingCard({
               {price.toLocaleString('no-NO')} kr
             </p>
           )}
+        </div>
+
+        {/* Fort gjort badge */}
+        <div className="mb-2">
+          <FortGjortBadge 
+            listing={{
+              id,
+              title,
+              price,
+              category: { slug: category?.toLowerCase() || '' },
+              status,
+              userId: userId || '',
+              listingType,
+              enableFortGjort,
+              user: { firstName: '', lastName: '' }
+            }}
+          />
         </div>
 
         {/* Lokasjon */}

@@ -22,6 +22,7 @@ import ImageUpload from '@/components/image-upload'
 import PaymentForm from '@/components/payment-form'
 import CarPriceDisplay from '@/components/car-price-display'
 import { getListingPrice } from '@/lib/stripe-shared'
+import { isEligibleForFortGjort, calculateSellerPayout, formatAmount } from '@/lib/fort-gjort'
 
 // Validering schema
 const listingSchema = z.object({
@@ -53,6 +54,7 @@ export default function CreateListingForm() {
   const [showPayment, setShowPayment] = useState(false)
   const [showAddress, setShowAddress] = useState<boolean>(false)
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false)
+  const [enableFortGjort, setEnableFortGjort] = useState<boolean>(false)
 
   const {
     register,
@@ -69,6 +71,23 @@ export default function CreateListingForm() {
   })
 
   const selectedCategory = watch('category')
+
+  // Håndter kategori-endring
+  const handleCategoryChange = (value: string) => {
+    setValue('category', value)
+    
+    // Vis bil-spesifikke felter for bil-kategorier
+    if (value === 'biler' || value === 'bil') {
+      setShowVehicleFields(true)
+    } else {
+      setShowVehicleFields(false)
+      setVehicleData(null)
+    }
+    
+    // Reset Fort gjort når kategori endres
+    setEnableFortGjort(false)
+    setShowPriceEstimation(false)
+  }
 
   // Last kategorier fra API (DB) for å sikre at UI alltid samsvarer med databasen
   useEffect(() => {
@@ -109,14 +128,6 @@ export default function CreateListingForm() {
       }
     }
   }, [session, setValue])
-
-  // Håndter kategori-endring
-  const handleCategoryChange = (value: string) => {
-    setValue('category', value)
-    setShowVehicleFields(value === 'biler')
-    setShowPriceEstimation(false)
-    setVehicleData(null)
-  }
 
   // Håndter bil-data endringer
   const handleVehicleDataChange = (data: any) => {
@@ -201,6 +212,10 @@ export default function CreateListingForm() {
             modifications: vehicleData.modifications || '',
             additionalEquipment: vehicleData.additionalEquipment || []
           }
+        } : {}),
+        // Fort gjort-spesifikke felt
+        ...(selectedCategory === 'torget' ? {
+          enableFortGjort: enableFortGjort
         } : {}),
         showAddress,
         images: uploadedImages.filter((img: any) => img.uploaded).map((img: any) => ({ 
@@ -376,6 +391,83 @@ export default function CreateListingForm() {
                 // Her kan vi lagre estimatet til senere bruk
               }}
             />
+          )}
+
+          {/* Fort gjort - kun for Torget-kategorien */}
+          {selectedCategory === 'torget' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-green-600">🛡️</span>
+                  Fort gjort - Sikker handel
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="fort-gjort"
+                      checked={enableFortGjort}
+                      onCheckedChange={(checked) => setEnableFortGjort(checked as boolean)}
+                    />
+                    <Label htmlFor="fort-gjort" className="font-medium text-green-800">
+                      Aktiver Fort gjort for denne annonsen
+                    </Label>
+                  </div>
+                </div>
+                
+                {enableFortGjort && (
+                  <div className="space-y-3 p-4 bg-white rounded-lg border border-green-200">
+                    <h4 className="font-medium text-green-800">Hvordan Fort gjort fungerer:</h4>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <div className="flex items-start space-x-2">
+                        <span className="text-green-600 font-medium mt-0.5">1.</span>
+                        <span>Kjøper betaler trygt - pengene holdes av Kulbruk</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <span className="text-green-600 font-medium mt-0.5">2.</span>
+                        <span>Du sender varen innen 7 dager med sporingsnummer</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <span className="text-green-600 font-medium mt-0.5">3.</span>
+                        <span>Kjøper har 3 dager til å godkjenne varen</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <span className="text-green-600 font-medium mt-0.5">4.</span>
+                        <span>Du får pengene utbetalt etter godkjenning</span>
+                      </div>
+                    </div>
+                    
+                    {watch('price') > 0 && (
+                      <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                        <div className="text-sm">
+                          <div className="flex justify-between mb-1">
+                            <span>Din annonse-pris:</span>
+                            <span className="font-medium">{Number(watch('price')).toLocaleString('no-NO')} kr</span>
+                          </div>
+                          <div className="flex justify-between mb-1 text-green-700">
+                            <span>Fort gjort-gebyr (2.5%):</span>
+                            <span className="font-medium">
+                              -{formatAmount(calculateSellerPayout(Number(watch('price')) * 100).kulbrukFee)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between border-t border-green-200 pt-1 font-semibold text-green-800">
+                            <span>Du får utbetalt:</span>
+                            <span>
+                              {formatAmount(calculateSellerPayout(Number(watch('price')) * 100).sellerAmount)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="text-xs text-gray-500">
+                  Fort gjort er tilgjengelig for annonser mellom 100-100.000 kr
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Bilder */}
@@ -555,7 +647,7 @@ export default function CreateListingForm() {
       </form>
 
       {/* Betalingsskjema modal */}
-    {showPayment && createdListingId && (
+    {showPayment && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6">

@@ -43,8 +43,7 @@ export async function GET(request: NextRequest) {
     
     if (location) {
       where.location = {
-        contains: location,
-        mode: 'insensitive'
+        contains: location
       }
     }
     
@@ -56,8 +55,9 @@ export async function GET(request: NextRequest) {
     
     if (search) {
       where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
+        { title: { contains: search } },
+        { description: { contains: search } },
+        { shortCode: { contains: search } }
       ]
     }
 
@@ -86,8 +86,16 @@ export async function GET(request: NextRequest) {
       prisma.listing.count({ where })
     ])
 
+    // Map listings to include necessary fields for Fort gjort
+    const mappedListings = listings.map(listing => ({
+      ...listing,
+      enableFortGjort: listing.enableFortGjort,
+      listingType: listing.listingType,
+      userId: listing.userId
+    }))
+
     return NextResponse.json({
-      listings,
+      listings: mappedListings,
       pagination: {
         page,
         limit,
@@ -261,6 +269,7 @@ export async function POST(request: NextRequest) {
         contactName: data.contactName,
         showAddress: !!data.showAddress,
         status: 'PENDING', // Alle nye annonser venter på godkjenning
+        enableFortGjort: !!data.enableFortGjort,
         // Opprett VehicleSpec dersom sendt inn
         ...((data.vehicleSpec || enrichedVehicleSpec) ? {
           vehicleSpec: {

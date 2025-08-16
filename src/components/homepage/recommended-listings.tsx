@@ -15,6 +15,9 @@ type ApiListing = {
   images?: { url: string; altText?: string }[]
   views: number
   createdAt: string
+  enableFortGjort?: boolean
+  listingType?: string
+  userId?: string
 }
 
 function buildParamsFromLastSearch(): URLSearchParams | null {
@@ -136,6 +139,9 @@ export default function RecommendedListings() {
             images={l.images}
             views={l.views}
             createdAt={new Date(l.createdAt)}
+            enableFortGjort={l.enableFortGjort}
+            listingType={l.listingType}
+            userId={l.userId}
           />
         ))}
       </ListingGrid>

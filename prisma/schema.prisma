@@ -45,6 +45,13 @@ model User {
   favorites             Favorite[]
   savedSearches         SavedSearch[]
   auditLogs             AuditLog[]
+  // Fort gjort relasjoner
+  secureOrdersBuyer     SecureOrder[]  @relation("SecureOrdersBuyer")
+  secureOrdersSeller    SecureOrder[]  @relation("SecureOrdersSeller")
+  orderDisputesInitiated OrderDispute[] @relation("OrderDisputesInitiated")
+  orderDisputesResolved  OrderDispute[] @relation("OrderDisputesResolved")
+  orderStatusUpdates     OrderStatusHistory[] @relation("OrderStatusUpdates")
+  sellerStripeAccount    SellerStripeAccount? @relation("SellerStripeAccount")
 
   @@map("users")
 }
@@ -132,6 +139,7 @@ model Listing {
   registrationNumber String?
   reservePrice       Decimal?         @db.Decimal(10, 2)
   suggestedPrice     Decimal?         @db.Decimal(10, 2)
+  enableFortGjort    Boolean          @default(false)
   user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   category           Category         @relation(fields: [categoryId], references: [id])
   images             Image[]
@@ -145,6 +153,8 @@ model Listing {
   reports            Report[]
   reviews            Review[]
   favorites          Favorite[]
+  // Fort gjort
+  secureOrders       SecureOrder[]
 
   @@index([categoryId], map: "listings_categoryId_fkey")
   @@index([userId], map: "listings_userId_fkey")
@@ -664,4 +674,123 @@ model Review {
   @@index([revieweeId])
   @@index([reviewerId])
   @@map("reviews")
+}
+
+// Fort gjort (sikker handel) - kun for Torget-kategorien
+model SecureOrder {
+  id                        String                     @id @default(cuid())
+  listingId                 String
+  buyerId                   String
+  sellerId                  String
+  stripePaymentIntentId     String?
+  stripeConnectedAccountId  String?
+  amount                    Int                        // Total beløp i øre
+  kulbrukFee                Int                        // Kulbruk sin andel i øre
+  sellerAmount              Int                        // Selger får utbetalt (amount - kulbrukFee)
+  status                    SecureOrderStatus          @default(PENDING_SHIPMENT)
+  trackingNumber            String?
+  trackingUrl               String?
+  shippingMethod            String?                    // Posten, Bring, etc.
+  shippedAt                 DateTime?
+  deliveryDeadline          DateTime?                  // 7 dager fra ordre
+  approvalDeadline          DateTime?                  // 3 dager etter levering
+  approvedAt                DateTime?
+  completedAt               DateTime?
+  notes                     String?                    @db.Text
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  
+  // Relasjoner
+  listing                   Listing                    @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer                     User                       @relation("SecureOrdersBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller                    User                       @relation("SecureOrdersSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  disputes                  OrderDispute[]
+  statusHistory             OrderStatusHistory[]
+
+  @@index([listingId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([deliveryDeadline])
+  @@index([approvalDeadline])
+  @@map("secure_orders")
+}
+
+enum SecureOrderStatus {
+  PENDING_SHIPMENT    // Venter på at selger sender
+  SHIPPED             // Sendt av selger
+  DELIVERED           // Levert til kjøper
+  APPROVED            // Godkjent av kjøper
+  DISPUTED            // Klage fra kjøper
+  COMPLETED           // Ferdig - penger overført
+  CANCELLED           // Kansellert
+  EXPIRED             // Utløpt (ikke sendt i tide)
+}
+
+model OrderDispute {
+  id            String              @id @default(cuid())
+  orderId       String
+  initiatedBy   String              // buyerId eller sellerId
+  reason        String              @db.Text
+  description   String?             @db.Text
+  status        OrderDisputeStatus  @default(OPEN)
+  resolution    String?             @db.Text
+  resolvedBy    String?             // Admin/moderator userId
+  resolvedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  
+  // Relasjoner
+  order         SecureOrder         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  initiator     User                @relation("OrderDisputesInitiated", fields: [initiatedBy], references: [id], onDelete: Cascade)
+  resolver      User?               @relation("OrderDisputesResolved", fields: [resolvedBy], references: [id])
+
+  @@index([orderId])
+  @@index([initiatedBy])
+  @@index([status])
+  @@map("order_disputes")
+}
+
+enum OrderDisputeStatus {
+  OPEN                // Åpen klage
+  RESOLVED_BUYER      // Løst til kjøpers fordel
+  RESOLVED_SELLER     // Løst til selgers fordel
+  RESOLVED_PARTIAL    // Delvis refundering
+}
+
+model OrderStatusHistory {
+  id        String            @id @default(cuid())
+  orderId   String
+  status    SecureOrderStatus
+  note      String?           @db.Text
+  createdBy String?           // Hvem som endret status
+  createdAt DateTime          @default(now())
+  
+  // Relasjoner
+  order     SecureOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user      User?             @relation("OrderStatusUpdates", fields: [createdBy], references: [id])
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+// Stripe Connect kontoer for selgere
+model SellerStripeAccount {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  stripeAccountId       String   @unique
+  stripeAccountStatus   String   // 'pending', 'enabled', 'disabled'
+  onboardingCompleted   Boolean  @default(false)
+  onboardingUrl         String?
+  payoutsEnabled        Boolean  @default(false)
+  chargesEnabled        Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relasjon
+  user                  User     @relation("SellerStripeAccount", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stripeAccountId])
+  @@map("seller_stripe_accounts")
 }
