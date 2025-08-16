@@ -30,6 +30,8 @@ export default function StripeConnectSetup() {
   const [error, setError] = useState<string | null>(null)
 
   const fetchStatus = async () => {
+    setLoading(true)
+    setError(null)
     try {
       const response = await fetch('/api/stripe-connect/status')
       const data = await response.json()
@@ -216,14 +218,27 @@ export default function StripeConnectSetup() {
               )}
             </div>
 
-            {!status.onboardingCompleted && status.onboardingUrl && (
+            {!status.onboardingCompleted && (
               <Button 
-                onClick={() => window.location.href = status.onboardingUrl!}
+                onClick={status.onboardingUrl ? 
+                  () => window.location.href = status.onboardingUrl! : 
+                  () => fetchStatus() // Refresh to get new onboarding URL
+                }
                 className="w-full"
                 variant="outline"
+                disabled={loading}
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Fullfør Stripe onboarding
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Oppdaterer...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    {status.onboardingUrl ? 'Fullfør Stripe onboarding' : 'Fortsett med Stripe Connect'}
+                  </>
+                )}
               </Button>
             )}
 

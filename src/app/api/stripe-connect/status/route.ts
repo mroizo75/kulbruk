@@ -36,6 +36,22 @@ export async function GET(request: NextRequest) {
       const chargesEnabled = stripeAccount.charges_enabled || false
       const onboardingCompleted = stripeAccount.details_submitted || false
       
+      // Generer ny onboarding URL hvis ikke fullført
+      let onboardingUrl = user.sellerStripeAccount.onboardingUrl
+      if (!onboardingCompleted) {
+        try {
+          const accountLink = await stripe.accountLinks.create({
+            account: user.sellerStripeAccount.stripeAccountId,
+            refresh_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/customer/innstillinger?connect=refresh`,
+            return_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/customer/innstillinger?connect=success`,
+            type: 'account_onboarding',
+          })
+          onboardingUrl = accountLink.url
+        } catch (linkError) {
+          console.error('Error creating account link:', linkError)
+        }
+      }
+
       // Oppdater database med siste status
       await prisma.sellerStripeAccount.update({
         where: { id: user.sellerStripeAccount.id },
@@ -45,7 +61,8 @@ export async function GET(request: NextRequest) {
           chargesEnabled,
           stripeAccountStatus: onboardingCompleted ? 
             (payoutsEnabled && chargesEnabled ? 'enabled' : 'pending') : 
-            'incomplete'
+            'incomplete',
+          onboardingUrl: !onboardingCompleted ? onboardingUrl : null
         }
       })
 
@@ -56,6 +73,7 @@ export async function GET(request: NextRequest) {
         payoutsEnabled,
         chargesEnabled,
         status: user.sellerStripeAccount.stripeAccountStatus,
+        onboardingUrl: !onboardingCompleted ? onboardingUrl : undefined,
         // Include some account details if available
         country: stripeAccount.country,
         defaultCurrency: stripeAccount.default_currency,
@@ -70,6 +88,7 @@ export async function GET(request: NextRequest) {
         payoutsEnabled: user.sellerStripeAccount.payoutsEnabled,
         chargesEnabled: user.sellerStripeAccount.chargesEnabled,
         status: user.sellerStripeAccount.stripeAccountStatus,
+        onboardingUrl: !user.sellerStripeAccount.onboardingCompleted ? user.sellerStripeAccount.onboardingUrl : undefined,
         error: 'Kunne ikke hente oppdatert status fra Stripe'
       })
     }

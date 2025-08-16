@@ -94,10 +94,26 @@ export async function POST(request: NextRequest) {
       status: sellerAccount.stripeAccountStatus
     })
 
-  } catch (error) {
-    console.error('Stripe Connect error:', error)
+  } catch (error: any) {
+    console.error('Stripe Connect error:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      param: error.param,
+      statusCode: error.statusCode,
+      requestId: error.requestId
+    })
+    
+    // Specific error handling
+    if (error.message?.includes('platform-profile')) {
+      return NextResponse.json(
+        { error: 'Stripe Connect må konfigureres i dashboard. Gå til https://dashboard.stripe.com/settings/connect/platform-profile' },
+        { status: 400 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: 'Feil ved opprettelse av Stripe Connect konto' },
+      { error: `Stripe feil: ${error.message || 'Ukjent feil'}` },
       { status: 500 }
     )
   }

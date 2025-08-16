@@ -162,27 +162,27 @@ export async function GET(request: NextRequest) {
     let hasVehicleSpecFilter = false
 
     if (shouldFilter(make)) {
-      vehicleSpecWhere.make = { contains: make, mode: 'insensitive' }
+      vehicleSpecWhere.make = { contains: make }
       hasVehicleSpecFilter = true
     }
     
     if (shouldFilter(fuelType)) {
-      vehicleSpecWhere.fuelType = { contains: fuelType, mode: 'insensitive' }
+      vehicleSpecWhere.fuelType = { contains: fuelType }
       hasVehicleSpecFilter = true
     }
     
     if (shouldFilter(transmission)) {
-      vehicleSpecWhere.transmission = { contains: transmission, mode: 'insensitive' }
+      vehicleSpecWhere.transmission = { contains: transmission }
       hasVehicleSpecFilter = true
     }
 
     if (shouldFilter(color)) {
-      vehicleSpecWhere.color = { contains: color, mode: 'insensitive' }
+      vehicleSpecWhere.color = { contains: color }
       hasVehicleSpecFilter = true
     }
 
     if (shouldFilter(wheelDrive)) {
-      vehicleSpecWhere.wheelDrive = { contains: wheelDrive, mode: 'insensitive' }
+      vehicleSpecWhere.wheelDrive = { contains: wheelDrive }
       hasVehicleSpecFilter = true
     }
 
@@ -213,7 +213,7 @@ export async function GET(request: NextRequest) {
       
       if (shouldFilter(propertyType)) {
         eiendomFilters.push({
-          description: { contains: propertyType, mode: 'insensitive' }
+          description: { contains: propertyType }
         })
       }
       
@@ -221,7 +221,7 @@ export async function GET(request: NextRequest) {
         const roomsNum = parseInt(rooms)
         if (!isNaN(roomsNum)) {
           eiendomFilters.push({
-            description: { contains: `${roomsNum} rom`, mode: 'insensitive' }
+            description: { contains: `${roomsNum} rom` }
           })
         }
       }
@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
         const areaNum = parseInt(area)
         if (!isNaN(areaNum)) {
           eiendomFilters.push({
-            description: { contains: `${areaNum} m`, mode: 'insensitive' }
+            description: { contains: `${areaNum} m` }
           })
         }
       }
@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
         const plotNum = parseInt(plotSize)
         if (!isNaN(plotNum)) {
           eiendomFilters.push({
-            description: { contains: `tomt`, mode: 'insensitive' }
+            description: { contains: `tomt` }
           })
         }
       }
@@ -249,8 +249,8 @@ export async function GET(request: NextRequest) {
         if (!isNaN(yearNum)) {
           eiendomFilters.push({
             OR: [
-              { title: { contains: buildYear, mode: 'insensitive' } },
-              { description: { contains: buildYear, mode: 'insensitive' } }
+              { title: { contains: buildYear } },
+              { description: { contains: buildYear } }
             ]
           })
         }
@@ -268,8 +268,8 @@ export async function GET(request: NextRequest) {
       if (shouldFilter(condition)) {
         torgetFilters.push({
           OR: [
-            { title: { contains: condition, mode: 'insensitive' } },
-            { description: { contains: condition, mode: 'insensitive' } }
+            { title: { contains: condition } },
+            { description: { contains: condition } }
           ]
         })
       }
@@ -278,8 +278,8 @@ export async function GET(request: NextRequest) {
       if (shouldFilter(brand)) {
         torgetFilters.push({
           OR: [
-            { title: { contains: brand, mode: 'insensitive' } },
-            { description: { contains: brand, mode: 'insensitive' } }
+            { title: { contains: brand } },
+            { description: { contains: brand } }
           ]
         })
       }
