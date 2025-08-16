@@ -48,15 +48,27 @@ export async function POST(request: NextRequest) {
     const fileName = `${uuidv4()}${fileExtension}`
     const filePath = path.join(uploadPath, fileName)
 
-    // Konverter fil til buffer og lagre
+    // Konverter fil til base64 for database lagring
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    
+    // På produksjon: bruk base64 data URL
+    // På development: kan fortsatt bruke fil system
+    const isProduction = process.env.NODE_ENV === 'production'
+    
+    let fileUrl: string
+    
+    if (isProduction) {
+      // Produksjon: lagre som base64 data URL
+      const base64 = buffer.toString('base64')
+      fileUrl = `data:${file.type};base64,${base64}`
+    } else {
+      // Development: fortsatt bruk fil system
+      await writeFile(filePath, buffer)
+      fileUrl = `/uploads/${folder}/${fileName}`
+    }
 
-    // Generer URL for tilgang til filen
-    const fileUrl = `/uploads/${folder}/${fileName}`
-
-    console.log(`📸 Bilde lastet opp: ${fileUrl} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
+    console.log(`📸 Bilde lastet opp: ${isProduction ? 'base64 data URL' : fileUrl} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
 
     return NextResponse.json({
       success: true,
