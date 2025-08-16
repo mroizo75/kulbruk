@@ -52,17 +52,23 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
       .then(r => r.ok ? r.json() : { count: 0 })
       .then(d => { if (active) setUnreadMessages(d.count || 0) })
       .catch(() => {})
-    const es = new EventSource('/api/user/notifications/stream')
-    es.onmessage = (event) => {
+    // Polling for uleste meldinger i stedet for SSE (kun admin/moderator bruker SSE)
+    const interval = setInterval(async () => {
       try {
-        const data = JSON.parse(event.data)
-        if (data?.type === 'message') {
-          setUnreadMessages(prev => (typeof prev === 'number' ? prev + 1 : 1))
+        const response = await fetch('/api/messages/unread-count')
+        if (response.ok) {
+          const data = await response.json()
+          setUnreadMessages(data.count || 0)
         }
-      } catch {}
+      } catch (error) {
+        // Silent fail
+      }
+    }, 30000) // Poll hver 30 sekund
+    
+    return () => { 
+      active = false
+      clearInterval(interval)
     }
-    es.onerror = () => es.close()
-    return () => { active = false; es.close() }
   }, [userRole])
 
   // Navigasjonsmenyer basert på brukerrolle

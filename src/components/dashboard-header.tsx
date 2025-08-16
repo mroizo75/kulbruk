@@ -18,20 +18,24 @@ export default function DashboardHeader({ userRole = 'customer' }: DashboardHead
     return () => { active = false }
   }, [])
 
-  // Live-oppdater ulest teller via SSE for kunder/bedrifter
+  // Live-oppdater ulest teller via polling for kunder/bedrifter (SSE kun for admin/moderator)
   useEffect(() => {
     if (userRole === 'admin' || userRole === 'moderator') return
-    const es = new EventSource('/api/user/notifications/stream')
-    es.onmessage = (event) => {
+    
+    // Poll hver 30 sekund i stedet for SSE
+    const interval = setInterval(async () => {
       try {
-        const data = JSON.parse(event.data)
-        if (data?.type === 'message') {
-          setUnread((prev) => (typeof prev === 'number' ? prev + 1 : 1))
+        const response = await fetch('/api/messages/unread-count')
+        if (response.ok) {
+          const data = await response.json()
+          setUnread(data.count || 0)
         }
-      } catch {}
-    }
-    es.onerror = () => es.close()
-    return () => es.close()
+      } catch (error) {
+        console.log('Kunne ikke hente uleste meldinger')
+      }
+    }, 30000)
+    
+    return () => clearInterval(interval)
   }, [userRole])
   const getRoleDisplay = () => {
     switch (userRole) {

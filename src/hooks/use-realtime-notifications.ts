@@ -160,8 +160,10 @@ export function useRealtimeNotifications(userRole: string) {
   }
 
   useEffect(() => {
-    // Start SSE connection
-    setupSSE()
+    // Start SSE connection kun for admin/moderator
+    if (userRole === 'admin' || userRole === 'moderator') {
+      setupSSE()
+    }
 
     // Cleanup ved unmount
     return cleanup

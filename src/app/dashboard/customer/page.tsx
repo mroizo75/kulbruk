@@ -26,11 +26,11 @@ export default async function CustomerDashboard() {
     
     if (!dbUser) {
       // Dette bør ikke skje hvis webhook fungerer
-      console.error('🚨 KRITISK: Bruker ikke funnet i database:', session.user?.id)
+      // Bruker ikke funnet - kan ikke vise dashboard
       redirect('/dashboard/setup-error')
     }
   } catch (error) {
-    console.error('🚨 Database-feil ved henting av bruker:', error)
+    // Database feil
     redirect('/dashboard/setup-error')
   }
   

@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
   try {
     // Debugging: sjekk headers
     const authHeader = request.headers.get('authorization')
-    console.log('Authorization header:', !!authHeader)
+
     
     // Auth.js v5
     const session = await auth()
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
 
     // Håndter bildeopplasting
     if (data.images && data.images.length > 0) {
-      console.log('Oppretter bilder:', data.images.length)
+
       
       // Opprett bilder i databasen
       const imagePromises = data.images.map((image: any, index: number) => 
@@ -337,7 +337,7 @@ export async function POST(request: NextRequest) {
       )
       
       await Promise.all(imagePromises)
-      console.log('Bilder opprettet for listing:', listing.id)
+
     }
 
     // Send real-time notification til admin/moderatorer
@@ -352,12 +352,9 @@ export async function POST(request: NextRequest) {
         }
       })
       
-      console.log('🔔 REAL-TIME NOTIFIKASJON SENDT:', listing.title)
-      console.log('   - ID:', listing.id)
-      console.log('   - Bruker:', listing.user.firstName, listing.user.lastName)
-      console.log('   - Status: PENDING - krever godkjenning')
+
     } catch (notificationError) {
-      console.error('Feil ved sending av real-time notifikasjon:', notificationError)
+      // Notification error - continue without failing
       // Ikke la notification-feil stoppe annonse-opprettelsen
     }
 

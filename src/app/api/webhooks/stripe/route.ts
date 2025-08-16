@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Uhåndtert event type: ${event.type}`)
+        // Uhåndtert event type
     }
 
     return NextResponse.json({ received: true })
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 // Handler-funksjoner
 async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   try {
-    console.log('✅ Webhook: Betaling vellykket...', paymentIntent.id)
+    // Webhook: Successful payment
     
     // Sjekk om dette er en Fort gjort betaling
     if (paymentIntent.metadata.type === 'fort_gjort') {
@@ -100,7 +100,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     if (payment.type === 'LISTING_FEE') {
       if (payment.listingId) {
         // GAMMEL flyt: annonse eksisterer allerede, bare godkjenn den
-        console.log('📝 Webhook: Godkjenner eksisterende annonse...', payment.listingId)
+        // Webhook: Approving existing listing
         
         await prisma.listingPayment.upsert({
           where: { listingId: payment.listingId },
@@ -128,24 +128,17 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 
       } else {
         // NY flyt: Opprett annonse etter vellykket betaling
-        console.log('🆕 Webhook: Oppretter ny annonse etter betaling...')
+        // Webhook: Creating new listing after payment
         
         // Hent annonse-data fra Payment metadata
-        console.log('📦 Webhook: Payment metadata:', {
-          rawMetadata: payment.metadata,
-          metadataType: typeof payment.metadata
-        })
+        // Processing payment metadata
         
         const paymentMetadata = JSON.parse(payment.metadata as string || '{}')
         
-        console.log('📋 Webhook: Parsed metadata:', {
-          keys: Object.keys(paymentMetadata),
-          hasPendingData: !!paymentMetadata.pendingListingData
-        })
+        // Processing parsed metadata
         
         if (!paymentMetadata.pendingListingData) {
-          console.error('❌ Webhook: Mangler pendingListingData i payment metadata')
-          console.error('📋 Webhook: Tilgjengelige metadata keys:', Object.keys(paymentMetadata))
+          // Missing pendingListingData in payment metadata
           return
         }
 
@@ -226,11 +219,11 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
           })
         }
 
-        console.log(`✅ Webhook: Annonse opprettet og publisert: ${listing.shortCode} (${listing.id})`)
+        // Webhook: Listing created successfully
       }
     }
 
-    console.log(`✅ Webhook: Betaling fullført: ${paymentIntent.id}`)
+    // Webhook: Payment completed successfully
   } catch (error) {
     console.error('❌ Webhook: Feil ved håndtering av vellykket betaling:', error)
   }
@@ -243,7 +236,7 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
       data: { status: 'FAILED' },
     })
 
-    console.log(`Betaling feilet: ${paymentIntent.id}`)
+    // Payment failed
   } catch (error) {
     console.error('Feil ved håndtering av mislykket betaling:', error)
   }
@@ -274,7 +267,7 @@ async function handleSubscriptionPaymentSuccess(invoice: Stripe.Invoice) {
       })
     }
 
-    console.log(`Abonnement betaling vellykket: ${(invoice as any).subscription}`)
+    // Subscription payment successful
   } catch (error) {
     console.error('Feil ved håndtering av abonnement betaling:', error)
   }
@@ -290,7 +283,7 @@ async function handleSubscriptionPaymentFailed(invoice: Stripe.Invoice) {
       data: { status: 'PAST_DUE' },
     })
 
-    console.log(`Abonnement betaling feilet: ${subscriptionId}`)
+    // Subscription payment failed
   } catch (error) {
     console.error('Feil ved håndtering av mislykket abonnement betaling:', error)
   }
@@ -321,7 +314,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
 async function handleFortGjortPaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   try {
-    console.log('🛡️ Webhook: Fort gjort betaling vellykket', paymentIntent.id)
+    // Fort gjort payment successful
 
     // Oppdater SecureOrder med betaling vellykket
     const order = await prisma.secureOrder.update({
@@ -350,7 +343,7 @@ async function handleFortGjortPaymentSuccess(paymentIntent: Stripe.PaymentIntent
     // Send varsel til selger om ny ordre
     // TODO: Implementer e-post varsling
 
-    console.log(`✅ Fort gjort ordre ${order.id} betaling bekreftet`)
+    // Fort gjort order payment confirmed
   } catch (error) {
     console.error('Feil ved håndtering av Fort gjort betaling:', error)
   }

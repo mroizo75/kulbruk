@@ -7,24 +7,18 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user) {
-      console.log('❌ Payment Intent: Ikke autentisert')
+
       return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
     }
 
     const body = await request.json()
     const { categorySlug, listingId, type, pendingListingData } = body
 
-    console.log('🚀 Payment Intent: Mottatt forespørsel:', {
-      categorySlug,
-      listingId,
-      type,
-      userEmail: session.user.email,
-      hasPendingData: !!pendingListingData
-    })
+
 
     // Valider input
     if (!categorySlug || !type) {
-      console.log('❌ Payment Intent: Mangler påkrevde felter:', { categorySlug, type })
+
       return NextResponse.json({ error: 'Mangler påkrevde felter' }, { status: 400 })
     }
 
@@ -49,16 +43,11 @@ export async function POST(request: NextRequest) {
       description = pricing.description
       paymentType = 'LISTING_FEE'
 
-      console.log('💰 Payment Intent: Prisberegning:', {
-        categorySlug,
-        pricing,
-        amount,
-        description
-      })
+
 
       // Hvis gratis annonse (Torget), ikke opprett Payment Intent
       if (amount === 0) {
-        console.log('✅ Payment Intent: Gratis annonse, returnerer success')
+
         return NextResponse.json({ 
           success: true, 
           isFree: true,
@@ -79,20 +68,14 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Annonse ikke funnet' }, { status: 404 })
         }
       } else {
-        console.log('⏳ Payment Intent: Ingen listingId - betaling før opprettelse av annonse')
+
       }
     } else {
       return NextResponse.json({ error: 'Ugyldig betalingstype' }, { status: 400 })
     }
 
     // Opprett Stripe Payment Intent
-    console.log('🔄 Payment Intent: Oppretter Stripe Payment Intent...', {
-      amount,
-      currency: 'nok',
-      description,
-      userId: user.id,
-      stripeProductId: pricing.stripeProductId || 'ikke satt'
-    })
+
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
@@ -118,12 +101,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log('✅ Payment Intent: Stripe Payment Intent opprettet:', {
-      id: paymentIntent.id,
-      status: paymentIntent.status,
-      amount: paymentIntent.amount,
-      hasClientSecret: !!paymentIntent.client_secret
-    })
+
 
     // Lagre annonse-data i metadata for webhook bruk
     let paymentMetadata: any = { 
@@ -132,10 +110,7 @@ export async function POST(request: NextRequest) {
       ...(pendingListingData && { pendingListingData: JSON.stringify(pendingListingData) })
     }
 
-    console.log('📦 Payment Intent: Lagrer metadata:', {
-      hasPendingData: !!pendingListingData,
-      metadataKeys: Object.keys(paymentMetadata)
-    })
+
 
     // Lagre betalingsinformasjon i database
     const payment = await prisma.payment.create({
