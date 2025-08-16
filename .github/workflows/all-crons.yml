@@ -85,7 +85,7 @@ jobs:
           
           response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
             -X GET \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "X-CRON-KEY: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             "${{ secrets.BASE_URL }}/api/cron/fort-gjort-timeout")
           
