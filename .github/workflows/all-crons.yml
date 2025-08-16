@@ -115,9 +115,9 @@ jobs:
           
           response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
             -X GET \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "X-CRON-KEY: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.BASE_URL }}/api/cron/saved-search-digest")
+            "${{ secrets.BASE_URL }}/api/cron/saved-search-digest?period=daily")
           
           http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
           body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
@@ -145,7 +145,7 @@ jobs:
           
           response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
             -X GET \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "X-CRON-KEY: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             "${{ secrets.BASE_URL }}/api/cron/listings-expiring")
           
