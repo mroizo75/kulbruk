@@ -168,6 +168,8 @@ export default function FortGjortCard({ listing, currentUserId }: FortGjortCardP
         ) : (
           <Button 
             onClick={() => {
+              // Lagre current URL i localStorage for å returnere hit etter innlogging
+              localStorage.setItem('postLoginRedirect', window.location.pathname)
               window.location.href = '/sign-in?redirect=' + encodeURIComponent(window.location.pathname)
             }}
             className="w-full bg-green-600 hover:bg-green-700 text-white"

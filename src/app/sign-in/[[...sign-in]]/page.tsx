@@ -12,7 +12,14 @@ export default function SignInPage() {
   const [providers, setProviders] = useState<any>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+  
+  // Smart redirect logic: 
+  // - If redirect/callbackUrl is set and NOT dashboard → use it
+  // - Otherwise use dashboard (which will route based on user role)
+  const redirectParam = searchParams.get('redirect') || searchParams.get('callbackUrl')
+  const callbackUrl = redirectParam && redirectParam !== '/dashboard' 
+    ? redirectParam 
+    : '/dashboard'
 
   useEffect(() => {
     const setUpProviders = async () => {

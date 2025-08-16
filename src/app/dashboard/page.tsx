@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
+import SmartCustomerRedirect from '@/components/smart-customer-redirect'
 
 const prisma = new PrismaClient()
 
@@ -67,7 +68,7 @@ export default async function DashboardPage() {
       redirect('/dashboard/business')
       return null
     default:
-      redirect('/dashboard/customer')
-      return null
+      // Kunder: bruk smart redirect komponent for å håndtere client-side redirect
+      return <SmartCustomerRedirect />
   }
 }

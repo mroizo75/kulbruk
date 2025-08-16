@@ -518,11 +518,19 @@ export default async function ListingDetailPage({ params }: PageProps) {
                       <p className="text-sm text-yellow-800 mb-3">
                         Du må være innlogget for å se kontaktinformasjon
                       </p>
-                      <Link href="/sign-in">
-                        <Button className="w-full" size="lg">
-                          Logg inn for å kontakte
-                        </Button>
-                      </Link>
+                      <Button 
+                        className="w-full" 
+                        size="lg"
+                        onClick={() => {
+                          // Lagre current URL for å returnere hit etter innlogging
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('postLoginRedirect', window.location.pathname)
+                            window.location.href = '/sign-in?redirect=' + encodeURIComponent(window.location.pathname)
+                          }
+                        }}
+                      >
+                        Logg inn for å kontakte
+                      </Button>
                     </div>
                     <Link href="/sign-up">
                       <Button variant="outline" className="w-full">
