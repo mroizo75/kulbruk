@@ -26,19 +26,18 @@ export default function Navbar() {
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
+          {/* Logo - Forbedret for mobil */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
               <Image 
                 src="/logo.svg" 
                 alt="Kulbruk.no" 
-                width={50} 
-                height={50} 
-                className="sm:w-16 sm:h-16 lg:w-20 lg:h-20" 
+                width={75} 
+                height={75} 
+                className="md:w-12 md:h-12 lg:w-16 lg:h-16" 
               />
             </Link>
           </div>
-
 
           {/* Desktop Search - Hidden on mobile/tablet */}
           <div className="hidden lg:flex flex-1 max-w-md mx-6">
@@ -57,75 +56,49 @@ export default function Navbar() {
           </div>
 
           {/* Right side - Actions */}
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Desktop: Full button */}
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Ny annonse knapp - fjernet fra mobil */}
             <Link
               href="/opprett"
-              className="hidden lg:flex items-center space-x-2 bg-[#af4c0f] text-white px-4 py-2 rounded-lg hover:bg-[#af4c0f]/90 transition-colors"
+              className="hidden md:flex items-center space-x-2 bg-[#af4c0f] text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-[#af4c0f]/90 transition-colors text-sm lg:text-base"
             >
               <Plus className="h-4 w-4" />
-              <span>Ny annonse</span>
-            </Link>
-
-            {/* Tablet: Shortened button */}
-            <Link
-              href="/opprett"
-              className="hidden md:lg:hidden md:flex items-center space-x-1 bg-[#af4c0f] text-white px-3 py-2 rounded-lg hover:bg-[#af4c0f]/90 transition-colors text-sm"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Legg ut</span>
-            </Link>
-
-            {/* Mobile: Icon only */}
-            <Link
-              href="/opprett"
-              className="md:hidden bg-[#af4c0f] text-white p-2 rounded-lg hover:bg-[#af4c0f]/90 transition-colors"
-              aria-label="Legg ut annonse"
-            >
-              <Plus className="h-5 w-5" />
+              <span className="hidden lg:block">Ny annonse</span>
+              <span className="lg:hidden">Legg ut</span>
             </Link>
 
             {/* Auth section */}
             {session ? (
               <>
-                {/* Meldinger og varsler */}
-                <Link href="/dashboard/customer/meldinger" className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 transition-colors px-2 py-1" title="Meldinger">
+                {/* Meldinger og varsler - kun desktop */}
+                <Link href="/dashboard/customer/meldinger" className="hidden lg:flex items-center text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-50" title="Meldinger">
                   <MessageSquare className="h-5 w-5" />
                 </Link>
-                <Link href="/dashboard/business/varsler" className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 transition-colors px-2 py-1" title="Varsler">
+                <Link href="/dashboard/business/varsler" className="hidden lg:flex items-center text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-50" title="Varsler">
                   <Bell className="h-5 w-5" />
                 </Link>
-                {/* Min side */}
+                
+                {/* Brukermeny - forbedret */}
                 <Link 
                   href="/dashboard"
-                  className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 transition-colors px-2 py-1"
+                  className="hidden md:flex items-center text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-50"
+                  title="Min side"
                 >
-                  <User className="h-4 w-4 mr-1" />
-                  <span className="hidden lg:block">Min side</span>
+                  {session.user?.image ? (
+                    <Image
+                      src={session.user.image}
+                      alt={session.user.name || 'Bruker'}
+                      width={32}
+                      height={32}
+                      className="rounded-full"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-to-br from-[#af4c0f] to-orange-600 rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-white" />
+                    </div>
+                  )}
+                  <span className="hidden lg:block ml-2 font-medium">Min side</span>
                 </Link>
-                
-                {/* User menu button */}
-                <div className="relative">
-                  <button
-                    onClick={() => signOut()}
-                    className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors px-2 py-1"
-                  >
-                    {session.user?.image ? (
-                      <Image
-                        src={session.user.image}
-                        alt={session.user.name || 'Bruker'}
-                        width={32}
-                        height={32}
-                        className="rounded-full"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                        <User className="h-4 w-4" />
-                      </div>
-                    )}
-                    <span className="hidden lg:block">Logg ut</span>
-                  </button>
-                </div>
               </>
             ) : (
               <>
@@ -133,7 +106,7 @@ export default function Navbar() {
                 <div className="hidden md:flex items-center space-x-2">
                   <Link
                     href="/sign-in"
-                    className="text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 text-sm lg:text-base"
+                    className="text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 text-sm lg:text-base rounded-lg hover:bg-gray-50"
                   >
                     Logg inn
                   </Link>
@@ -145,105 +118,138 @@ export default function Navbar() {
                   </Link>
                 </div>
 
-                {/* Mobile auth button */}
+                {/* Mobile auth icon */}
                 <Link
                   href="/sign-in"
-                  className="md:hidden text-gray-600 hover:text-gray-900 transition-colors p-2"
+                  className="md:hidden p-2 text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-50"
                   aria-label="Logg inn"
                 >
-                  <User className="h-5 w-5" />
+                  <User className="h-6 w-6" />
                 </Link>
               </>
             )}
 
-            {/* Mobile menu button */}
+            {/* Mobile menu button - forbedret design */}
             <button
               onClick={toggleMobileMenu}
-              className="lg:hidden p-2 text-gray-600 hover:text-gray-900 transition-colors"
-              aria-label="Toggle menu"
+              className="md:hidden p-2 text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-50"
+              aria-label="Meny"
             >
               {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div> 
-
-
-          {/* Mobile/Tablet Search Bar */}
-        <div className="lg:hidden px-4 pb-3">
-          <form onSubmit={handleSearch}>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Søk etter varer, biler, møbler..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#af4c0f] bg-white text-gray-900 placeholder:text-gray-500"
-                type="search"
-              />
-            </div>
-          </form>
         </div>
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 bg-white">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {/* Fjernet navigasjonslenker for katalogsider for å forenkle toppnavigasjonen */}
+          <div className="md:hidden border-t border-gray-200 bg-white shadow-lg">
+            <div className="px-4 py-4 space-y-3">
               
+              {/* Legg ut annonse - prioritert øverst for mobil */}
+              <Link
+                href="/opprett"
+                className="flex items-center space-x-3 bg-[#af4c0f] text-white px-4 py-3 rounded-lg hover:bg-[#af4c0f]/90 transition-colors font-medium"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Plus className="h-5 w-5" />
+                <span>Legg ut annonse</span>
+              </Link>
+
+              {/* Søk - tilgjengelig på mobil */}
+              <form onSubmit={(e) => { handleSearch(e); setIsMobileMenuOpen(false) }} className="w-full">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Søk etter varer, biler, møbler..."
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#af4c0f] bg-white text-gray-900 placeholder:text-gray-500"
+                    type="search"
+                  />
+                </div>
+              </form>
+
+              {/* Brukerområde */}
               {session ? (
-                <div className="border-t border-gray-200 pt-2 mt-2">
+                <div className="space-y-2 pt-3 border-t border-gray-200">
+                  <div className="flex items-center space-x-3 px-3 py-2">
+                    {session.user?.image ? (
+                      <Image
+                        src={session.user.image}
+                        alt={session.user.name || 'Bruker'}
+                        width={40}
+                        height={40}
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-gradient-to-br from-[#af4c0f] to-orange-600 rounded-full flex items-center justify-center">
+                        <User className="h-5 w-5 text-white" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-gray-900">{session.user?.name || 'Bruker'}</p>
+                      <p className="text-sm text-gray-500">{session.user?.email}</p>
+                    </div>
+                  </div>
+                  
                   <Link
                     href="/dashboard/customer/meldinger"
-                    className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                    className="flex items-center space-x-3 px-3 py-2.5 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    💬 Meldinger
+                    <MessageSquare className="h-5 w-5" />
+                    <span>Meldinger</span>
                   </Link>
                   <Link
                     href="/dashboard/business/varsler"
-                    className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                    className="flex items-center space-x-3 px-3 py-2.5 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    🔔 Varsler
+                    <Bell className="h-5 w-5" />
+                    <span>Varsler</span>
                   </Link>
                   <Link
                     href="/dashboard"
-                    className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                    className="flex items-center space-x-3 px-3 py-2.5 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    👤 Min side
+                    <User className="h-5 w-5" />
+                    <span>Min side</span>
                   </Link>
                   <button
                     onClick={() => {
                       signOut()
                       setIsMobileMenuOpen(false)
                     }}
-                    className="block w-full text-left px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                    className="flex items-center space-x-3 w-full text-left px-3 py-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                   >
-                    Logg ut
+                    <span>🚪</span>
+                    <span>Logg ut</span>
                   </button>
                 </div>
               ) : (
-                <div className="border-t border-gray-200 pt-2 mt-2">
+                <div className="space-y-2 pt-3 border-t border-gray-200">
                   <Link
                     href="/sign-in"
-                    className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                    className="flex items-center justify-center space-x-2 px-4 py-3 border border-gray-300 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors font-medium"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Logg inn
+                    <User className="h-5 w-5" />
+                    <span>Logg inn</span>
                   </Link>
                   <Link
                     href="/registrer"
-                    className="block px-3 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors mt-1"
+                    className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Registrer deg
+                    <span>✨</span>
+                    <span>Registrer deg</span>
                   </Link>
                 </div>
               )}
             </div>
           </div>
         )}
-      </div>
       </div>
     </nav>
   )

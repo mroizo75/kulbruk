@@ -43,7 +43,10 @@ export function formatCarPrice(amount: number): string {
 /**
  * Sjekk om en kategori er bil-relatert og trenger omregistreringsavgift
  */
-export function isCarCategory(categorySlug: string): boolean {
+export function isCarCategory(categorySlug: string | undefined | null): boolean {
+  if (!categorySlug) {
+    return false
+  }
   const normalized = categorySlug.toLowerCase()
   return normalized === 'bil' || normalized === 'biler'
 }

@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
       categorySlug,
       listingId,
       type,
-      userEmail: session.user.email
+      userEmail: session.user.email,
+      hasPendingData: !!pendingListingData
     })
 
     // Valider input
@@ -130,6 +131,11 @@ export async function POST(request: NextRequest) {
       stripeClientSecret: paymentIntent.client_secret,
       ...(pendingListingData && { pendingListingData: JSON.stringify(pendingListingData) })
     }
+
+    console.log('📦 Payment Intent: Lagrer metadata:', {
+      hasPendingData: !!pendingListingData,
+      metadataKeys: Object.keys(paymentMetadata)
+    })
 
     // Lagre betalingsinformasjon i database
     const payment = await prisma.payment.create({

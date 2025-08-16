@@ -39,6 +39,7 @@ function ListingsContent() {
   const [loading, setLoading] = useState(true)
   const [totalPages, setTotalPages] = useState(1)
   const [currentPage, setCurrentPage] = useState(1)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   
   // Filter states
   const [search, setSearch] = useState(searchParams.get('search') || '')
@@ -169,6 +170,8 @@ function ListingsContent() {
     const newUrl = `/annonser${params.toString() ? `?${params.toString()}` : ''}`
     router.push(newUrl, { scroll: false })
     setCurrentPage(1)
+    // Lukk mobil-filter etter søk
+    setShowMobileFilters(false)
   }
 
   // Clear all filters
@@ -199,6 +202,8 @@ function ListingsContent() {
     setBrand('')
     router.push('/annonser', { scroll: false })
     setCurrentPage(1)
+    // Lukk mobil-filter etter nullstilling
+    setShowMobileFilters(false)
   }
 
   // Count active filters
@@ -243,9 +248,29 @@ function ListingsContent() {
           <p className="text-gray-600">Velg kategori og finn det du leter etter blant tusenvis av annonser</p>
         </div>
 
-        <div className="flex gap-8">
+        {/* Mobile filter toggle button */}
+        <div className="lg:hidden mb-4">
+          <Button 
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            variant="outline" 
+            className="w-full justify-between"
+          >
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4" />
+              <span>Filtrer søk</span>
+              {activeFiltersCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {activeFiltersCount}
+                </Badge>
+              )}
+            </div>
+            <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+          </Button>
+        </div>
+
+        <div className="lg:flex lg:gap-8">
           {/* Left sidebar with filters */}
-          <div className="w-80 space-y-6">
+          <div className={`lg:w-80 space-y-6 ${showMobileFilters ? 'block mb-6' : 'hidden'} lg:block`}>
             {/* Search */}
             <div className="bg-white rounded-lg border shadow-sm p-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Søk</h3>
@@ -654,7 +679,7 @@ function ListingsContent() {
           </div>
 
           {/* Main content area */}
-          <div className="flex-1">
+          <div className="lg:flex-1">
             {/* Results */}
             {loading ? (
               <div className="text-center py-12">

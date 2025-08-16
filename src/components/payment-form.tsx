@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import {
   Elements,
@@ -196,6 +196,31 @@ export default function PaymentForm(props: PaymentFormProps) {
   const [paymentId, setPaymentId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [pendingListingData, setPendingListingData] = useState<any>(null)
+
+  // Hent localStorage data umiddelbart ved mount (ikke vente til initializePayment)
+  useEffect(() => {
+    if (!props.listingId && typeof window !== 'undefined') {
+      const storedData = localStorage.getItem('pendingListingData')
+      console.log('📦 PaymentForm mount: localStorage check:', {
+        hasStoredData: !!storedData,
+        storedDataLength: storedData?.length
+      })
+      if (storedData) {
+        try {
+          const parsed = JSON.parse(storedData)
+          setPendingListingData(parsed)
+          console.log('✅ PaymentForm mount: Lagret pending data:', {
+            title: parsed?.title,
+            price: parsed?.price,
+            categorySlug: parsed?.categorySlug
+          })
+        } catch (e) {
+          console.error('❌ PaymentForm mount: Feil ved parsing av localStorage:', e)
+        }
+      }
+    }
+  }, [props.listingId])
 
   const initializePayment = async () => {
     if (props.amount === 0) {
@@ -214,15 +239,12 @@ export default function PaymentForm(props: PaymentFormProps) {
         description: props.description
       })
 
-      // Hent pending listing data fra localStorage hvis ingen listingId
-      let pendingListingData = null
-      if (!props.listingId && typeof window !== 'undefined') {
-        const storedData = localStorage.getItem('pendingListingData')
-        if (storedData) {
-          pendingListingData = JSON.parse(storedData)
-          console.log('📦 PaymentForm: Hentet pending listing data fra localStorage')
-        }
-      }
+      // Bruk pending listing data som ble hentet ved mount
+      console.log('📦 PaymentForm initializePayment: Sender data:', {
+        hasPendingData: !!pendingListingData,
+        title: pendingListingData?.title,
+        listingId: props.listingId
+      })
 
       const response = await fetch('/api/payments/create-payment-intent', {
         method: 'POST',

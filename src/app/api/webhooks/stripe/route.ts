@@ -125,10 +125,21 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
         console.log('🆕 Webhook: Oppretter ny annonse etter betaling...')
         
         // Hent annonse-data fra Payment metadata
+        console.log('📦 Webhook: Payment metadata:', {
+          rawMetadata: payment.metadata,
+          metadataType: typeof payment.metadata
+        })
+        
         const paymentMetadata = JSON.parse(payment.metadata as string || '{}')
+        
+        console.log('📋 Webhook: Parsed metadata:', {
+          keys: Object.keys(paymentMetadata),
+          hasPendingData: !!paymentMetadata.pendingListingData
+        })
         
         if (!paymentMetadata.pendingListingData) {
           console.error('❌ Webhook: Mangler pendingListingData i payment metadata')
+          console.error('📋 Webhook: Tilgjengelige metadata keys:', Object.keys(paymentMetadata))
           return
         }
 

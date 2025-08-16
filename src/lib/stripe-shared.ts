@@ -43,7 +43,12 @@ export const formatPrice = (amountInOre: number): string => {
   }).format(amountInOre / 100)
 }
 
-export const getListingPrice = (categorySlug: string): typeof PRICING.CAR_AD | typeof PRICING.TORGET_AD => {
+export const getListingPrice = (categorySlug: string | undefined | null): typeof PRICING.CAR_AD | typeof PRICING.TORGET_AD => {
+  if (!categorySlug) {
+    console.warn('⚠️ getListingPrice: categorySlug er undefined/null, returnerer TORGET_AD som fallback')
+    return PRICING.TORGET_AD
+  }
+  
   const normalized = categorySlug.toLowerCase()
   // Godta både 'bil' (hovedkategori) og 'biler' (DB/visningsnavn)
   if (normalized === 'biler' || normalized === 'bil') {

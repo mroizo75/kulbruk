@@ -51,7 +51,6 @@ export default function CreateListingForm() {
   const [vehicleData, setVehicleData] = useState<any>(null)
   const [showPriceEstimation, setShowPriceEstimation] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
-  const [createdListingId, setCreatedListingId] = useState<string | null>(null)
   const [showAddress, setShowAddress] = useState<boolean>(false)
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false)
 
