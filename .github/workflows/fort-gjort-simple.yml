@@ -1,9 +1,11 @@
-name: Fort gjort Timeout Cron
+name: Fort gjort Timeout Simple
 
 on:
   schedule:
     # Kjør hver time på minutt 15 (00:15, 01:15, 02:15, etc.)
     - cron: '15 * * * *'
+    # Backup kjøring 2 ganger daglig (08:00 og 20:00 UTC)
+    - cron: '0 8,20 * * *'
   
   # Tillat manuell kjøring for testing
   workflow_dispatch:
@@ -18,6 +20,21 @@ jobs:
         run: |
           echo "🛡️ Starter Fort gjort timeout sjekk..."
           
+          # Test først om server er oppe
+          health_response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+            -X GET \
+            "${{ secrets.BASE_URL }}/api/health")
+          
+          health_code=$(echo $health_response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          
+          if [ $health_code -ne 200 ]; then
+            echo "❌ Server er ikke tilgjengelig (HTTP $health_code)"
+            exit 1
+          fi
+          
+          echo "✅ Server er oppe"
+          
+          # Kjør Fort gjort timeout
           response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
             -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
@@ -32,7 +49,10 @@ jobs:
           
           if [ $http_code -eq 200 ]; then
             echo "✅ Fort gjort timeout cron fullført"
-            echo "$body" | jq '.' || echo "$body"
+            echo "$body" | jq '.' 2>/dev/null || echo "$body"
+          elif [ $http_code -eq 404 ]; then
+            echo "⚠️ Fort gjort timeout API ikke funnet (404) - sannsynligvis ikke deployert enda"
+            echo "Dette er OK under utvikling"
           else
             echo "❌ Fort gjort timeout cron feilet"
             echo "$body"
@@ -43,30 +63,7 @@ jobs:
         if: failure()
         run: |
           echo "🚨 Fort gjort timeout cron feilet!"
-          # Her kan du legge til Slack/Discord/email varsling
-          
-  # Backup cron job som kjører 2 ganger daglig
-  fort-gjort-timeout-backup:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    
-    if: always()
-    
-    steps:
-      - name: Backup timeout check
-        run: |
-          echo "🔄 Kjører backup timeout sjekk..."
-          
-          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
-            -X GET \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json" \
-            "${{ secrets.BASE_URL }}/api/cron/fort-gjort-timeout")
-          
-          http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-          
-          if [ $http_code -eq 200 ]; then
-            echo "✅ Backup timeout sjekk OK"
-          else
-            echo "⚠️ Backup timeout sjekk feilet, men fortsetter"
-          fi
+          # Her kan du legge til Slack/Discord/email varsling hvis ønskelig
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"🚨 Kulbruk Fort gjort timeout feilet!"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

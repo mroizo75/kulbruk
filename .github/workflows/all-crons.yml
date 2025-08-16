@@ -87,7 +87,7 @@ jobs:
             -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/cron/fort-gjort-timeout")
+            "${{ secrets.BASE_URL }}/api/cron/fort-gjort-timeout")
           
           http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
           body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
@@ -117,7 +117,7 @@ jobs:
             -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/cron/saved-search-digest")
+            "${{ secrets.BASE_URL }}/api/cron/saved-search-digest")
           
           http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
           body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
@@ -147,7 +147,7 @@ jobs:
             -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/cron/listings-expiring")
+            "${{ secrets.BASE_URL }}/api/cron/listings-expiring")
           
           http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
           body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
