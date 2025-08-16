@@ -39,10 +39,8 @@ export default function FortGjortCard({ listing, currentUserId }: FortGjortCardP
     return null
   }
   
-  // Ikke vis for egen annonse (kan ikke kjøpe sin egen vare)
-  if (currentUserId === listing.userId) {
-    return null
-  }
+  // Sjekk om det er egen annonse
+  const isOwnListing = currentUserId === listing.userId
   
   const priceInOre = Math.round(listing.price * 100)
   const { totalAmount, kulbrukFee, sellerAmount } = calculateSellerPayout(priceInOre)
@@ -126,7 +124,16 @@ export default function FortGjortCard({ listing, currentUserId }: FortGjortCardP
           </div>
         </div>
         
-        {currentUserId ? (
+        {isOwnListing ? (
+          <Button 
+            disabled
+            className="w-full bg-gray-400 text-white cursor-not-allowed"
+            size="lg"
+          >
+            <Shield className="h-4 w-4 mr-2" />
+            ✅ Fort gjort aktivert
+          </Button>
+        ) : currentUserId ? (
           <Button 
             onClick={async () => {
               try {
@@ -173,10 +180,16 @@ export default function FortGjortCard({ listing, currentUserId }: FortGjortCardP
         )}
         
         <p className="text-xs text-center text-gray-500">
-          Ved å kjøpe med Fort gjort godtar du våre{' '}
-          <a href="/vilkar-og-betingelser" className="text-green-600 hover:underline">
-            vilkår for sikker handel
-          </a>
+          {isOwnListing ? (
+            'Din annonse tilbyr Fort gjort for trygg handel'
+          ) : (
+            <>
+              Ved å kjøpe med Fort gjort godtar du våre{' '}
+              <a href="/vilkar-og-betingelser" className="text-green-600 hover:underline">
+                vilkår for sikker handel
+              </a>
+            </>
+          )}
         </p>
       </CardContent>
     </Card>
