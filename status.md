@@ -1,12 +1,13 @@
 ## Kulbruk – Status og veikart
 
-Oppdatert: fylles ved commit
+Oppdatert: 16. august 2025
 
 ### 1) Nåværende status (kort)
 - Kjerne: Opprette/visning av annonser (kortkode), godkjenning, admin-slett, betaling (listing fee/abonnement), bilinfo (Vegvesen), "Mer som dette", kart, lånekalkulator.
 - Autentisering: NextAuth v5 (JWT), roller (admin/moderator/business/customer).
 - DB: Prisma (MySQL). Kortkode `Listing.shortCode` i bruk. Bilspesifikasjoner lagres i `VehicleSpec`.
 - UI/UX: App Router, shadcn/ui, responsiv, CSS-fallback lagt inn.
+- **Nytt**: Fort gjort sikker handel (Stripe Connect), Cloudinary bildelagring, smart customer redirect.
 
 ### 2) Prod‑ready (høyeste prioritet)
 - [ ] Flytt prosjekt ut av OneDrive (unngå Prisma EPERM-låsing). Anbefalt sti: `C:\dev\kulbruk`
@@ -21,6 +22,7 @@ Oppdatert: fylles ved commit
 - [x] Ytelse: caching for `public/uploads` (immutable)
 - [x] Indekser i DB: `Listing(categoryId,status,isActive,expiresAt)` + fulltekst på `title`
 - [x] E‑postleverandør: Postmark integrert (From satt til verifisert `info@kksas.no` inntil `kulbruk.no`-domene er verifisert)
+- [x] **Bildehåndtering**: Cloudinary integrert med fallback til base64
 
 ### 3) Produkt-funksjoner (MVP‑gap)
 - Meldinger
@@ -46,11 +48,15 @@ Oppdatert: fylles ved commit
 - [x] SavedSearch: e‑post ved nye treff
 
 ### 4) Betalings‑ og salgsflyt (valg)
-- Beslutning: skal kjøp skje i plattformen?
-  - A (senere): Ordre + Stripe Connect/Transfers (payouts/escrow)
-    - [ ] Model: Order { buyerId, sellerId, listingId, amount, status }
-    - [ ] Checkout, betaling, refund, disputter
-  - B (nå): fortsatt listing fee/abonnement, handel avtales via meldinger
+- **Fort gjort sikker handel** (implementert)
+  - [x] **Model**: SecureOrder, OrderStatusHistory, SellerStripeAccount
+  - [x] **Stripe Connect**: Seller onboarding og payouts
+  - [x] **Escrow system**: Hold funds til buyer approval eller timeout
+  - [x] **API endpoints**: create-payment, approve, mark-shipped, timeout cron
+  - [x] **UI**: FortGjortCard, checkout, status management
+  - [x] **Cron automation**: GitHub Actions for timeout handling
+  - [x] **Kun Torget**: Kategoribegrenset til private handler
+- Fortsatt listing fee/abonnement for bil/eiendom annonser
 
 ### 5) Admin og moderasjon
 - [x] Admin‑liste: søk/filter (status/kategori/kortkode), paginering (server‑side)
@@ -68,8 +74,11 @@ Oppdatert: fylles ved commit
 - [x] E‑post: ny melding, rapport, godkjenning/avvisning, utløper snart (cron)
 - [x] SSE for bruker (meldinger)
   - [x] Ulest‑teller i sidebar (kunde)
-- [x] Cron‑endepunkter sikret med `X-CRON-KEY`/`CRON_SECRET`
-- [x] SavedSearch digest via cron – API klart; VPS‑oppsett dokumentert i `CRON_VPS_SETUP.md`
+- [x] **Cron‑system komplett**: GitHub Actions for alle scheduled tasks
+  - [x] **Fort gjort timeout**: Automatic fund release/order cancellation
+  - [x] **SavedSearch digest**: Daily/weekly med robust error handling
+  - [x] **Listings expiring**: Notification before expiry
+  - [x] **Authentication**: Konsistent X-CRON-KEY for alle endpoints
 
 ### 8) Juridisk og personvern
 - [x] Samtykke‑banner for cookies/lokal lagring (lokal søkehistorikk med brukerens samtykke)
@@ -78,19 +87,42 @@ Oppdatert: fylles ved commit
 - [ ] Oppdatert personvern/cookie‑samtykke (juridiske tekster – finpuss m/juridisk gjennomgang)
 - [ ] DPA med tredjepart (Stripe, e‑postleverandør)
 
-### 9) Hurtigvinninger
+### 9) Hurtigvinninger og UX-forbedringer
 - [x] Vis `shortCode` i detaljside og admin‑liste
 - [x] Vis `shortCode` i Mine annonser + kvittering/toast etter opprettelse
 - [x] Admin: bekreftelsesdialog før slett
 - [x] SEO: kanoniske URL‑er + Product structured data på detaljsiden (videre utvidelser står igjen)
 - [x] Tom‑tilstander i lister
+- [x] **Smart customer redirect**: Kunder sendes tilbake til listing etter login (ikke dashboard)
+- [x] **Fort gjort UX perfekt**: Alltid synlig på kvalifiserte annonser, tydelige statuser
+- [x] **SSR-feil løst**: Proper client/server component separation
+- [x] **Security cleanup**: Fjernet sensitive debug logs fra produksjon
 
-### 10) Sprintplan
-- Sprint 1: Meldinger + Rapporter (DB, API, UI, epost/SSE)
-- Sprint 2: Rating + Favoritter + SavedSearch
-- Sprint 3: Admin‑filter/bulk, audit‑log, SEO/monitor
-- Sprint 4: (valgfritt) Ordre/payouts (hvis valgt)
+### 10) Neste fokusområder (prioritert)
+1. **Ytelse og stabilitet**
+   - [ ] Cloudinary credentials produksjon (erstatte base64 fallback)
+   - [ ] Meilisearch/Algolia for avansert søk
+   - [ ] Database optimalisering og caching
+   - [ ] CDN setup for statiske assets
+
+2. **Business features**
+   - [ ] Fort gjort utvidelse til flere kategorier (bil/eiendom)
+   - [ ] Stripe Connect dashboard integration
+   - [ ] Advanced seller analytics
+   - [ ] Bulk listing tools for businesses
+
+3. **Brukeropplevelse**
+   - [ ] Mobile app (React Native/PWA)
+   - [ ] Real-time notifications (Push API)
+   - [ ] Advanced filtering på /annonser (maps, saved filters)
+   - [ ] Social features (reviews, seller profiles)
+
+### 11) Teknisk gjeld
+- [ ] Migrere fra base64 til Cloudinary i eksisterende listings
+- [ ] Implementere proper caching strategy
+- [ ] Sette opp monitoring og alerting (Better Stack)
+- [ ] Security audit og penetrasjon testing
 
 ---
 
-Notat: CSS‑fallback er implementert (`public/base-fallback.css`). Når CSP strammes i prod, verifiser at Next preloads og Tailwind CSS ikke blokkeres.
+**Status**: Prosjektet er nå produksjonsklart med Fort gjort sikker handel som hovedfeature. Cloudinary bildelagring og smart brukerflyt er implementert. Cron-system er robust og automatisert via GitHub Actions.

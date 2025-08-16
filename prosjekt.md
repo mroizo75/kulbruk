@@ -16,9 +16,9 @@
 | UI-bibliotek | shadcn/ui |
 | Backend | Next.js API Routes / Edge Functions |
 | Database | MySQL (PlanetScale eller Supabase) |
-| Autentisering | Clerk (med sosiale innlogginger: Google, Apple etc.) |
-| Adminsystem | Admin-panel med Next.js + Clerk RBAC |
-| Bildehåndtering | UploadThing eller Cloudinary |
+| Autentisering | NextAuth v5 (med sosiale innlogginger: Google, GitHub etc.) |
+| Adminsystem | Admin-panel med Next.js + RBAC |
+| Bildehåndtering | Cloudinary (med base64 fallback) |
 | Søkeoptimalisering | MySQL fulltekst + ev. Algolia |
 | Notifikasjoner | Epost + valgfri SMS (Twilio) |
 | Betaling | Stripe |
@@ -92,6 +92,7 @@
 | Boost | Vises på topp i søkeresultater |
 | Abonnement | F.eks. 99 kr/mnd for 10 annonser |
 | Bedriftskontoer | Logo + firmaside |
+| **Fort gjort** | **2.5% fee på sikre transaksjoner (Torget)** |
 | Affiliate-annonser | Kommisjonsbaserte |
 
 ---
@@ -104,6 +105,8 @@
 | Tungt grensesnitt | Moderne, rask UI |
 | Mye uønsket kontakt | Meldingsfilter og spamkontroll |
 | Lite SMB-støtte | Firmaprofiler inkludert |
+| **Ingen sikker handel** | **Fort gjort - escrow system** |
+| **Kompleks brukerflyt** | **Smart redirect etter login** |
 
 ---
 
