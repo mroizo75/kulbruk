@@ -39,7 +39,12 @@ export default function FortGjortCard({ listing, currentUserId }: FortGjortCardP
     return null
   }
   
-  // Ikke vis for egen annonse
+  // Må være innlogget for å kjøpe
+  if (!currentUserId) {
+    return null
+  }
+  
+  // Ikke vis for egen annonse (kan ikke kjøpe sin egen vare)
   if (currentUserId === listing.userId) {
     return null
   }
