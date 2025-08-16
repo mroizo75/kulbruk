@@ -11,9 +11,27 @@ jobs:
     steps:
       - name: Call daily digest endpoint
         run: |
-          curl -sS -X GET "$BASE_URL/api/cron/saved-search-digest?period=daily" -H "X-CRON-KEY: $CRON_SECRET"
-        env:
-          BASE_URL: ${{ secrets.APP_BASE_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          echo "📧 Kjører saved search digest (daily)..."
+          
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.BASE_URL }}/api/cron/saved-search-digest")
+          
+          http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          if [ $http_code -eq 200 ]; then
+            echo "✅ Saved search digest fullført"
+          elif [ $http_code -eq 404 ]; then
+            echo "⚠️ Saved search digest API ikke funnet (404)"
+          else
+            echo "❌ Saved search digest feilet"
+            exit 1
+          fi
 
 

@@ -29,6 +29,7 @@ jobs:
           
           if [ $health_code -ne 200 ]; then
             echo "❌ Server er ikke tilgjengelig (HTTP $health_code)"
+            echo "Health response: $health_response"
             exit 1
           fi
           
