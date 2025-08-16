@@ -39,11 +39,6 @@ export default function FortGjortCard({ listing, currentUserId }: FortGjortCardP
     return null
   }
   
-  // Må være innlogget for å kjøpe
-  if (!currentUserId) {
-    return null
-  }
-  
   // Ikke vis for egen annonse (kan ikke kjøpe sin egen vare)
   if (currentUserId === listing.userId) {
     return null
@@ -131,37 +126,51 @@ export default function FortGjortCard({ listing, currentUserId }: FortGjortCardP
           </div>
         </div>
         
-        <Button 
-          onClick={async () => {
-            try {
-              const response = await fetch('/api/fort-gjort/create-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ listingId: listing.id })
-              })
-              
-              const data = await response.json()
-              
-              if (!response.ok) {
-                alert(`Feil: ${data.error}`)
-                return
+        {currentUserId ? (
+          <Button 
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/fort-gjort/create-payment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ listingId: listing.id })
+                })
+                
+                const data = await response.json()
+                
+                if (!response.ok) {
+                  alert(`Feil: ${data.error}`)
+                  return
+                }
+                
+                // Redirect til checkout med clientSecret
+                const checkoutUrl = `/fort-gjort/checkout?clientSecret=${data.clientSecret}&orderId=${data.orderId}`
+                window.location.href = checkoutUrl
+              } catch (error) {
+                console.error('Fort gjort error:', error)
+                alert('Feil ved start av Fort gjort kjøp')
               }
-              
-              // Redirect til checkout med clientSecret
-              const checkoutUrl = `/fort-gjort/checkout?clientSecret=${data.clientSecret}&orderId=${data.orderId}`
-              window.location.href = checkoutUrl
-            } catch (error) {
-              console.error('Fort gjort error:', error)
-              alert('Feil ved start av Fort gjort kjøp')
-            }
-          }}
-          className="w-full bg-green-600 hover:bg-green-700 text-white"
-          size="lg"
-        >
-          <Shield className="h-4 w-4 mr-2" />
-          Kjøp med Fort gjort
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
+            }}
+            className="w-full bg-green-600 hover:bg-green-700 text-white"
+            size="lg"
+          >
+            <Shield className="h-4 w-4 mr-2" />
+            Kjøp med Fort gjort
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        ) : (
+          <Button 
+            onClick={() => {
+              window.location.href = '/sign-in?redirect=' + encodeURIComponent(window.location.pathname)
+            }}
+            className="w-full bg-green-600 hover:bg-green-700 text-white"
+            size="lg"
+          >
+            <Shield className="h-4 w-4 mr-2" />
+            Logg inn for Fort gjort
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        )}
         
         <p className="text-xs text-center text-gray-500">
           Ved å kjøpe med Fort gjort godtar du våre{' '}
