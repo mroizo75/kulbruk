@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import path from 'path'
+import { uploadToCloudinary } from '@/lib/cloudinary'
 import { v4 as uuidv4 } from 'uuid'
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public/uploads')
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
@@ -37,46 +34,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Opprett upload mappe hvis den ikke eksisterer
-    const uploadPath = path.join(UPLOAD_DIR, folder)
-    if (!existsSync(uploadPath)) {
-      await mkdir(uploadPath, { recursive: true })
-    }
-
-    // Generer unikt filnavn
-    const fileExtension = path.extname(file.name)
-    const fileName = `${uuidv4()}${fileExtension}`
-    const filePath = path.join(uploadPath, fileName)
-
-    // Konverter fil til base64 for database lagring
+    // Konverter fil til buffer for Cloudinary upload
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     
-    // På produksjon: bruk base64 data URL
-    // På development: kan fortsatt bruke fil system
-    const isProduction = process.env.NODE_ENV === 'production'
+    // Generer unikt filnavn for Cloudinary
+    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const fileName = `${uuidv4()}.${fileExtension}`
     
-    let fileUrl: string
-    
-    if (isProduction) {
-      // Produksjon: lagre som base64 data URL
-      const base64 = buffer.toString('base64')
-      fileUrl = `data:${file.type};base64,${base64}`
-    } else {
-      // Development: fortsatt bruk fil system
-      await writeFile(filePath, buffer)
-      fileUrl = `/uploads/${folder}/${fileName}`
+    try {
+      // Last opp til Cloudinary
+      const uploadResult = await uploadToCloudinary(buffer, {
+        folder,
+        filename: fileName.split('.')[0], // Cloudinary bruker ikke extension i filename
+        width: 1200,
+        height: 800,
+        quality: 'auto'
+      })
+
+      console.log(`📸 Bilde lastet opp til Cloudinary: ${uploadResult.secureUrl} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
+
+      return NextResponse.json({
+        success: true,
+        url: uploadResult.secureUrl,
+        publicId: uploadResult.publicId,
+        filename: fileName,
+        size: file.size,
+        type: file.type,
+        width: uploadResult.width,
+        height: uploadResult.height,
+        cloudinary: {
+          // Generer thumbnail URLs
+          thumbnail: uploadResult.secureUrl.replace('/upload/', '/upload/w_300,h_200,c_fill,q_auto,f_auto/'),
+          medium: uploadResult.secureUrl.replace('/upload/', '/upload/w_600,h_400,c_fill,q_auto,f_auto/'),
+          large: uploadResult.secureUrl
+        }
+      })
+    } catch (cloudinaryError) {
+      console.error('Cloudinary upload failed:', cloudinaryError)
+      throw new Error('Failed to upload to Cloudinary')
     }
-
-    console.log(`📸 Bilde lastet opp: ${isProduction ? 'base64 data URL' : fileUrl} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
-
-    return NextResponse.json({
-      success: true,
-      url: fileUrl,
-      filename: fileName,
-      size: file.size,
-      type: file.type
-    })
 
   } catch (error) {
     console.error('Feil ved bildeopplasting:', error)
