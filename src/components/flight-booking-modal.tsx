@@ -125,6 +125,12 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
     setIsLoading(true)
     
     try {
+      console.log('📤 Sending booking request with:', {
+        flightOffer: flightOffer?.id,
+        travelersCount: travelers.length,
+        contactInfo: { email: contactInfo.email, hasPhone: !!contactInfo.phone }
+      })
+      
       // Add contact info to first traveler
       const travelersWithContact = travelers.map((traveler, index) => ({
         ...traveler,
@@ -150,20 +156,18 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
         body: JSON.stringify({
           flightOffer,
           travelers: travelersWithContact,
-          contacts: contactInfo.email ? [{
+          contacts: [{
             addresseeName: {
               firstName: travelers[0]?.name.firstName,
               lastName: travelers[0]?.name.lastName
             },
             emailAddress: contactInfo.email,
-            ...(contactInfo.phone && {
-              phones: [{
-                deviceType: 'MOBILE',
-                countryCallingCode: '47',
-                number: contactInfo.phone
-              }]
-            })
-          }] : undefined
+            phones: [{
+              deviceType: 'MOBILE',
+              countryCallingCode: '47',
+              number: contactInfo.phone
+            }]
+          }]
         })
       })
 
@@ -364,14 +368,18 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
                   </p>
                 </div>
                 <div>
-                  <Label htmlFor="phone">Telefonnummer (valgfritt)</Label>
+                  <Label htmlFor="phone">Telefonnummer *</Label>
                   <Input
                     id="phone"
                     type="tel"
                     value={contactInfo.phone}
                     onChange={(e) => setContactInfo(prev => ({ ...prev, phone: e.target.value }))}
                     placeholder="12345678"
+                    required
                   />
+                  <p className="text-sm text-gray-600 mt-1">
+                    Nødvendig for flyselskapets kontakt ved forsinkelser eller endringer
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -382,7 +390,7 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
               </Button>
               <Button 
                 onClick={() => setStep('payment')}
-                disabled={!contactInfo.email}
+                disabled={!contactInfo.email || !contactInfo.phone}
               >
                 Neste: Betaling
               </Button>

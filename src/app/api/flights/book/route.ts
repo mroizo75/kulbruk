@@ -42,10 +42,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Valider kontaktinformasjon
+    if (!contacts || contacts.length === 0 || !contacts[0]?.emailAddress) {
+      return NextResponse.json(
+        { error: 'E-postadresse er påkrevd for booking' },
+        { status: 400 }
+      )
+    }
+
+    if (!contacts[0]?.phones || contacts[0]?.phones.length === 0) {
+      return NextResponse.json(
+        { error: 'Telefonnummer er påkrevd for booking' },
+        { status: 400 }
+      )
+    }
+
     console.log('🎫 Starting flight booking process...')
     console.log(`Flight: ${flightOffer.id}`)
     console.log(`Travelers: ${travelers.length}`)
     console.log(`User: ${userId}`)
+    console.log('📊 Received data:', {
+      flightOffer: flightOffer ? 'Present' : 'Missing',
+      travelers: travelers?.map(t => ({ name: t.name, dob: t.dateOfBirth, gender: t.gender })),
+      contacts: contacts?.map(c => ({ email: c.emailAddress, hasPhone: !!c.phones?.length }))
+    })
 
     // 1. Først bekreft prisen med Amadeus
     console.log('💰 Confirming flight price...')
