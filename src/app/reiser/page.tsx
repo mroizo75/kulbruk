@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import FlightSearchForm from '@/components/flight-search-form'
 import FlightFilters, { FlightFilters as FlightFiltersType } from '@/components/flight-filters'
@@ -43,26 +43,33 @@ interface FlightOffer {
   originalOffer: any
 }
 
-// Populære ruter med sanntidspriser inspirert av FINN.no
-const popularRoutes = [
-  { from: 'Oslo', to: 'London', price: '612', month: 'oktober 2025', code: 'OSL-LHR', trend: 'ned' },
-  { from: 'Oslo', to: 'København', price: '889', month: 'august 2025', code: 'OSL-CPH', trend: 'ned' },
-  { from: 'Oslo', to: 'Stockholm', price: '959', month: 'august 2025', code: 'OSL-ARN', trend: 'opp' },
-  { from: 'Bergen', to: 'London', price: '745', month: 'september 2025', code: 'BGO-LHR', trend: 'ned' },
-  { from: 'Oslo', to: 'Barcelona', price: '828', month: 'mai 2026', code: 'OSL-BCN', trend: 'ned' },
-  { from: 'Oslo', to: 'Amsterdam', price: '934', month: 'september 2025', code: 'OSL-AMS', trend: 'ned' },
-  { from: 'Stavanger', to: 'Oslo', price: '499', month: 'september 2025', code: 'SVG-OSL', trend: 'ned' },
-  { from: 'Oslo', to: 'Ålesund', price: '1001', month: 'august 2025', code: 'OSL-AES', trend: 'opp' },
-  { from: 'Oslo', to: 'Gdansk', price: '318', month: 'september 2025', code: 'OSL-GDN', trend: 'ned' },
-  { from: 'Oslo', to: 'Riga', price: '707', month: 'september 2025', code: 'OSL-RIX', trend: 'ned' },
-  { from: 'Oslo', to: 'Vilnius', price: '761', month: 'oktober 2025', code: 'OSL-VNO', trend: 'ned' },
-  { from: 'Oslo', to: 'Billund', price: '1089', month: 'august 2025', code: 'OSL-BLL', trend: 'opp' }
+interface PopularRoute {
+  from: string
+  to: string
+  price: string
+  formattedPrice: string
+  month: string
+  code: string
+  trend: 'opp' | 'ned'
+  isLive: boolean
+}
+
+// Fallback data hvis API feiler
+const fallbackRoutes: PopularRoute[] = [
+  { from: 'Oslo', to: 'London', price: '612', formattedPrice: '612 kr', month: 'oktober 2025', code: 'OSL-LHR', trend: 'ned', isLive: false },
+  { from: 'Oslo', to: 'København', price: '889', formattedPrice: '889 kr', month: 'august 2025', code: 'OSL-CPH', trend: 'ned', isLive: false },
+  { from: 'Oslo', to: 'Stockholm', price: '959', formattedPrice: '959 kr', month: 'august 2025', code: 'OSL-ARN', trend: 'opp', isLive: false },
+  { from: 'Bergen', to: 'London', price: '745', formattedPrice: '745 kr', month: 'september 2025', code: 'BGO-LHR', trend: 'ned', isLive: false },
+  { from: 'Oslo', to: 'Barcelona', price: '828', formattedPrice: '828 kr', month: 'mai 2026', code: 'OSL-BCN', trend: 'ned', isLive: false },
+  { from: 'Oslo', to: 'Amsterdam', price: '934', formattedPrice: '934 kr', month: 'september 2025', code: 'OSL-AMS', trend: 'ned', isLive: false }
 ]
 
 export default function ReiserPage() {
   const { data: session } = useSession()
   const [searchResults, setSearchResults] = useState<FlightOffer[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [popularRoutes, setPopularRoutes] = useState<PopularRoute[]>(fallbackRoutes)
+  const [routesLoading, setRoutesLoading] = useState(true)
   const [hasSearched, setHasSearched] = useState(false)
   const [showFilters, setShowFilters] = useState(true)
   const [activeTab, setActiveTab] = useState<'all' | 'cheapest' | 'best' | 'fastest'>('all')
@@ -70,6 +77,34 @@ export default function ReiserPage() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
   const [bookingPassengers, setBookingPassengers] = useState(1)
   const [searchPassengers, setSearchPassengers] = useState({ adults: 1, children: 0 })
+
+  // Hent populære ruter når komponenten lastes
+  useEffect(() => {
+    const fetchPopularRoutes = async () => {
+      try {
+        console.log('🔍 Fetching popular routes...')
+        setRoutesLoading(true)
+        
+        const response = await fetch('/api/flights/popular-routes')
+        const data = await response.json()
+        
+        if (data.success && data.routes) {
+          console.log(`✅ Loaded ${data.routes.length} popular routes (live: ${data.routes.filter((r: PopularRoute) => r.isLive).length})`)
+          setPopularRoutes(data.routes)
+        } else {
+          console.log('⚠️ Using fallback routes')
+          setPopularRoutes(fallbackRoutes)
+        }
+      } catch (error) {
+        console.error('Error fetching popular routes:', error)
+        setPopularRoutes(fallbackRoutes)
+      } finally {
+        setRoutesLoading(false)
+      }
+    }
+    
+    fetchPopularRoutes()
+  }, [])
 
   // Funksjon for å deduplisere flyresultater
   const deduplicateFlights = (offers: FlightOffer[]): FlightOffer[] => {
@@ -207,7 +242,7 @@ export default function ReiserPage() {
     setIsBookingModalOpen(true)
   }
 
-  const handleQuickSearch = (route: any) => {
+  const handleQuickSearch = (route: PopularRoute) => {
     const [fromCode, toCode] = route.code.split('-')
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + 14) // 2 uker frem
@@ -827,9 +862,17 @@ export default function ReiserPage() {
           {!hasSearched && (
             <>
               <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Rimelige reiser akkurat nå
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Rimelige reiser akkurat nå
+                  </h2>
+                  {routesLoading && (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <div className="w-4 h-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+                      Henter live priser...
+                    </div>
+                  )}
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {popularRoutes.map((route, idx) => (
@@ -858,8 +901,13 @@ export default function ReiserPage() {
                           <div className="flex justify-between items-end">
                             <div>
                               <span className="text-xl font-bold text-blue-600">
-                                fra {route.price} kr
+                                fra {route.formattedPrice}
                               </span>
+                              {route.isLive && (
+                                <span className="text-xs text-green-600 font-medium">
+                                  ⚡ Live pris
+                                </span>
+                              )}
                               <p className="text-xs text-gray-500">per person</p>
                             </div>
                             <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
@@ -1010,6 +1058,74 @@ export default function ReiserPage() {
                           <span><strong>🤖 AI-analyse:</strong> Prisforutsigelser og reiseråd</span>
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* App Download Links */}
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg p-6 border border-emerald-200">
+                <div className="flex items-start space-x-4">
+                  <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="h-6 w-6 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-emerald-900 mb-2">
+                      📱 Last ned Amadeus Travel App
+                    </h3>
+                    <p className="text-emerald-800 mb-3">
+                      Etter booking får du e-tickets og PNR-kode. Last ned appen for best opplevelse:
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                        <span><strong>✈️ Online check-in:</strong> 24 timer før avgang</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                        <span><strong>🎫 Digital boarding pass:</strong> Direkte på mobilen</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                        <span><strong>📱 Sanntids oppdateringer:</strong> Gate, forsinkelser</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                        <span><strong>🪑 Endre seter:</strong> Velg nye plasser</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-3">
+                      <a 
+                        href="https://play.google.com/store/apps/details?id=com.amadeus.travel"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 bg-black text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+                      >
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.61 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
+                        </svg>
+                        Google Play
+                      </a>
+                      <a 
+                        href="https://apps.apple.com/app/amadeus-travel/id123456789"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 bg-black text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+                      >
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M18.71,19.5C17.88,20.74 17,21.95 15.66,21.97C14.32,22 13.89,21.18 12.37,21.18C10.84,21.18 10.37,21.95 9.1,22C7.79,22.05 6.8,20.68 5.96,19.47C4.25,17 2.94,12.45 4.7,9.39C5.57,7.87 7.13,6.91 8.82,6.88C10.1,6.86 11.32,7.75 12.11,7.75C12.89,7.75 14.37,6.68 15.92,6.84C16.57,6.87 18.39,7.1 19.56,8.82C19.47,8.88 17.39,10.1 17.41,12.63C17.44,15.65 20.06,16.66 20.09,16.67C20.06,16.74 19.67,18.11 18.71,19.5M13,3.5C13.73,2.67 14.94,2.04 15.94,2C16.07,3.17 15.6,4.35 14.9,5.19C14.21,6.04 13.07,6.7 11.95,6.61C11.8,5.46 12.36,4.26 13,3.5Z"/>
+                        </svg>
+                        App Store
+                      </a>
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-emerald-100 rounded-lg">
+                      <p className="text-sm text-emerald-800">
+                        <strong>💡 Alternativt:</strong> Bruk PNR-koden du får tilsendt på flyselskaps nettsider (SAS.no, Norwegian.no, etc.)
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -67,28 +67,51 @@ export async function POST(request: NextRequest) {
       contacts: contacts?.map(c => ({ email: c.emailAddress, hasPhone: !!c.phones?.length }))
     })
 
-    // 1. Først bekreft prisen med Amadeus
-    console.log('💰 Confirming flight price...')
-    const priceConfirmation = await amadeusClient.confirmFlightOffer(flightOffer)
+    // 1. Sjekk om dette er mock-data (test-miljø)
+    const isMockData = flightOffer.id?.startsWith('COMPETITIVE_') || flightOffer.id?.startsWith('MOCK_')
     
-    if (!priceConfirmation.success) {
-      console.error('Price confirmation failed:', priceConfirmation.error)
-      return NextResponse.json(
-        { error: 'Kunne ikke bekrefte flypris. Prøv igjen.' },
-        { status: 400 }
-      )
+    let confirmedOffer = flightOffer
+    
+    if (!isMockData) {
+      // Kun bekreft pris for ekte Amadeus-data
+      console.log('💰 Confirming flight price with Amadeus...')
+      const priceConfirmation = await amadeusClient.confirmFlightOffer(flightOffer)
+      
+      if (!priceConfirmation.success) {
+        console.error('Price confirmation failed:', priceConfirmation.error)
+        return NextResponse.json(
+          { error: 'Kunne ikke bekrefte flypris. Prøv igjen.' },
+          { status: 400 }
+        )
+      }
+      confirmedOffer = priceConfirmation.data?.flightOffers?.[0] || flightOffer
+    } else {
+      console.log('🎭 Using mock data - skipping price confirmation')
     }
 
-    // 2. Bruk bekreftet tilbud for booking
-    const confirmedOffer = priceConfirmation.data?.flightOffers?.[0] || flightOffer
-
-    // 3. Book via Amadeus
-    console.log('🎫 Creating flight order via Amadeus...')
-    const bookingResult = await amadeusClient.instance.bookFlight(
-      confirmedOffer,
-      travelers,
-      contacts
-    )
+    // 3. Book via Amadeus (kun for ekte data)
+    let bookingResult
+    
+    if (!isMockData) {
+      console.log('🎫 Creating flight order via Amadeus...')
+      bookingResult = await amadeusClient.instance.bookFlight(
+        confirmedOffer,
+        travelers,
+        contacts
+      )
+    } else {
+      console.log('🎭 Simulating booking for mock data...')
+      // Simuler en vellykket booking for test-data
+      bookingResult = {
+        success: true,
+        data: {
+          id: 'DEMO_BOOKING_' + Date.now(),
+          associatedRecords: [{
+            reference: 'DEMO_REF_' + Math.random().toString(36).substr(2, 6).toUpperCase()
+          }]
+        }
+      }
+    }
 
     if (!bookingResult.success) {
       console.error('Amadeus booking failed:', bookingResult.error)
@@ -115,7 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Success - Lagre booking i database
-    console.log('✅ Amadeus booking successful, saving to database...')
+    console.log(isMockData ? '✅ Demo booking successful, saving to database...' : '✅ Amadeus booking successful, saving to database...')
     
     const booking = {
       id: `booking_${Date.now()}`,
@@ -138,7 +161,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Flyreise booket successfully!',
+      message: isMockData ? 'Demo flyreise booket successfully!' : 'Flyreise booket successfully!',
+      demo: isMockData,
       booking: {
         id: booking.id,
         bookingReference: booking.bookingReference,

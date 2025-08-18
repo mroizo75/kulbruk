@@ -185,7 +185,11 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
       if (result.success) {
         setBookingResult(result)
         setStep('confirmation')
-        toast.success('Flyreise booket successfully!')
+        if (result.demo) {
+          toast.success('Demo flyreise booket successfully! 🎭')
+        } else {
+          toast.success('Flyreise booket successfully! ✈️')
+        }
       } else {
         toast.error(result.error || 'Booking feilet')
       }
@@ -600,8 +604,15 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check className="h-8 w-8 text-green-600" />
               </div>
-              <h3 className="text-2xl font-bold text-green-600 mb-2">Booking Bekreftet!</h3>
-              <p className="text-gray-600">Din flyreise er booket successfully</p>
+              <h3 className="text-2xl font-bold text-green-600 mb-2">
+                {bookingResult?.demo ? 'Demo Booking Bekreftet! 🎭' : 'Booking Bekreftet! ✈️'}
+              </h3>
+              <p className="text-gray-600">
+                {bookingResult?.demo 
+                  ? 'Demo flyreise er simulert successfully (ingen faktisk booking)'
+                  : 'Din flyreise er booket successfully'
+                }
+              </p>
             </div>
 
             <Card>
