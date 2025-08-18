@@ -69,6 +69,7 @@ export default function ReiserPage() {
   const [selectedOffer, setSelectedOffer] = useState<FlightOffer | null>(null)
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
   const [bookingPassengers, setBookingPassengers] = useState(1)
+  const [searchPassengers, setSearchPassengers] = useState({ adults: 1, children: 0 })
 
   // Funksjon for å deduplisere flyresultater
   const deduplicateFlights = (offers: FlightOffer[]): FlightOffer[] => {
@@ -141,6 +142,9 @@ export default function ReiserPage() {
     setIsSearching(true)
     setHasSearched(true)
     
+    // Lagre antall passasjerer fra søket
+    setSearchPassengers({ adults: searchData.adults || 1, children: searchData.children || 0 })
+    
     try {
       console.log('🔍 Søker etter flyreiser...', searchData)
 
@@ -194,10 +198,12 @@ export default function ReiserPage() {
     }
   }
 
-  const handleBookFlight = (offer: FlightOffer, passengers: number = 1) => {
+  const handleBookFlight = (offer: FlightOffer, passengers?: number) => {
     // La brukere starte booking-prosessen uten å være logget inn
     setSelectedOffer(offer)
-    setBookingPassengers(passengers)
+    // Bruk antall passasjerer fra søket hvis ikke spesifisert
+    const totalPassengers = passengers || (searchPassengers.adults + searchPassengers.children)
+    setBookingPassengers(totalPassengers)
     setIsBookingModalOpen(true)
   }
 
@@ -727,10 +733,44 @@ export default function ReiserPage() {
                             {/* Pris og booking */}
                             <div className="flex flex-col items-end space-y-3 lg:min-w-[200px]">
                               <div className="text-right">
-                                <div className="text-3xl font-bold text-blue-600">
-                                  {offer.price.formattedNOK}
-                                </div>
-                                <div className="text-sm text-gray-500">per person</div>
+                                {(() => {
+                                  const totalPassengers = searchPassengers.adults + searchPassengers.children
+                                  const pricePerPerson = parseFloat(offer.price.total.toString())
+                                  const totalPrice = pricePerPerson * totalPassengers
+                                  
+                                  return (
+                                    <>
+                                      {totalPassengers > 1 ? (
+                                        <>
+                                          <div className="text-2xl font-bold text-blue-600">
+                                            {new Intl.NumberFormat('nb-NO', { 
+                                              style: 'currency', 
+                                              currency: 'NOK',
+                                              minimumFractionDigits: 0,
+                                              maximumFractionDigits: 0
+                                            }).format(totalPrice)}
+                                          </div>
+                                          <div className="text-sm text-gray-500">
+                                            for {totalPassengers} passasjerer
+                                          </div>
+                                          <div className="text-sm text-gray-400">
+                                            ({offer.price.formattedNOK} per person)
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="text-3xl font-bold text-blue-600">
+                                            {offer.price.formattedNOK}
+                                          </div>
+                                          <div className="text-sm text-gray-500">per person</div>
+                                        </>
+                                      )}
+                                      <div className="text-xs text-orange-600 font-medium mt-1">
+                                        ⚠️ Grunnpris - ekskl. bagasje/seter
+                                      </div>
+                                    </>
+                                  )
+                                })()}
                               </div>
                               
                               <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -740,7 +780,7 @@ export default function ReiserPage() {
                               
                               <Button 
                                 className="bg-blue-600 hover:bg-blue-700 px-8 py-2"
-                                onClick={() => handleBookFlight(offer, 1)}
+                                onClick={() => handleBookFlight(offer)}
                               >
                                 Book Reise
                               </Button>
@@ -894,7 +934,50 @@ export default function ReiserPage() {
                   </Card>
                 </div>
 
-                {/* Reise-API info banner */}
+                {/* Pristransparens info banner */}
+              <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg p-6 border border-orange-200">
+                <div className="flex items-start space-x-4">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="h-6 w-6 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-orange-900 mb-2">
+                      💰 Pristransparens - Viktig å vite
+                    </h3>
+                    <p className="text-orange-800 mb-3 font-medium">
+                      Prisene vist er grunnpriser og inkluderer IKKE tilleggstjenester fra flyselskapet:
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                        <span><strong>💺 Setevalg:</strong> 150-800 kr per person ekstra</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                        <span><strong>🧳 Innsjekket bagasje:</strong> 200-600 kr per person ekstra</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                        <span><strong>🍽️ Måltider:</strong> 100-400 kr per person ekstra</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                        <span><strong>📱 Endringer/avbestilling:</strong> Varierende avgifter</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 p-3 bg-orange-100 rounded-lg">
+                      <p className="text-sm text-orange-800">
+                        <strong>💡 Tips:</strong> En grunnpris på 500 kr kan bli 950-1300 kr per person med vanlige tillegg. 
+                        Planlegg budsjettet deretter!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reise-API info banner */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
                   <div className="flex items-start space-x-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">

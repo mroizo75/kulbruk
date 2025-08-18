@@ -222,12 +222,31 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-blue-600">
-                  {flightOffer.price.formattedNOK}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {passengers} passasjer{passengers > 1 ? 'er' : ''}
-                </div>
+                {(() => {
+                  const pricePerPerson = parseFloat(flightOffer.price.total.toString())
+                  const totalPrice = pricePerPerson * passengers
+                  
+                  return (
+                    <>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {new Intl.NumberFormat('nb-NO', { 
+                          style: 'currency', 
+                          currency: 'NOK',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        }).format(totalPrice)}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {passengers} passasjer{passengers > 1 ? 'er' : ''}
+                      </div>
+                      {passengers > 1 && (
+                        <div className="text-xs text-gray-500">
+                          ({flightOffer.price.formattedNOK} per person)
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </CardContent>
@@ -375,6 +394,30 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
           <div>
             <h3 className="text-xl font-semibold mb-4">Betaling og Bekreftelse</h3>
             
+            {/* Pristransparens advarsel */}
+            <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-orange-600 text-sm font-bold">⚠️</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-orange-800 mb-2">Viktig prisinfmasjon</h4>
+                  <div className="text-sm text-orange-700 space-y-2">
+                    <p><strong>Prisen vist er grunnpris og inkluderer IKKE:</strong></p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>Setevalg (ca. 150-800 kr per person)</li>
+                      <li>Innsjekket bagasje (ca. 200-600 kr per person)</li>
+                      <li>Måltider ombord (ca. 100-400 kr per person)</li>
+                      <li>Ekstra håndbagasje (ca. 100-300 kr per person)</li>
+                    </ul>
+                    <p className="font-medium pt-2">
+                      Endelig pris kan bli betydelig høyere enn vist grunnpris.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             {!user && (
               <Card className="mb-6 border-blue-200 bg-blue-50">
                 <CardContent className="pt-6">
@@ -421,12 +464,90 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
                 </div>
                 
                 <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span>Totalpris:</span>
-                    <span className="font-semibold">{flightOffer.price.formattedNOK}</span>
+                  {/* Grunnpris */}
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Grunnpris flybillett:</span>
+                      <span className="font-semibold">
+                        {new Intl.NumberFormat('nb-NO', { 
+                          style: 'currency', 
+                          currency: 'NOK',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        }).format(parseFloat(flightOffer.price.total.toString()) * passengers)}
+                      </span>
+                    </div>
+                    {passengers > 1 && (
+                      <div className="flex justify-between text-sm text-gray-600 mt-1">
+                        <span>{passengers} passasjerer × {flightOffer.price.formattedNOK}</span>
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-500 mt-1">
+                      Inkluderer skatter og avgifter
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Inkluderer skatter og avgifter</span>
+
+                  {/* Estimert tilleggskostnader */}
+                  <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                    <div className="text-sm">
+                      <div className="font-medium text-yellow-800 mb-2">
+                        + Estimerte tilleggskostnader per person:
+                      </div>
+                      <div className="space-y-1 text-yellow-700">
+                        <div className="flex justify-between">
+                          <span>• Setevalg (valgfritt):</span>
+                          <span>150-800 kr</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• Innsjekket bagasje (20kg):</span>
+                          <span>200-600 kr</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>• Måltid ombord (valgfritt):</span>
+                          <span>100-400 kr</span>
+                        </div>
+                      </div>
+                      <div className="border-t border-yellow-300 mt-2 pt-2">
+                        <div className="flex justify-between font-medium text-yellow-800">
+                          <span>Mulig totalpris:</span>
+                          <span>
+                            {new Intl.NumberFormat('nb-NO', { 
+                              style: 'currency', 
+                              currency: 'NOK',
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0
+                            }).format((parseFloat(flightOffer.price.total.toString()) + 450) * passengers)} - 
+                            {new Intl.NumberFormat('nb-NO', { 
+                              style: 'currency', 
+                              currency: 'NOK',
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0
+                            }).format((parseFloat(flightOffer.price.total.toString()) + 1800) * passengers)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-yellow-600 mt-1">
+                          Avhengig av valg du gjør under bestilling
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bekreftet totalpris kun grunnpris */}
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Du betaler nå (grunnpris):</span>
+                      <span className="text-lg font-bold text-blue-600">
+                        {new Intl.NumberFormat('nb-NO', { 
+                          style: 'currency', 
+                          currency: 'NOK',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        }).format(parseFloat(flightOffer.price.total.toString()) * passengers)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Tilleggstjenester velges og betales direkte til flyselskapet
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -481,8 +602,21 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium">Totalpris:</span>
-                    <span>{flightOffer.price.formattedNOK}</span>
+                    <span>
+                      {new Intl.NumberFormat('nb-NO', { 
+                        style: 'currency', 
+                        currency: 'NOK',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                      }).format(parseFloat(flightOffer.price.total.toString()) * passengers)}
+                    </span>
                   </div>
+                  {passengers > 1 && (
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Per person:</span>
+                      <span>{flightOffer.price.formattedNOK}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="font-medium">E-post bekrefelse:</span>
                     <span>{contactInfo.email}</span>
