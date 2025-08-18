@@ -1034,34 +1034,37 @@ export default function ReiserPage() {
                       </svg>
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900 mb-2">
-                        ✈️ Powered by Professional Travel APIs
+                      <h3 className="text-lg font-bold text-blue-900 mb-2">
+                        ✈️ Søk over 800+ reiseselskap med billige turer for deg!
                       </h3>
-                      <p className="text-gray-600 mb-3">
-                        Kulbruk.no bruker avanserte reisetjeneste-API-er som gir tilgang til:
+                      <p className="text-blue-800 mb-3">
+                        Vi sammenligner priser fra alle store reiseselskap så du får den beste prisen:
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div className="flex items-center space-x-2">
                           <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                          <span><strong>✈️ Flyreiser:</strong> 800+ flyselskaper inkludert SAS og Norwegian</span>
+                          <span><strong>✈️ Flyreiser:</strong> SAS, Norwegian, Lufthansa, KLM og mange flere</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
-                          <span><strong>🏨 Hoteller:</strong> 2M+ hoteller verden rundt</span>
+                          <span><strong>🏨 Hoteller:</strong> Fra luksushoteller til budsjettovernatting</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                          <span><strong>🚗 Leiebiler:</strong> Alle store utleieselskaper</span>
+                          <span><strong>🚗 Leiebiler:</strong> Avis, Hertz, Europcar og lokale selskap</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                          <span><strong>🤖 AI-analyse:</strong> Prisforutsigelser og reiseråd</span>
+                          <span><strong>💰 Beste pris:</strong> Vi finner alltid de billigste turene for deg</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Spacing between the two bottom cards */}
+              <div className="h-6"></div>
 
               {/* App Download Links */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg p-6 border border-emerald-200">
