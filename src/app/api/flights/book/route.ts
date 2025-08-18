@@ -150,7 +150,9 @@ export async function POST(request: NextRequest) {
       status: 'CONFIRMED',
       departureDate: new Date(confirmedOffer.itineraries[0].segments[0].departure.at),
       returnDate: confirmedOffer.itineraries[1] ? new Date(confirmedOffer.itineraries[1].segments[0].departure.at) : null,
-      passengers: travelers.length
+      passengers: travelers.length,
+      departureAirport: confirmedOffer.itineraries[0].segments[0].departure.iataCode,
+      arrivalAirport: confirmedOffer.itineraries[0].segments[confirmedOffer.itineraries[0].segments.length - 1].arrival.iataCode
     }
     
     // TODO: Implement database save when Prisma is configured
@@ -160,10 +162,11 @@ export async function POST(request: NextRequest) {
     console.log(`Booking ID: ${booking.id}`)
     console.log(`Amadeus Order ID: ${bookingResult.data?.id}`)
 
-    // 6. Send booking confirmation email (kun for ekte bookinger)
-    if (!isMockData) {
-      try {
-        console.log('📧 Sending booking confirmation email...')
+    // 6. Send booking confirmation email (alltid, også for demo)
+    try {
+      console.log('📧 Starting email process...')
+      console.log('📧 Contacts data:', JSON.stringify(contacts, null, 2))
+      console.log('📧 Travelers data:', JSON.stringify(travelers, null, 2))
         
         const emailResult = await sendBookingConfirmationEmail({
           to: contacts[0].emailAddress,
@@ -204,12 +207,9 @@ export async function POST(request: NextRequest) {
           }
         }
         
-      } catch (emailError) {
-        console.error('⚠️ Notification sending failed:', emailError)
-        // Booking is still successful, only notification failed
-      }
-    } else {
-      console.log('🎭 Mock booking - skipping email notifications')
+    } catch (emailError) {
+      console.error('⚠️ Notification sending failed:', emailError)
+      // Booking is still successful, only notification failed
     }
 
     return NextResponse.json({

@@ -29,7 +29,10 @@ export interface BookingConfirmationData {
 
 export async function sendBookingConfirmationEmail(data: BookingConfirmationData) {
   try {
+    console.log('📧 Starting email send process...')
+    console.log('📧 Resend API Key present:', !!process.env.RESEND_API_KEY)
     console.log('📧 Sending booking confirmation email to:', data.to)
+    console.log('📧 Booking data:', JSON.stringify(data.booking, null, 2))
     
     const { booking, travelers, flightDetails } = data
     
@@ -129,6 +132,13 @@ export async function sendBookingConfirmationEmail(data: BookingConfirmationData
       </html>
     `
     
+    console.log('📧 About to call resend.emails.send...')
+    console.log('📧 Email payload:', {
+      from: 'Kulbruk.no <bookings@kulbruk.no>',
+      to: data.to,
+      subject: `✈️ Flyreise bekreftet - ${booking.route} (${booking.confirmationCode})`
+    })
+
     const result = await resend.emails.send({
       from: 'Kulbruk.no <bookings@kulbruk.no>',
       to: data.to,
@@ -159,11 +169,13 @@ Kulbruk.no teamet
       `
     })
     
-    console.log('✅ Email sent successfully:', result.data?.id)
+    console.log('✅ Email sent successfully!')
+    console.log('📧 Resend response:', JSON.stringify(result, null, 2))
     return { success: true, data: result.data }
     
   } catch (error) {
-    console.error('❌ Email sending failed:', error)
+    console.error('❌ Email sending failed - Full error:', error)
+    console.error('❌ Error details:', JSON.stringify(error, null, 2))
     return { success: false, error: error }
   }
 }

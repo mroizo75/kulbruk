@@ -137,7 +137,10 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
           dob: t.dateOfBirth, 
           gender: t.gender 
         })),
-        contactInfo: { email: contactInfo.email, hasPhone: !!contactInfo.phone }
+        contacts: [{ 
+          emailAddress: contactInfo.email,
+          phones: contactInfo.phone ? [{ number: contactInfo.phone }] : []
+        }]
       })
       
       // Add contact info to first traveler
