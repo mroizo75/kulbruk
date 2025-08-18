@@ -1047,7 +1047,7 @@ export default function ReiserPage() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
-                          <span><strong>🏨 Hoteller:</strong> Fra luksushoteller til budsjettovernatting</span>
+                          <span><strong>🎁 Pakkereiser:</strong> Fly + hotell + aktiviteter i én bestilling</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -1133,6 +1133,9 @@ export default function ReiserPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Spacing between app section and features */}
+              <div className="h-6"></div>
 
               {/* Features section */}
               <div className="bg-white rounded-lg p-8 shadow-sm">

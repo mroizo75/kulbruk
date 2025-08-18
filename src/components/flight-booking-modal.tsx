@@ -653,6 +653,41 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
               </CardContent>
             </Card>
 
+            {/* Email and SMS notifications info */}
+            {bookingResult?.notifications && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-blue-900 flex items-center gap-2">
+                      📬 Bekreftelser sendt
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-700">📧</span>
+                        <span className="text-blue-800">{bookingResult.notifications.email}</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-700">📱</span>
+                        <span className="text-blue-800">{bookingResult.notifications.sms}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-blue-200">
+                      <h5 className="font-medium text-blue-900 mb-2">📋 Neste steg:</h5>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        {bookingResult.notifications.nextSteps.map((step, index) => (
+                          <li key={index} className="flex items-start gap-2">
+                            <span className="text-blue-600">•</span>
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="mt-6">
               <Button onClick={resetModal} className="w-full">
                 Lukk

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { amadeusClient } from '@/lib/amadeus-client'
+import { sendBookingConfirmationEmail, sendBookingSMS } from '@/lib/resend'
 // Note: Import Prisma client when available
 // import { prisma } from '@/lib/prisma'
 
@@ -159,6 +160,58 @@ export async function POST(request: NextRequest) {
     console.log(`Booking ID: ${booking.id}`)
     console.log(`Amadeus Order ID: ${bookingResult.data?.id}`)
 
+    // 6. Send booking confirmation email (kun for ekte bookinger)
+    if (!isMockData) {
+      try {
+        console.log('📧 Sending booking confirmation email...')
+        
+        const emailResult = await sendBookingConfirmationEmail({
+          to: contacts[0].emailAddress,
+          booking: {
+            id: booking.id,
+            confirmationCode: bookingResult.data.associatedRecords[0].reference,
+            totalPrice: booking.totalPrice,
+            currency: booking.currency,
+            route: `${booking.departureAirport} → ${booking.arrivalAirport}`,
+            departureDate: booking.departureDate,
+            returnDate: booking.returnDate,
+            status: booking.status
+          },
+          travelers: travelers,
+          flightDetails: confirmedOffer
+        })
+
+        if (emailResult.success) {
+          console.log('✅ Booking confirmation email sent successfully')
+        } else {
+          console.error('⚠️ Email sending failed:', emailResult.error)
+        }
+
+        // Send SMS if phone number is provided
+        const phone = contacts[0].phones?.[0]?.number
+        if (phone) {
+          const smsResult = await sendBookingSMS({
+            to: phone,
+            confirmationCode: bookingResult.data.associatedRecords[0].reference,
+            route: `${booking.departureAirport} → ${booking.arrivalAirport}`,
+            departureDate: booking.departureDate
+          })
+          
+          if (smsResult.success) {
+            console.log('✅ SMS notification sent successfully')
+          } else {
+            console.log('⚠️ SMS sending failed:', smsResult.error)
+          }
+        }
+        
+      } catch (emailError) {
+        console.error('⚠️ Notification sending failed:', emailError)
+        // Booking is still successful, only notification failed
+      }
+    } else {
+      console.log('🎭 Mock booking - skipping email notifications')
+    }
+
     return NextResponse.json({
       success: true,
       message: isMockData ? 'Demo flyreise booket successfully!' : 'Flyreise booket successfully!',
@@ -174,7 +227,17 @@ export async function POST(request: NextRequest) {
         returnDate: booking.returnDate,
         passengers: booking.passengers
       },
-      amadeusOrder: bookingResult.data
+      amadeusOrder: bookingResult.data,
+      notifications: {
+        email: isMockData ? 'Demo-booking - ingen epost sendt' : `Booking-bekreftelse sendt til ${contacts[0].emailAddress}`,
+        sms: isMockData ? 'Demo-booking - ingen SMS sendt' : (contacts[0].phones?.length > 0 ? 'SMS-bekreftelse sendt' : 'Ingen telefonnummer oppgitt'),
+        nextSteps: [
+          '📧 Sjekk e-post for e-tickets og boarding pass',
+          '📱 Last ned Amadeus app for flight status',
+          '✈️ Check in online 24 timer før avgang',
+          '🛂 Husk gyldig ID til flyplassen'
+        ]
+      }
     })
 
   } catch (error) {
