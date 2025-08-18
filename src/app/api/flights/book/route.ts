@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { amadeusClient } from '@/lib/amadeus-client'
 // Note: Import Prisma client when available
 // import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
+    const session = await auth()
+    const userId = (session?.user as any)?.id
     
     if (!userId) {
       return NextResponse.json(

@@ -418,7 +418,7 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
               </div>
             </div>
             
-            {!user && (
+            {!session?.user && (
               <Card className="mb-6 border-blue-200 bg-blue-50">
                 <CardContent className="pt-6">
                   <div className="text-center">
@@ -559,7 +559,7 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
               </Button>
               <Button 
                 onClick={handleBooking}
-                disabled={isLoading || !user}
+                disabled={isLoading || !session?.user}
                 className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
               >
                 {isLoading ? (
@@ -567,7 +567,7 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Booker...
                   </>
-                ) : !user ? (
+                ) : !session?.user ? (
                   'Logg inn for å booke'
                 ) : (
                   'Bekreft Booking'
