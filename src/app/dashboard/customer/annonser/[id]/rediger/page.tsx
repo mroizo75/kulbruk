@@ -18,7 +18,12 @@ export default async function EditListingPage({ params }: PageProps) {
   // Hent annonsen og verifiser eierskap
   const listing = await prisma.listing.findFirst({
     where: { id, userId },
-    include: { images: true, category: true, vehicleSpec: true },
+    include: { 
+      images: { orderBy: { sortOrder: 'asc' } }, 
+      category: true, 
+      vehicleSpec: true,
+      propertySpec: true
+    },
   })
 
   if (!listing) {
@@ -43,7 +48,16 @@ export default async function EditListingPage({ params }: PageProps) {
           shortCode={listing.shortCode || undefined}
           images={listing.images.map((img) => ({ url: img.url }))}
           vehicleSpec={listing.vehicleSpec || undefined}
+          propertySpec={listing.propertySpec || undefined}
           listingType={listing.listingType as any}
+          status={listing.status}
+          enableFortGjort={!!listing.enableFortGjort}
+          propertyPurpose={listing.propertyPurpose || undefined}
+          rentalPrice={listing.rentalPrice ? Number(listing.rentalPrice) : undefined}
+          deposit={listing.deposit ? Number(listing.deposit) : undefined}
+          availableFrom={listing.availableFrom?.toISOString().slice(0,10) || undefined}
+          rentIncludes={listing.rentIncludes || undefined}
+          category={listing.category}
         />
       </div>
     </DashboardLayout>

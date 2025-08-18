@@ -109,12 +109,20 @@ export async function PUT(
           contactPhone: data.contactPhone,
           contactName: data.contactName,
           showAddress: typeof data.showAddress === 'boolean' ? data.showAddress : undefined,
+          // Eiendom utleie felter
+          ...(data.propertyPurpose && { propertyPurpose: data.propertyPurpose }),
+          ...(typeof data.rentalPrice === 'number' && { rentalPrice: data.rentalPrice }),
+          ...(typeof data.deposit === 'number' && { deposit: data.deposit }),
+          ...(data.availableFrom && { availableFrom: new Date(data.availableFrom) }),
+          ...(data.rentIncludes && { rentIncludes: data.rentIncludes }),
+          // Fort gjort setting
+          ...(typeof data.enableFortGjort === 'boolean' && { enableFortGjort: data.enableFortGjort }),
           // Kunde: merk som solgt
           ...(data?.markAsSold === true ? { status: 'SOLD', soldAt: new Date() } : {}),
           // Kunde: toggle visning
           ...(typeof data?.isActive === 'boolean' ? { isActive: data.isActive } : {}),
           // Status settes tilbake til PENDING hvis innhold endres
-          status: (data.title || data.description || data.price || data.vehicleSpec) ? 'PENDING' : undefined
+          status: (data.title || data.description || data.price || data.vehicleSpec || data.propertySpec) ? 'PENDING' : undefined
         },
         include: {
           category: true,
@@ -169,6 +177,76 @@ export async function PUT(
             // Omregistreringsavgift fra Skatteetaten
             omregistreringsavgift: data.vehicleSpec.omregistreringsavgift || null,
             omregAvgiftDato: data.vehicleSpec.omregAvgiftDato ? new Date(data.vehicleSpec.omregAvgiftDato) : null,
+          }
+        })
+      }
+
+      // Oppdater propertySpec dersom sendt inn
+      if (data.propertySpec) {
+        await tx.propertySpec.upsert({
+          where: { listingId: id },
+          update: {
+            rooms: data.propertySpec.rooms ?? undefined,
+            bedrooms: data.propertySpec.bedrooms ?? undefined,
+            bathrooms: data.propertySpec.bathrooms ?? undefined,
+            livingArea: data.propertySpec.livingArea ?? undefined,
+            totalUsableArea: data.propertySpec.totalUsableArea ?? undefined,
+            propertyType: data.propertySpec.propertyType ?? undefined,
+            ownershipType: data.propertySpec.ownershipType ?? undefined,
+            buildingYear: data.propertySpec.buildingYear ?? undefined,
+            condition: data.propertySpec.condition ?? undefined,
+            furnished: typeof data.propertySpec.furnished === 'boolean' ? data.propertySpec.furnished : undefined,
+            furnishingLevel: data.propertySpec.furnishingLevel ?? undefined,
+            utilitiesIncluded: typeof data.propertySpec.utilitiesIncluded === 'boolean' ? data.propertySpec.utilitiesIncluded : undefined,
+            internetIncluded: typeof data.propertySpec.internetIncluded === 'boolean' ? data.propertySpec.internetIncluded : undefined,
+            cleaningIncluded: typeof data.propertySpec.cleaningIncluded === 'boolean' ? data.propertySpec.cleaningIncluded : undefined,
+            minimumRentalPeriod: data.propertySpec.minimumRentalPeriod ?? undefined,
+            petsAllowed: typeof data.propertySpec.petsAllowed === 'boolean' ? data.propertySpec.petsAllowed : undefined,
+            smokingAllowed: typeof data.propertySpec.smokingAllowed === 'boolean' ? data.propertySpec.smokingAllowed : undefined,
+            studentFriendly: typeof data.propertySpec.studentFriendly === 'boolean' ? data.propertySpec.studentFriendly : undefined,
+            hasBalcony: typeof data.propertySpec.hasBalcony === 'boolean' ? data.propertySpec.hasBalcony : undefined,
+            hasGarden: typeof data.propertySpec.hasGarden === 'boolean' ? data.propertySpec.hasGarden : undefined,
+            hasParking: typeof data.propertySpec.hasParking === 'boolean' ? data.propertySpec.hasParking : undefined,
+            hasElevator: typeof data.propertySpec.hasElevator === 'boolean' ? data.propertySpec.hasElevator : undefined,
+            hasBasement: typeof data.propertySpec.hasBasement === 'boolean' ? data.propertySpec.hasBasement : undefined,
+            energyRating: data.propertySpec.energyRating ?? undefined,
+            heatingType: data.propertySpec.heatingType ?? undefined,
+            monthlyFee: data.propertySpec.monthlyFee ? parseFloat(String(data.propertySpec.monthlyFee)) : undefined,
+            propertyTax: data.propertySpec.propertyTax ? parseFloat(String(data.propertySpec.propertyTax)) : undefined,
+            floor: data.propertySpec.floor ?? undefined,
+            totalFloors: data.propertySpec.totalFloors ?? undefined,
+          },
+          create: {
+            listingId: id,
+            rooms: data.propertySpec.rooms || null,
+            bedrooms: data.propertySpec.bedrooms || null,
+            bathrooms: data.propertySpec.bathrooms || null,
+            livingArea: data.propertySpec.livingArea || null,
+            totalUsableArea: data.propertySpec.totalUsableArea || null,
+            propertyType: data.propertySpec.propertyType || null,
+            ownershipType: data.propertySpec.ownershipType || null,
+            buildingYear: data.propertySpec.buildingYear || null,
+            condition: data.propertySpec.condition || null,
+            furnished: data.propertySpec.furnished ?? null,
+            furnishingLevel: data.propertySpec.furnishingLevel || null,
+            utilitiesIncluded: data.propertySpec.utilitiesIncluded ?? null,
+            internetIncluded: data.propertySpec.internetIncluded ?? null,
+            cleaningIncluded: data.propertySpec.cleaningIncluded ?? null,
+            minimumRentalPeriod: data.propertySpec.minimumRentalPeriod || null,
+            petsAllowed: data.propertySpec.petsAllowed ?? null,
+            smokingAllowed: data.propertySpec.smokingAllowed ?? null,
+            studentFriendly: data.propertySpec.studentFriendly ?? null,
+            hasBalcony: data.propertySpec.hasBalcony ?? null,
+            hasGarden: data.propertySpec.hasGarden ?? null,
+            hasParking: data.propertySpec.hasParking ?? null,
+            hasElevator: data.propertySpec.hasElevator ?? null,
+            hasBasement: data.propertySpec.hasBasement ?? null,
+            energyRating: data.propertySpec.energyRating || null,
+            heatingType: data.propertySpec.heatingType || null,
+            monthlyFee: data.propertySpec.monthlyFee ? parseFloat(String(data.propertySpec.monthlyFee)) : null,
+            propertyTax: data.propertySpec.propertyTax ? parseFloat(String(data.propertySpec.propertyTax)) : null,
+            floor: data.propertySpec.floor || null,
+            totalFloors: data.propertySpec.totalFloors || null,
           }
         })
       }
