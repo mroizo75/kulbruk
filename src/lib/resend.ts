@@ -33,8 +33,22 @@ export async function sendBookingConfirmationEmail(data: BookingConfirmationData
     console.log('📧 Resend API Key present:', !!process.env.RESEND_API_KEY)
     console.log('📧 Sending booking confirmation email to:', data.to)
     console.log('📧 Booking data:', JSON.stringify(data.booking, null, 2))
+    console.log('📧 Departure date type:', typeof data.booking.departureDate)
+    console.log('📧 Departure date value:', data.booking.departureDate)
     
     const { booking, travelers, flightDetails } = data
+    
+    // Ensure dates are proper Date objects
+    const departureDate = new Date(booking.departureDate)
+    const returnDate = booking.returnDate ? new Date(booking.returnDate) : null
+    
+    console.log('📧 Processed departure date:', departureDate)
+    console.log('📧 Processed return date:', returnDate)
+    console.log('📧 Is departure date valid:', !isNaN(departureDate.getTime()))
+    
+    // Fallback hvis dato er invalid
+    const safeDepartureDate = !isNaN(departureDate.getTime()) ? departureDate : new Date()
+    const safeReturnDate = returnDate && !isNaN(returnDate.getTime()) ? returnDate : null
     
     // Format travelers list
     const travelersList = travelers.map((t, index) => 
@@ -92,8 +106,8 @@ export async function sendBookingConfirmationEmail(data: BookingConfirmationData
               <div class="flight-details">
                 <h3>✈️ Flydetaljer</h3>
                 <table>
-                  <tr><td class="label">Avreise:</td><td>${booking.departureDate.toLocaleDateString('nb-NO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td></tr>
-                  ${booking.returnDate ? `<tr><td class="label">Retur:</td><td>${booking.returnDate.toLocaleDateString('nb-NO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td></tr>` : ''}
+                  <tr><td class="label">Avreise:</td><td>${safeDepartureDate.toLocaleDateString('nb-NO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td></tr>
+                  ${safeReturnDate ? `<tr><td class="label">Retur:</td><td>${safeReturnDate.toLocaleDateString('nb-NO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td></tr>` : ''}
                 </table>
               </div>
               
