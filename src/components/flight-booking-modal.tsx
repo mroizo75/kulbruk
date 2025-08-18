@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -76,8 +76,9 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
   const [bookingResult, setBookingResult] = useState<any>(null)
 
   // Initialize travelers when modal opens
-  useState(() => {
+  useEffect(() => {
     if (isOpen && passengers > 0) {
+      console.log(`🧳 Initializing ${passengers} travelers for modal`)
       const initialTravelers: Traveler[] = Array.from({ length: passengers }, (_, i) => ({
         id: `${i + 1}`,
         name: {
@@ -88,8 +89,20 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
         gender: 'UNSPECIFIED' as const
       }))
       setTravelers(initialTravelers)
+      console.log('✅ Travelers initialized:', initialTravelers.length)
+    } else if (isOpen) {
+      console.log('⚠️ Modal opened but no passengers set:', passengers)
     }
   }, [isOpen, passengers])
+
+  const validateTravelers = () => {
+    return travelers.length > 0 && travelers.every(traveler => 
+      traveler.name.firstName.trim() && 
+      traveler.name.lastName.trim() && 
+      traveler.dateOfBirth && 
+      traveler.gender !== 'UNSPECIFIED'
+    )
+  }
 
   const updateTraveler = (index: number, field: string, value: string) => {
     setTravelers(prev => prev.map((traveler, i) => {
@@ -110,15 +123,6 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
     }))
   }
 
-  const validateTravelers = () => {
-    return travelers.every(traveler => 
-      traveler.name.firstName && 
-      traveler.name.lastName && 
-      traveler.dateOfBirth && 
-      traveler.gender !== 'UNSPECIFIED'
-    )
-  }
-
   const handleBooking = async () => {
     if (!flightOffer) return
 
@@ -128,6 +132,11 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
       console.log('📤 Sending booking request with:', {
         flightOffer: flightOffer?.id,
         travelersCount: travelers.length,
+        travelers: travelers.map(t => ({ 
+          name: `${t.name.firstName} ${t.name.lastName}`, 
+          dob: t.dateOfBirth, 
+          gender: t.gender 
+        })),
         contactInfo: { email: contactInfo.email, hasPhone: !!contactInfo.phone }
       })
       
