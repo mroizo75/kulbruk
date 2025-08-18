@@ -1,6 +1,7 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { MapPin, Calendar, Eye, Heart } from 'lucide-react'
@@ -8,6 +9,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { calculateCarTotalPrice, formatCarPrice, isCarCategory } from '@/lib/car-pricing'
 import { FortGjortBadge } from '@/components/fort-gjort-card'
+import { toast } from 'sonner'
+import { useFavorites } from '@/contexts/favorites-context'
 
 interface ListingCardProps {
   id: string
@@ -50,28 +53,58 @@ export default function ListingCard({
   views = 0,
   createdAt,
   isFeatured = false,
-  isFavorited,
+  isFavorited: propIsFavorited,
   onFavoriteChange,
   registrationFee,
   listingType,
   userId,
   enableFortGjort,
 }: ListingCardProps) {
+  const { data: session } = useSession()
+  const { isFavorited, addFavorite, removeFavorite } = useFavorites()
+  const [isToggling, setIsToggling] = useState(false)
+  
   const statusInfo = statusConfig[status]
   const isClickable = status === 'APPROVED'
-  async function toggleFavorite(e: React.MouseEvent) {
+  const cardIsFavorited = isFavorited(id)
+
+  const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault()
+    e.stopPropagation()
+    
+    if (!session?.user) {
+      toast.error('Du må være logget inn for å lagre favoritter')
+      return
+    }
+    
+    if (isToggling) return // Prevent double-clicks
+    
+    setIsToggling(true)
+    
     try {
-      if (isFavorited) {
-        const res = await fetch(`/api/favorites?listingId=${encodeURIComponent(id)}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error('Fav-feil')
-        onFavoriteChange && onFavoriteChange(false)
+      if (cardIsFavorited) {
+        const success = await removeFavorite(id)
+        if (success) {
+          onFavoriteChange && onFavoriteChange(false)
+          toast.success('Fjernet fra favoritter')
+        } else {
+          toast.error('Kunne ikke fjerne fra favoritter')
+        }
       } else {
-        const res = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: id }) })
-        if (!res.ok) throw new Error('Fav-feil')
-        onFavoriteChange && onFavoriteChange(true)
+        const success = await addFavorite(id)
+        if (success) {
+          onFavoriteChange && onFavoriteChange(true)
+          toast.success('Lagt til i favoritter')
+        } else {
+          toast.error('Kunne ikke legge til i favoritter')
+        }
       }
-    } catch {}
+    } catch (error) {
+      console.error('Favoritt-feil:', error)
+      toast.error('Noe gikk galt. Prøv igjen.')
+    } finally {
+      setIsToggling(false)
+    }
   }
   
   const cardContent = (
@@ -121,8 +154,12 @@ export default function ListingCard({
         </div>
         
         {/* Favorite */}
-        <button onClick={toggleFavorite} className="absolute top-2 right-2 p-1 bg-white/80 rounded-full hover:bg-white">
-          <Heart className={`h-4 w-4 ${isFavorited ? 'text-red-500 fill-red-500' : 'text-red-500'}`} />
+        <button 
+          onClick={toggleFavorite} 
+          disabled={isToggling}
+          className="absolute top-2 right-2 p-1 bg-white/80 rounded-full hover:bg-white transition-colors disabled:opacity-50"
+        >
+          <Heart className={`h-4 w-4 ${cardIsFavorited ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-red-500'} transition-colors`} />
         </button>
 
         {/* Featured badge */}

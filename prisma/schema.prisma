@@ -140,10 +140,19 @@ model Listing {
   reservePrice       Decimal?         @db.Decimal(10, 2)
   suggestedPrice     Decimal?         @db.Decimal(10, 2)
   enableFortGjort    Boolean          @default(false)
+  
+  // Eiendom-spesifikke felt
+  propertyPurpose    PropertyPurpose? @default(SALE) // Salg eller utleie
+  rentalPrice        Decimal?         @db.Decimal(10, 2) // Månedlig leie
+  deposit            Decimal?         @db.Decimal(10, 2) // Depositum
+  availableFrom      DateTime?        // Tilgjengelig fra dato
+  rentIncludes       String?          @db.Text // Hva som inngår i leien
+  
   user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   category           Category         @relation(fields: [categoryId], references: [id])
   images             Image[]
   vehicleSpec        VehicleSpec?
+  propertySpec       PropertySpec?
   priceEstimation    PriceEstimation?
   auction            Auction?
   bids               Bid[]
@@ -160,6 +169,7 @@ model Listing {
   @@index([userId], map: "listings_userId_fkey")
   @@index([categoryId, status, isActive, expiresAt])
   @@index([status, isActive, expiresAt])
+  @@index([propertyPurpose])
   @@fulltext([title])
   @@map("listings")
 }
@@ -305,6 +315,233 @@ model VehicleSpec {
   listing            Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@map("vehicle_specs")
+}
+
+// ================== EIENDOM ==================
+
+model PropertySpec {
+  id            String   @id @default(cuid())
+  listingId     String   @unique
+  
+  // === MATRIKKELDATA (fra Kartverket) ===
+  municipalityNumber String?  // 301 (Oslo)
+  municipalityName   String?  // Oslo kommune
+  propertyNumber     String?  // 229 (gårdsnr)
+  leaseNumber        String?  // 107 (bruksnr)
+  unitNumber         String?  // Seksjonsnummer (for sameier)
+  matrikkelId        String?  // Unik matrikkel-ID fra Kartverket
+  cadastralNumber    String?  // Matrikkelenhet fullstendig (301-229/107)
+  
+  // === GRUNNLEGGENDE EIENDOMSINFO ===
+  propertyType       PropertyType?     // Leilighet, Enebolig, Rekkehus, etc.
+  ownershipType      OwnershipType?    // Selveier, Aksje, Borettslag, Andel, Leie
+  buildingYear       Int?              // Byggeår
+  condition          PropertyCondition? // A-E tilstand
+  renovationYear     Int?              // År for større renovering
+  
+  // === OFFISIELL ADRESSE (fra Kartverket) ===
+  officialAddress    String?  // Komplett adresse fra matrikkelen
+  streetName         String?  // Gatenavn
+  houseNumber        String?  // Husnummer (kan være 12A, 45-47)
+  apartmentNumber    String?  // Leilighetsnummer (H0201, 0301)
+  postalCode         String?  // Postnummer
+  city               String?  // Poststed
+  county             String?  // Fylke
+  
+  // === AREAL OG STØRRELSE (m²) ===
+  // Fra matrikkeldata
+  propertyArea       Int?     // Totalt eiendomsareal/tomteareal
+  usableAreaInternal Int?     // BRA-i (bruksareal internt)
+  usableAreaExternal Int?     // BRA-e (bruksareal eksternt: bod, garasje) 
+  totalUsableArea    Int?     // Total BRA (BRA-i + BRA-e)
+  builtArea          Int?     // Bebygd areal (BYA)
+  balconyTerraceArea Int?     // TBA (terrasse/balkong areal)
+  plotSize           Int?     // Tomteareal for eneboliger
+  livingArea         Int?     // P-ROM (primærrom - boareal)
+  garageArea         Int?     // Garasjeareal
+  storageArea        Int?     // Lager/bod areal
+  basementArea       Int?     // Kjeller areal
+  atticArea          Int?     // Loft areal
+  
+  // === ROM OG LAYOUT ===
+  rooms              Int?     // Antall rom totalt
+  bedrooms           Int?     // Antall soverom
+  bathrooms          Int?     // Antall bad/dusjrom
+  separateToilets    Int?     // Antall separate toaletter
+  floor              String?  // Etasje (eks. "5", "U1", "1-2", "Kj")
+  totalFloors        Int?     // Antall etasjer i bygget
+  entranceFloor      String?  // Inngangsadresse etasje
+  
+  // === ENERGI OG TEKNISK ===
+  energyRating       EnergyRating?     // A-G energimerking
+  energyColor        String?           // Fargekode (mørkegrønn, grønn, etc.)
+  heatingType        HeatingType?      // Fjernvarme, Elektrisk, Varmepumpe
+  heatingSource      String?           // Hovedoppvarming detaljer
+  ventilationType    VentilationType?  // Naturlig, Balansert, Avtrekk
+  waterHeating       WaterHeatingType? // Fjernvarme, Elektrisk, Varmepumpe
+  
+  // === FELLESSKAP (borettslag/sameie) ===
+  housingAssociation String?  // Navn på borettslag/sameie
+  organizationNumber String?  // Organisasjonsnummer
+  monthlyFee         Decimal? @db.Decimal(10, 2) // Felleskost kr/mnd
+  sharedDebt         Decimal? @db.Decimal(10, 2) // Fellesgjeld kr
+  sharedAssets       Decimal? @db.Decimal(10, 2) // Fellesformue kr
+  maxLoan            Decimal? @db.Decimal(10, 2) // Maks lånebeløp
+  equityRequired     Decimal? @db.Decimal(10, 2) // Krav til egenkapital
+  
+  // === BYGNINGSDETALJER ===
+  buildingMaterial   BuildingMaterial? // Tre, Betong, Mur, Stål
+  roofType           RoofType?        // Skifer, Tegl, Blikk, Papp
+  foundationType     FoundationType?  // Betong, Naturstein, Pilarer
+  wallType           WallType?        // Tømmer, Mur, Betong
+  insulation         InsulationType?  // Mineralull, Cellulosa, EPS
+  windows            WindowType?      // Tre, Aluminium, Plast
+  
+  // === UTSTYR OG FASILITETER ===
+  // Uteplasser
+  hasBalcony         Boolean? @default(false)
+  hasTerrace         Boolean? @default(false)
+  hasGarden          Boolean? @default(false)
+  gardenSize         Int?     // Hagestørrelse m²
+  hasRoof            Boolean? @default(false) // Takterrasse
+  
+  // Parkering
+  hasParking         Boolean? @default(false)
+  parkingType        ParkingType?     // Garasje, Carport, Gateparkering
+  parkingSpaces      Int?             // Antall parkeringsplasser
+  
+  // Bygningsfasiliteter
+  hasElevator        Boolean? @default(false)
+  hasBasement        Boolean? @default(false)
+  hasAttic           Boolean? @default(false)
+  hasFireplace       Boolean? @default(false)
+  hasAirConditioning Boolean? @default(false)
+  hasAlarm           Boolean? @default(false)
+  
+  // Tekniske installasjoner
+  fiberInternet      Boolean? @default(false)
+  cableTV            Boolean? @default(false)
+  dishwasher         Boolean? @default(false)
+  washingMachine     Boolean? @default(false)
+  dryer              Boolean? @default(false)
+  
+  // === FELLESTJENESTER ===
+  sharedLaundry      Boolean? @default(false)
+  sharedSauna        Boolean? @default(false)
+  sharedGym          Boolean? @default(false)
+  sharedBikeRoom     Boolean? @default(false)
+  janitorService     Boolean? @default(false)
+  
+  // === KJØKKEN ===
+  kitchenType        KitchenType?     // Åpent, Separat, Kjøkkenkrok
+  kitchenEquipped    Boolean? @default(false)
+  stove              StoveType?       // Elektrisk, Gass, Induksjon
+  oven               Boolean? @default(false)
+  refrigerator       Boolean? @default(false)
+  freezer            Boolean? @default(false)
+  
+  // === BAD/TOALETT ===
+  bathroomType       BathroomType?    // Helstøpt bad, Flislagt, etc.
+  hasShower          Boolean? @default(false)
+  hasBathtub         Boolean? @default(false)
+  floorHeating       Boolean? @default(false)
+  
+  // === SÆRLIGE FORHOLD ===
+  petsAllowed        Boolean? @default(true)
+  smokingAllowed     Boolean? @default(false)
+  studentFriendly    Boolean? @default(false)
+  seniorFriendly     Boolean? @default(false)
+  wheelchairAccess   Boolean? @default(false)
+  noiseLevel         NoiseLevel?      // Stille, Moderat, Høy
+  
+  // === UTLEIE-SPESIFIKKE FELT ===
+  furnished          Boolean? @default(false)
+  furnishingLevel    FurnishingLevel? // Umøblert, Delvis, Fullt
+  shortTermRental    Boolean? @default(false)
+  minimumRentalPeriod Int?            // Måneder
+  utilitiesIncluded  Boolean? @default(false)
+  internetIncluded   Boolean? @default(false)
+  cleaningIncluded   Boolean? @default(false)
+  
+  // === INTERNASJONALE FELT ===
+  // For utenlandske eiendomsmeglere
+  foreignAddress     String?  @db.Text // Adresse i utenlandsk format
+  foreignCountry     String?  // Land
+  foreignRegion      String?  // Region/provins/stat
+  foreignPostalCode  String?  // Postkode (kan være alfanumerisk)
+  foreignCurrency    String?  // Valuta for priser (EUR, USD, SEK)
+  translatedTitle    String?  // Oversatt tittel
+  translatedDesc     String?  @db.Text // Oversatt beskrivelse
+  
+  // === GEOGRAFISKE DATA ===
+  latitude           Float?   // Breddegrad (WGS84)
+  longitude          Float?   // Lengdegrad (WGS84)
+  propertyBoundary   Json?    // GeoJSON polygon av eiendomsgrenser
+  elevation          Int?     // Høyde over havet (moh)
+  seaView            Boolean? @default(false)
+  mountainView       Boolean? @default(false)
+  forestView         Boolean? @default(false)
+  cityView           Boolean? @default(false)
+  
+  // === NÆROMGIVELSER ===
+  distanceToCenter   Int?     // Avstand til sentrum (meter)
+  distanceToSchool   Int?     // Avstand til skole (meter)
+  distanceToStore    Int?     // Avstand til butikk (meter)
+  publicTransport    String?  // Kollektivtilbud beskrivelse
+  
+  // === ØKONOMI OG KOSTNADER ===
+  propertyTax        Decimal? @db.Decimal(10, 2) // Eiendomsskatt årlig
+  municipalFee       Decimal? @db.Decimal(10, 2) // Kommunale avgifter
+  waterSewer         Decimal? @db.Decimal(10, 2) // Vann/avløp årlig
+  garbageCollection  Decimal? @db.Decimal(10, 2) // Renovasjon årlig
+  insurance          Decimal? @db.Decimal(10, 2) // Forsikring årlig
+  heatingCost        Decimal? @db.Decimal(10, 2) // Oppvarmingskostnad årlig
+  electricityCost    Decimal? @db.Decimal(10, 2) // Strømkostnad årlig
+  
+  // === JURIDISKE FORHOLD ===
+  registeredOwner    String?  // Registrert eier (kun for verifisering)
+  ownershipForm      String?  // Selveier, Aksje, Andel, etc.
+  rightOfOccupancy   Boolean? @default(false) // Bruksrett
+  buybackClause      Boolean? @default(false) // Tilbakekjøpsrett
+  preemptionRight    Boolean? @default(false) // Forkjøpsrett
+  restrictions       String?  @db.Text // Restriksjoner/servitutter
+  
+  // === SPESIELLE EIENDOMSTYPER ===
+  // For fritidsboliger
+  seasonalProperty   Boolean? @default(false)
+  winterAccess       Boolean? @default(false)
+  waterfront         Boolean? @default(false)
+  
+  // For næringseiendom
+  commercialUse      Boolean? @default(false)
+  mixedUse           Boolean? @default(false)
+  businessType       String?  // Kontor, Lager, Butikk, etc.
+  
+  // For bofellesskap/kollektiv
+  sharedLiving       Boolean? @default(false)
+  privateRoom        Boolean? @default(false)
+  sharedKitchen      Boolean? @default(false)
+  sharedBathroom     Boolean? @default(false)
+  
+  // === METADATA ===
+  kartverketUpdated  DateTime? // Når data sist ble hentet fra Kartverket
+  dataQuality        DataQuality? // A-E kvalitetsvurdering
+  verificationStatus VerificationStatus? // VERIFIED, PENDING, FAILED
+  lastUpdated        DateTime? // Når eier/megler sist oppdaterte
+  autoUpdated        Boolean? @default(false) // Om data er auto-hentet
+  
+  // === TIMESTAMPS ===
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  listing            Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([propertyType])
+  @@index([ownershipType]) 
+  @@index([municipalityNumber])
+  @@index([energyRating])
+  @@index([furnished])
+  @@index([foreignCountry])
+  @@map("property_specs")
 }
 
 model FlightBooking {
@@ -509,8 +746,17 @@ enum PaymentStatus {
 }
 
 enum SubscriptionPlan {
-  BASIC
-  STANDARD
+  // Privatpersoner utleie
+  PRIVATE_RENTAL    // 99 kr/mnd - kun utleie
+  
+  // Meglere/Bedrifter eiendom
+  BUSINESS_BASIC    // 499 kr/mnd - 5 annonser
+  BUSINESS_STANDARD // 990 kr/mnd - 10 annonser  
+  BUSINESS_PREMIUM  // 1990 kr/mnd - 50 annonser
+  
+  // Eksisterende (bil/torget)
+  BASIC             // Grunnplan
+  STANDARD          // Standardplan
 }
 
 enum SubscriptionStatus {
@@ -523,6 +769,239 @@ enum SubscriptionStatus {
 enum ListingPaymentType {
   CAR_AD
   TORGET_AD
+  PROPERTY_AD
+}
+
+// ================== EIENDOM ENUMS ==================
+
+enum PropertyPurpose {
+  SALE      // Til salgs
+  RENT      // Til leie
+  BOTH      // Både salg og leie
+}
+
+enum PropertyType {
+  // Boliger
+  APARTMENT         // Leilighet  
+  HOUSE             // Enebolig
+  TOWNHOUSE         // Rekkehus
+  SEMI_DETACHED     // Tomannsbolig/Delt bolig
+  TERRACED_HOUSE    // Rekkehus
+  VILLA             // Villa
+  MANSION           // Herskapshus
+  PENTHOUSE         // Penthouse
+  STUDIO            // Hybel/Studio
+  ROOM              // Rom til leie
+  
+  // Fritidsboliger
+  CABIN             // Hytte
+  COTTAGE           // Sommerhus
+  CHALET            // Chalet
+  VACATION_HOME     // Feriebolig
+  
+  // Spesielle boformer
+  SHARED_HOUSING    // Bofellesskap
+  STUDENT_HOUSING   // Studentbolig
+  SENIOR_HOUSING    // Seniorbolig
+  ASSISTED_LIVING   // Omsorgsbolig
+  
+  // Næringseiendom
+  OFFICE            // Kontor
+  RETAIL            // Butikk/Handel
+  WAREHOUSE         // Lager
+  INDUSTRIAL        // Industri
+  MIXED_USE         // Blandet bruk
+  HOTEL             // Hotell
+  RESTAURANT        // Restaurant
+  
+  // Tomter
+  RESIDENTIAL_PLOT  // Boligtomt
+  COMMERCIAL_PLOT   // Næringstomt
+  AGRICULTURAL_LAND // Landbruksområde
+  FOREST_LAND       // Skogsområde
+  
+  // Andre
+  GARAGE            // Garasje
+  PARKING_SPACE     // Parkeringsplass
+  STORAGE           // Lager/Bod
+  OTHER             // Annet
+}
+
+enum OwnershipType {
+  FREEHOLD          // Selveier
+  SHARE             // Aksje (borettslag)
+  COOPERATIVE       // Andel (borettslag)
+  LEASEHOLD         // Festeeiendom
+  RIGHT_OF_USE      // Bruksrett
+  RENTAL            // Leie
+  TIMESHARE         // Deleie
+  OTHER             // Annet
+}
+
+enum PropertyCondition {
+  A_EXCELLENT       // A - Utmerket (som ny)
+  B_VERY_GOOD       // B - Meget god
+  C_GOOD            // C - God
+  D_FAIR            // D - Brukbar
+  E_POOR            // E - Dårlig
+}
+
+enum EnergyRating {
+  A_DARK_GREEN      // A - Mørkegrønn
+  B_GREEN           // B - Grønn  
+  C_LIGHT_GREEN     // C - Lysegrønn
+  D_YELLOW          // D - Gul
+  E_ORANGE          // E - Oransje
+  F_RED             // F - Rød
+  G_DARK_RED        // G - Mørk rød
+}
+
+enum HeatingType {
+  DISTRICT_HEATING  // Fjernvarme
+  ELECTRIC          // Elektrisk
+  HEAT_PUMP         // Varmepumpe
+  GAS               // Gass
+  OIL               // Olje
+  WOOD              // Ved
+  PELLETS           // Pellets
+  SOLAR             // Solvarme
+  GEOTHERMAL        // Geotermisk
+  OTHER             // Annet
+}
+
+enum VentilationType {
+  NATURAL           // Naturlig ventilasjon
+  BALANCED          // Balansert ventilasjon
+  EXHAUST           // Avtrekksventilasjon
+  MECHANICAL        // Mekanisk ventilasjon
+  NONE              // Ingen ventilasjon
+}
+
+enum WaterHeatingType {
+  DISTRICT_HEATING  // Fjernvarme
+  ELECTRIC          // Elektrisk
+  HEAT_PUMP         // Varmepumpe
+  GAS               // Gass
+  OIL               // Olje
+  SOLAR             // Solvarme
+  OTHER             // Annet
+}
+
+enum BuildingMaterial {
+  WOOD              // Tre
+  CONCRETE          // Betong
+  BRICK             // Mur/Tegl
+  STEEL             // Stål
+  STONE             // Stein
+  MIXED             // Blandet
+  OTHER             // Annet
+}
+
+enum RoofType {
+  TILE              // Tegl
+  SLATE             // Skifer
+  METAL             // Blikk/Metall
+  MEMBRANE          // Membran
+  THATCH            // Strå/Torv
+  CONCRETE          // Betong
+  OTHER             // Annet
+}
+
+enum FoundationType {
+  CONCRETE          // Betong
+  STONE             // Naturstein
+  PILES             // Pilarer
+  SLAB              // Plate på mark
+  CRAWL_SPACE       // Krypkjeller
+  FULL_BASEMENT     // Full kjeller
+  OTHER             // Annet
+}
+
+enum WallType {
+  LOG               // Tømmer
+  FRAME             // Bindingsverk
+  BRICK             // Mur
+  CONCRETE          // Betong
+  PANEL             // Panel
+  STONE             // Stein
+  OTHER             // Annet
+}
+
+enum InsulationType {
+  MINERAL_WOOL      // Mineralull
+  CELLULOSE         // Cellulosa
+  EPS               // EPS (flamingo)
+  POLYURETHANE      // Polyuretan
+  NATURAL           // Naturlige materialer
+  OTHER             // Annet
+}
+
+enum WindowType {
+  WOOD              // Tre
+  ALUMINUM          // Aluminium
+  PLASTIC           // Plast (PVC)
+  WOOD_ALUMINUM     // Tre/aluminium
+  STEEL             // Stål
+  OTHER             // Annet
+}
+
+enum ParkingType {
+  GARAGE            // Garasje
+  CARPORT           // Carport
+  COVERED           // Overdekket
+  STREET            // Gateparkering
+  PRIVATE_SPACE     // Privat plass
+  NONE              // Ingen parkering
+}
+
+enum KitchenType {
+  OPEN              // Åpent kjøkken
+  SEPARATE          // Separat kjøkken
+  KITCHENETTE       // Kjøkkenkrok
+  NONE              // Ikke kjøkken
+}
+
+enum StoveType {
+  ELECTRIC          // Elektrisk
+  GAS               // Gass
+  INDUCTION         // Induksjon
+  WOOD              // Ved
+  NONE              // Ingen komfyr
+}
+
+enum BathroomType {
+  FULL              // Helstøpt bad
+  TILED             // Flislagt
+  SHOWER_ROOM       // Dusjrom
+  WET_ROOM          // Våtrom
+  HALF_BATH         // Toalett/servant
+}
+
+enum NoiseLevel {
+  QUIET             // Stille
+  MODERATE          // Moderat
+  NOISY             // Støyete
+}
+
+enum FurnishingLevel {
+  UNFURNISHED       // Umøblert
+  PARTIALLY         // Delvis møblert
+  FULLY             // Fullt møblert
+}
+
+enum DataQuality {
+  A_EXCELLENT       // A - Utmerket datakvalitet
+  B_GOOD            // B - God datakvalitet
+  C_FAIR            // C - Brukbar datakvalitet
+  D_POOR            // D - Dårlig datakvalitet
+  E_UNKNOWN         // E - Ukjent kvalitet
+}
+
+enum VerificationStatus {
+  VERIFIED          // Verifisert
+  PENDING           // Venter på verifisering
+  FAILED            // Verifisering feilet
+  NOT_REQUIRED      // Ikke påkrevd
 }
 
 // --------- Favoritter ---------

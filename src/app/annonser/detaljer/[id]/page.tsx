@@ -38,6 +38,9 @@ import ReviewForm from '@/components/reviews/review-form'
 import RecentlyViewedRecorder from '@/components/recently-viewed-recorder'
 import FortGjortCard from '@/components/fort-gjort-card'
 import LoginToContactButton from '@/components/login-to-contact-button'
+import FavoriteButton from '@/components/favorite-button'
+import ShareButton from '@/components/share-button'
+import ReportButton from '@/components/report-button'
 // Address map uses a simple Google Maps embed per your preference
 
 export const dynamic = 'force-dynamic'
@@ -298,15 +301,9 @@ export default async function ListingDetailPage({ params }: PageProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm">
-                      <Heart className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Share2 className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Flag className="h-4 w-4" />
-                    </Button>
+                    <FavoriteButton listingId={listing.id} />
+                    <ShareButton listing={listing} />
+                    <ReportButton listingId={listing.id} />
                   </div>
                 </div>
                 

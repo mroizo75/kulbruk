@@ -6,6 +6,7 @@ import ConditionalNavbar from '@/components/conditional-navbar'
 import ConditionalFooter from '@/components/conditional-footer'
 import CookieConsent from '@/components/cookie-consent'
 import SessionProvider from '@/components/session-provider'
+import { FavoritesProvider } from '@/contexts/favorites-context'
 import './globals.css'
 import '@/sentry.client.config'
 
@@ -45,9 +46,10 @@ export default function RootLayout({
     <html lang="no">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SessionProvider>
-          <Suspense fallback={null}>
-            <ConditionalNavbar />
-          </Suspense>
+          <FavoritesProvider>
+            <Suspense fallback={null}>
+              <ConditionalNavbar />
+            </Suspense>
           <main className="min-h-screen">
             {children}
           </main>
@@ -56,6 +58,7 @@ export default function RootLayout({
           </Suspense>
           <Toaster position="top-right" richColors />
           <CookieConsent />
+          </FavoritesProvider>
         </SessionProvider>
         {/* Inline minimal CSS fallback in case main CSS fails to load on enkelte mobilnettlesere */}
         <noscript>

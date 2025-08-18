@@ -393,18 +393,18 @@ export default function VehicleInfoForm({
           <CardTitle>Tilleggsutstyr</CardTitle>
           <p className="text-sm text-gray-600">Velg tilleggsutstyr som følger med bilen</p>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           
           {/* Forhåndsdefinerte utstyr */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {commonEquipment.map((equipment) => (
-              <div key={equipment} className="flex items-center space-x-2">
+              <div key={equipment} className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
                 <Checkbox
                   id={equipment}
                   checked={(formData.additionalEquipment || []).includes(equipment)}
                   onCheckedChange={() => toggleEquipment(equipment)}
                 />
-                <Label htmlFor={equipment} className="text-sm cursor-pointer">
+                <Label htmlFor={equipment} className="text-sm font-medium cursor-pointer leading-5">
                   {equipment}
                 </Label>
               </div>
@@ -412,12 +412,13 @@ export default function VehicleInfoForm({
           </div>
 
           {/* Egendefinert utstyr */}
-          <div>
-            <Label htmlFor="customEquipment">Legg til annet utstyr</Label>
-            <div className="flex gap-2">
+          <div className="space-y-3">
+            <Label htmlFor="customEquipment" className="text-sm font-medium">Legg til annet utstyr</Label>
+            <div className="flex gap-3">
               <Input
                 id="customEquipment"
                 placeholder="F.eks: Vinterdekk, Takboks..."
+                className="flex-1"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -431,6 +432,7 @@ export default function VehicleInfoForm({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="px-4"
                 onClick={() => {
                   const input = document.getElementById('customEquipment') as HTMLInputElement
                   addCustomEquipment(input.value)

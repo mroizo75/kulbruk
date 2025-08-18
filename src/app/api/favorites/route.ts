@@ -6,7 +6,18 @@ export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const userId = (session.user as any).id as string
-  const favorites = await prisma.favorite.findMany({ where: { userId }, include: { listing: true } })
+  const favorites = await prisma.favorite.findMany({ 
+    where: { userId }, 
+    include: { 
+      listing: { 
+        include: { 
+          category: true, 
+          images: { orderBy: { sortOrder: 'asc' }, take: 1 } 
+        } 
+      } 
+    },
+    orderBy: { createdAt: 'desc' }
+  })
   return NextResponse.json({ favorites })
 }
 
