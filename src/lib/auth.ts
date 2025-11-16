@@ -1,18 +1,19 @@
-import NextAuth, { type NextAuthConfig } from "next-auth"
+import { type NextAuthOptions } from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import GoogleProvider from "next-auth/providers/google"
 import GitHubProvider from "next-auth/providers/github"
 import { prisma } from "./prisma"
 import type { UserRole } from "./types"
-import Credentials from "next-auth/providers/credentials"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { getServerSession } from "next-auth/next"
 
-// Felles NextAuth v5-konfig
-export const authConfig: NextAuthConfig = {
+// NextAuth v4 konfig
+export const authOptions: NextAuthOptions = {
   // Tillat lokale/dev-hosts uten å feile på UntrustedHost
   trustHost: true,
   adapter: PrismaAdapter(prisma),
   providers: [
-    Credentials({
+    CredentialsProvider({
       name: 'Credentials',
       credentials: {
         email: { label: 'E-post', type: 'email' },
@@ -120,11 +121,10 @@ export const authConfig: NextAuthConfig = {
   },
 }
 
-// Eksporter v5 helpers (auth for server, handlers for API route, signIn/signOut klient/server)
-export const { auth, handlers, signIn, signOut } = NextAuth(authConfig)
-
-// Midlertidig kompat-eksport for eksisterende kall som bruker getServerSession(authOptions)
-export const authOptions = authConfig
+// Helper function to get session in server components
+export async function auth() {
+  return await getServerSession(authOptions)
+}
 
 // Hjelpefunksjoner for å erstatte Clerk-funksjonalitet
 export async function getCurrentUser() {

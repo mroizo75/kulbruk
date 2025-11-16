@@ -1,96 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { amadeusClient } from '@/lib/amadeus-client'
+import { ratehawkClient } from '@/lib/ratehawk-client'
+import { RateHawkHotelSearchParams } from '@/lib/types'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
-// POST /api/hotels/search - Søk etter hoteller
 export async function POST(request: NextRequest) {
   try {
+    console.log('🏨 API: Hotel search request received')
+
     const body = await request.json()
-    const { 
-      cityCode,
-      checkInDate, 
-      checkOutDate, 
-      adults = 1, 
-      children = 0,
-      rooms = 1,
-      currency = 'NOK'
-    } = body
+    console.log('🏨 API: Request body:', body)
 
-    // Valider påkrevde felt
-    if (!cityCode || !checkInDate || !checkOutDate) {
+    // Hent user country fra session/database
+    let userCountry: string | null = null
+    try {
+      const session = await getServerSession(authOptions)
+      if (session?.user?.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: session.user.email },
+          select: { location: true }
+        })
+        userCountry = dbUser?.location || null
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not fetch user country:', error)
+    }
+
+    const params: RateHawkHotelSearchParams = {
+      destination: body.destination,
+      checkIn: body.checkIn,
+      checkOut: body.checkOut,
+      adults: body.adults || 2,
+      children: body.children || [],
+      rooms: body.rooms || 1,
+      currency: body.currency || 'NOK'
+    }
+
+    console.log('🏨 API: Searching hotels with params:', params, 'userCountry:', userCountry)
+
+    const result = await ratehawkClient.searchHotels(params, userCountry)
+
+    console.log('🏨 API: Search completed, hotels found:', result.hotels?.length || 0)
+
+    // Hvis søket feilet, returner feilmelding med riktig status code
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'cityCode, checkInDate og checkOutDate er påkrevd' },
-        { status: 400 }
+        {
+          success: false,
+          error: result.error || 'Hotel search failed',
+          technicalError: result.technicalError,
+          hotels: [],
+          totalResults: 0
+        },
+        { status: 400 } // 400 Bad Request for brukerfeil, ikke 500
       )
     }
 
-    console.log('🏨 Søker etter hoteller:', { cityCode, checkInDate, checkOutDate, adults, rooms })
+    return NextResponse.json(result)
 
-    const result = await amadeusClient.searchHotels({
-      cityCode,
-      checkInDate,
-      checkOutDate,
-      adults,
-      children,
-      rooms,
-      currency
-    })
-
-    if (result.success) {
-      // Format hotel offers for frontend
-      const formattedOffers = result.data?.map((offer: any) => ({
-        id: offer.id,
-        hotel: {
-          hotelId: offer.hotel?.hotelId,
-          name: offer.hotel?.name,
-          rating: offer.hotel?.rating,
-          contact: offer.hotel?.contact,
-          address: offer.hotel?.address,
-          distance: offer.hotel?.distance
-        },
-        available: offer.available,
-        offers: offer.offers?.map((hotelOffer: any) => ({
-          id: hotelOffer.id,
-          checkInDate: hotelOffer.checkInDate,
-          checkOutDate: hotelOffer.checkOutDate,
-          rateCode: hotelOffer.rateCode,
-          room: hotelOffer.room,
-          guests: hotelOffer.guests,
-          price: {
-            currency: hotelOffer.price?.currency,
-            base: hotelOffer.price?.base,
-            total: hotelOffer.price?.total,
-            taxes: hotelOffer.price?.taxes,
-            formattedNOK: `${Math.round(parseFloat(hotelOffer.price?.total || '0'))} kr`
-          },
-          policies: hotelOffer.policies,
-          self: hotelOffer.self
-        })),
-        self: offer.self
-      })) || []
-
-      return NextResponse.json({
-        success: true,
-        offers: formattedOffers,
-        meta: result.meta,
-        message: `Fant ${formattedOffers.length} hoteller i ${cityCode}`
-      })
-    } else {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: result.error,
-          code: result.code 
-        },
-        { status: 400 }
-      )
+  } catch (error: any) {
+    console.error('❌ API: Hotel search error:', error)
+    
+    // Parse feilmelding for bedre brukeropplevelse
+    let userFriendlyError = 'Kunne ikke søke etter hoteller'
+    if (error.message?.includes('region') || error.message?.includes('cannot be searched')) {
+      userFriendlyError = 'Denne destinasjonen kan ikke søkes. Prøv Oslo eller test hotel (ID: 8473727).'
     }
-
-  } catch (error) {
-    console.error('Hotel search error:', error)
+    
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'En feil oppstod under hotellsøket' 
+      {
+        success: false,
+        error: userFriendlyError,
+        technicalError: error.message || 'Unknown error',
+        hotels: [],
+        totalResults: 0
       },
       { status: 500 }
     )

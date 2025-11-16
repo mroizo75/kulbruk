@@ -1,16 +1,11 @@
-import { auth } from "@/lib/auth-edge"
 import { NextRequest, NextResponse } from 'next/server'
 import { getCategoryRedirect } from './lib/category-mapper'
 import * as Sentry from '@sentry/nextjs'
 
-// Ruter som krever autentisering
-const protectedRoutes = [
-  '/dashboard',
-  '/opprett',
-  '/complete-business-setup'
-]
+// Note: Auth sjekk er flyttet til komponenter/server-side for Edge Runtime kompatibilitet
+// next-auth v4 fungerer ikke i Edge Runtime (middleware)
 
-export default auth((req) => {
+export default function middleware(req: NextRequest) {
   // Håndter kategori-redirects først
   try {
     const categoryRedirect = handleCategoryRedirects(req)
@@ -21,23 +16,13 @@ export default auth((req) => {
     Sentry.captureException(err)
   }
 
-  // Beskytt ruter manuelt: hvis match på protectedRoutes og ikke session -> redirect
-  const isProtected = protectedRoutes.some((route) => req.nextUrl.pathname.startsWith(route))
-  // @ts-expect-error: auth wrapper legger session på request
-  const session = req.auth
-  if (isProtected && !session?.user) {
-    const url = new URL('/sign-in', req.nextUrl)
-    url.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search)
-    return NextResponse.redirect(url)
-  }
-
   try {
     return NextResponse.next()
   } catch (err) {
     Sentry.captureException(err)
     return NextResponse.next()
   }
-})
+}
 
 function handleCategoryRedirects(req: NextRequest): NextResponse | null {
   const { pathname } = req.nextUrl

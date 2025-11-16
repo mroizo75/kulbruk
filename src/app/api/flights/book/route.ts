@@ -8,13 +8,25 @@ import { sendBookingConfirmationEmail, sendBookingSMS } from '@/lib/resend'
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    const userId = (session?.user as any)?.id
-    
+    let userId = (session?.user as any)?.id
+
+    // Hvis ikke logget inn, opprett en gjestebruker automatisk
+    let isGuestUser = false
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Ikke autentisert. Logg inn for å booke flyreiser.' },
-        { status: 401 }
-      )
+      try {
+        // TODO: Implementer gjestebruker opprettelse med database
+        // For nå, returner feil
+        return NextResponse.json(
+          { error: 'Automatisk kontoopprettelse ikke implementert ennå. Logg inn for å booke flyreiser.' },
+          { status: 401 }
+        )
+      } catch (guestError) {
+        console.error('Failed to create guest user:', guestError)
+        return NextResponse.json(
+          { error: 'Kunne ikke opprette gjestebruker. Prøv igjen eller logg inn.' },
+          { status: 500 }
+        )
+      }
     }
 
     const body = await request.json()

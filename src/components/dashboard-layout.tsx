@@ -22,7 +22,8 @@ import {
   Gavel,
   Target,
   Bell,
-  Database
+  Database,
+  Hotel
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -76,6 +77,7 @@ export default function DashboardLayout({ children, userRole = 'customer' }: Das
     { name: 'Dashboard', href: '/dashboard/customer', icon: Home },
     { name: 'Legg ut annonse', href: '/opprett', icon: Plus },
     { name: 'Mine annonser', href: '/dashboard/customer/annonser', icon: FileText },
+    { name: 'Hotellbookinger', href: '/dashboard/customer/hotellbookinger', icon: Hotel },
     { name: 'Meldinger', href: '/dashboard/customer/meldinger', icon: MessageSquare },
     { name: 'Favoritter', href: '/dashboard/customer/favoritter', icon: Heart },
     { name: 'Lagrede søk', href: '/dashboard/customer/lagrede-sok', icon: Search },

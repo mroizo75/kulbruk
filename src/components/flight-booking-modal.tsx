@@ -443,30 +443,16 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
             </div>
             
             {!session?.user && (
-              <Card className="mb-6 border-blue-200 bg-blue-50">
+              <Card className="mb-6 border-green-200 bg-green-50">
                 <CardContent className="pt-6">
                   <div className="text-center">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <User className="h-6 w-6 text-blue-600" />
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Check className="h-6 w-6 text-green-600" />
                     </div>
-                    <h4 className="font-semibold text-blue-900 mb-2">Logg inn for å fullføre booking</h4>
-                    <p className="text-sm text-blue-700 mb-4">
-                      Du må være logget inn for å fullføre booking og motta billetter på e-post.
+                    <h4 className="font-semibold text-green-900 mb-2">Konto opprettes automatisk</h4>
+                    <p className="text-sm text-green-700">
+                      Vi oppretter en konto for deg automatisk når du fullfører bookingen.
                     </p>
-                    <div className="flex gap-2 justify-center">
-                      <Button 
-                        onClick={() => window.location.href = '/sign-in'}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        Logg inn
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        onClick={() => window.location.href = '/sign-up'}
-                      >
-                        Opprett konto
-                      </Button>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -581,9 +567,9 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
               <Button variant="outline" onClick={() => setStep('contact')}>
                 Tilbake
               </Button>
-              <Button 
+              <Button
                 onClick={handleBooking}
-                disabled={isLoading || !session?.user}
+                disabled={isLoading}
                 className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
               >
                 {isLoading ? (
@@ -591,8 +577,6 @@ export function FlightBookingModal({ isOpen, onClose, flightOffer, passengers }:
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Booker...
                   </>
-                ) : !session?.user ? (
-                  'Logg inn for å booke'
                 ) : (
                   'Bekreft Booking'
                 )}

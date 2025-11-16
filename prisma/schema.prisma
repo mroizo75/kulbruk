@@ -30,6 +30,7 @@ model User {
   listings       Listing[]
   bids           Bid[]
   flightBookings FlightBooking[]
+  hotelBookings  HotelBooking[]
   payments       Payment[]
   subscription   Subscription?
   accounts       Account[]
@@ -1275,4 +1276,47 @@ model SellerStripeAccount {
   @@index([userId])
   @@index([stripeAccountId])
   @@map("seller_stripe_accounts")
+}
+
+model HotelBooking {
+  id                String   @id @default(cuid())
+  userId            String
+  bookingId         String   @unique // RateHawk booking ID (order_id)
+  confirmationCode  String   @unique // Partner order ID
+  matchHash         String   // RateHawk match_hash for the room
+  hcn               String?  // Hotel Confirmation Number (HCN) - tilsvarer PNR for fly
+  
+  // Payment
+  paymentIntentId   String?  // Stripe Payment Intent ID
+  
+  // Guest information
+  guestFirstName    String
+  guestLastName     String
+  guestEmail        String
+  guestPhone        String
+  
+  // Booking details
+  checkIn           DateTime?
+  checkOut          DateTime?
+  adults            Int?
+  children          Int?
+  rooms             Int?
+  totalPrice        Float?
+  currency          String?  @default("NOK")
+  
+  // Status
+  status            String   @default("pending") // pending, confirmed, cancelled
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([bookingId])
+  @@index([confirmationCode])
+  @@index([status])
+  @@index([hcn])
+  @@map("hotel_bookings")
 }

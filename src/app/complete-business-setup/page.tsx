@@ -61,10 +61,10 @@ export default function CompleteBusinessSetupPage() {
           return
         }
 
-        // Pre-fill med brukerdata fra Clerk
+        // Pre-fill med brukerdata
         setFormData(prev => ({
           ...prev,
-          phone: session.user?.phone || ''
+          phone: (session.user as any)?.phone || ''
         }))
 
         console.log('Business setup ikke komplett - viser form')
@@ -76,7 +76,7 @@ export default function CompleteBusinessSetupPage() {
         // Fortsett med å vise skjema selv om API feiler
         setFormData(prev => ({
           ...prev,
-          phone: session.user?.phone || ''
+          phone: (session.user as any)?.phone || ''
         }))
       } finally {
         setIsCheckingUser(false)
@@ -193,7 +193,7 @@ export default function CompleteBusinessSetupPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <CheckCircle className="h-6 w-6 text-green-600 mr-2" />
-              <span className="text-sm font-medium text-green-600">Clerk-konto opprettet</span>
+              <span className="text-sm font-medium text-green-600">Konto opprettet</span>
             </div>
             <ArrowRight className="h-4 w-4 text-gray-400" />
             <div className="flex items-center">
@@ -373,7 +373,7 @@ export default function CompleteBusinessSetupPage() {
                   type="button" 
                   variant="outline" 
                   onClick={() => {
-                    // Set en flag i Clerk metadata om at brukeren hoppet over
+                    // Marker at brukeren hoppet over business setup
                     fetch('/api/user/skip-business-setup', { 
                       method: 'POST',
                       credentials: 'include'

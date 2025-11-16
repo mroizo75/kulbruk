@@ -5,21 +5,22 @@ class AmadeusClient {
   private client: Amadeus
 
   constructor() {
-    const clientId = process.env.FLIGHT_API_KEY
-    const clientSecret = process.env.FLIGHT_API_SECRET
+    const clientId = process.env.AMADEUS_CLIENT_ID
+    const clientSecret = process.env.AMADEUS_CLIENT_SECRET
     
     // Debug logging (fjern i produksjon)
     console.log('🔧 Amadeus Client Init:', {
       clientId: clientId ? `${clientId.substring(0, 6)}...` : 'MISSING',
       clientSecret: clientSecret ? `${clientSecret.substring(0, 6)}...` : 'MISSING',
+      hostname: 'test',
       env: process.env.NODE_ENV,
       nodeEnv: typeof process !== 'undefined' ? 'Server' : 'Client'
     })
 
     if (!clientId || !clientSecret) {
       const error = `❌ Amadeus API credentials missing:
-      - FLIGHT_API_KEY: ${clientId ? 'SET' : 'MISSING'}
-      - FLIGHT_API_SECRET: ${clientSecret ? 'SET' : 'MISSING'}
+      - AMADEUS_CLIENT_ID: ${clientId ? 'SET' : 'MISSING'}
+      - AMADEUS_CLIENT_SECRET: ${clientSecret ? 'SET' : 'MISSING'}
       
       Sjekk at begge er satt i .env.local filen.`
       
@@ -31,16 +32,16 @@ class AmadeusClient {
       this.client = new Amadeus({
         clientId,
         clientSecret,
-        hostname: 'production' // Bytte til produksjon for realistiske priser
+        hostname: 'test' // Bruk test environment først
       })
-      console.log('✅ Amadeus client successfully initialized')
+      console.log('✅ Amadeus client successfully initialized (test environment)')
     } catch (error) {
       console.error('❌ Failed to initialize Amadeus client:', error)
       throw new Error('Kunne ikke initialisere Amadeus API client')
     }
   }
 
-  // Søk etter flybilletter
+  // Søk etter flybilletter (test environment - begrenset til enkelte flyselskaper)
   async searchFlights(params: FlightOffersSearchGetParams) {
     try {
       console.log('🔍 Amadeus Flight Search Parameters:', params)
@@ -71,20 +72,34 @@ class AmadeusClient {
     }
   }
 
-  // Søk flyplasser basert på nøkkelord
+  // Søk flyplasser basert på nøkkelord (test environment)
   async searchAirports(keyword: string) {
     try {
+      console.log('🔍 Amadeus Airport Search - keyword:', keyword)
+
+      // Prøv med forskjellige subType verdier som dokumentasjonen viser
       const response = await this.client.referenceData.locations.get({
         keyword,
-        subType: 'AIRPORT'
+        subType: 'AIRPORT,CITY' // Prøv både AIRPORT og CITY
       })
-      
+
+      console.log('✅ Amadeus Airport Search Success:', {
+        count: response.data?.length || 0,
+        firstResult: response.data?.[0]
+      })
+
       return {
         success: true,
         data: response.data
       }
-    } catch (error) {
-      console.error('Amadeus Airport Search Error:', error)
+    } catch (error: any) {
+      console.error('❌ Amadeus Airport Search Error:', {
+        message: error.message,
+        code: error.code,
+        description: error.description,
+        response: error.response?.body || error.response,
+        status: error.response?.statusCode
+      })
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

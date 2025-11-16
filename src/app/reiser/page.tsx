@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import FlightSearchForm from '@/components/flight-search-form'
+import FlightSearchFormSkyscanner from '@/components/flight-search-form-skyscanner'
 import FlightFilters, { FlightFilters as FlightFiltersType } from '@/components/flight-filters'
 import { FlightBookingModal } from '@/components/flight-booking-modal'
 import { Card, CardContent } from '@/components/ui/card'
@@ -469,7 +469,7 @@ export default function ReiserPage() {
       {/* Hero Section med søkeskjema */}
       <div className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
+            <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold text-gray-900 mb-4">Reise</h1>
@@ -479,9 +479,7 @@ export default function ReiserPage() {
             </div>
 
             {/* Search Form Container */}
-            <div className="bg-white rounded-lg shadow-lg border p-6">
-              <FlightSearchForm onSearch={handleSearch} isLoading={isSearching} />
-            </div>
+            <FlightSearchFormSkyscanner onSearch={handleSearch} isLoading={isSearching} />
           </div>
         </div>
       </div>

@@ -6,19 +6,44 @@ import { stripe, getListingPrice, PRICING } from '@/lib/stripe'
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session?.user) {
+    
+    const body = await request.json()
+    const { categorySlug, listingId, type, pendingListingData, amount, currency, description, metadata } = body
 
+    // Hvis dette er en hotell-betaling (har amount og description)
+    if (amount && description && metadata?.type === 'hotel') {
+      console.log('💳 Creating hotel payment intent:', { amount, currency, description })
+
+      // Opprett Stripe Payment Intent for hotell
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency: currency || 'nok',
+        description,
+        metadata: metadata || {},
+        automatic_payment_methods: {
+          enabled: true,
+          allow_redirects: 'never',
+        },
+      })
+
+      console.log('✅ Hotel payment intent created:', paymentIntent.id)
+
+      return NextResponse.json({
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: amount / 100,
+        description,
+      })
+    }
+
+    // Standard listing-betaling - krever autentisering
+    if (!session?.user) {
       return NextResponse.json({ error: 'Ikke autentisert' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { categorySlug, listingId, type, pendingListingData } = body
-
-
-
-    // Valider input
+    // Valider input for listing
     if (!categorySlug || !type) {
-
       return NextResponse.json({ error: 'Mangler påkrevde felter' }, { status: 400 })
     }
 
@@ -31,22 +56,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Bruker ikke funnet' }, { status: 404 })
     }
 
-    let amount: number
-    let description: string
+    let listingAmount: number
+    let listingDescription: string
     let paymentType: 'LISTING_FEE' | 'SUBSCRIPTION'
     let pricing: any = null
 
     if (type === 'listing') {
       // Annonse-betaling
       pricing = getListingPrice(categorySlug)
-      amount = pricing.amount
-      description = pricing.description
+      listingAmount = pricing.amount
+      listingDescription = pricing.description
       paymentType = 'LISTING_FEE'
 
 
 
       // Hvis gratis annonse (Torget), ikke opprett Payment Intent
-      if (amount === 0) {
+      if (listingAmount === 0) {
 
         return NextResponse.json({ 
           success: true, 
@@ -78,9 +103,9 @@ export async function POST(request: NextRequest) {
 
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount,
+      amount: listingAmount,
       currency: 'nok',
-      description,
+      description: listingDescription,
       metadata: {
         userId: user.id,
         id: session.user.id,
@@ -117,9 +142,9 @@ export async function POST(request: NextRequest) {
       data: {
         stripePaymentIntentId: paymentIntent.id,
         userId: user.id,
-        amount: amount / 100, // Konverter øre til kroner
+        amount: listingAmount / 100, // Konverter øre til kroner
         currency: 'NOK',
-        description,
+        description: listingDescription,
         type: paymentType,
         listingId: listingId || null,
         status: 'PENDING',
@@ -131,8 +156,8 @@ export async function POST(request: NextRequest) {
       success: true,
       clientSecret: paymentIntent.client_secret,
       paymentId: payment.id,
-      amount: amount / 100,
-      description,
+      amount: listingAmount / 100,
+      description: listingDescription,
     })
 
   } catch (error) {
