@@ -352,7 +352,8 @@ class RateHawkClient {
       console.log('🏨 Processing first 20 hotels only')
       
       if (limitedHotelData && Array.isArray(limitedHotelData) && limitedHotelData.length > 0) {
-        limitedHotelData.forEach((hotel: any) => {
+        // Prosesser hoteller parallelt for bedre ytelse
+        const hotelPromises = limitedHotelData.map(async (hotel: any) => {
           // RateHawk returnerer hoteller med rates array
           // Finn billigste rate for å vise pris
           let minPrice = 0
@@ -371,19 +372,69 @@ class RateHawkClient {
             currency = cheapestRate.payment_options?.payment_types?.[0]?.currency_code || 'NOK'
           }
           
-          // Bruk data fra søkeresultatet direkte (raskere enn dump)
-          // Hvis vi trenger mer detaljer, bruk /hotel/info/ endpoint lazy
-          const hotelName = hotel.name || hotel.hotel_name || 'Hotel ID: ' + (hotel.id || hotel.hid)
+          // Hent statisk info fra /hotel/info/ for bedre data (stjerner, adresse, amenities)
+          const hotelId = hotel.id || hotel.hid
+          let staticInfo: any = null
           
-          // Adresse fra søkeresultatet eller fallback
-          const hotelAddress = hotel.address || hotel.location?.address || 'Address not available'
+          if (hotelId) {
+            try {
+              staticInfo = await this.getHotelStaticInfo(hotelId.toString(), typeof hotelId === 'number' ? hotelId : undefined)
+            } catch (error) {
+              logger.warn('Could not fetch static info for hotel', {
+                hotelId,
+                error: error instanceof Error ? error.message : String(error)
+              })
+              // Fortsett med søkeresultat-data hvis static info feiler
+            }
+          }
           
-          // Bilde fra søkeresultatet eller fallback
-          const hotelImage = hotel.image || hotel.images?.[0]?.url || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80'
+          // Bruk statisk info hvis tilgjengelig, ellers fallback til søkeresultat
+          const hotelName = staticInfo?.name || staticInfo?.hotel_name || hotel.name || hotel.hotel_name || 'Hotel ID: ' + hotelId
           
-          // Amenities fra søkeresultatet (begrenset, men raskt)
+          // Adresse fra statisk info eller søkeresultat
+          let hotelAddress = 'Address not available'
+          if (staticInfo) {
+            hotelAddress = [
+              staticInfo.address,
+              staticInfo.city?.name,
+              staticInfo.region?.name,
+              staticInfo.region?.country_name || staticInfo.country?.name
+            ].filter(Boolean).join(', ') || staticInfo.address || 'Address not available'
+          } else {
+            hotelAddress = hotel.address || hotel.location?.address || 'Address not available'
+          }
+          
+          // Bilde fra statisk info eller søkeresultat
+          const hotelImage = staticInfo?.images?.[0]?.url || 
+                            hotel.image || 
+                            hotel.images?.[0]?.url || 
+                            'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80'
+          
+          // Stjerner fra statisk info eller søkeresultat
+          const starRating = staticInfo?.star_rating || 
+                            staticInfo?.stars || 
+                            hotel.star_rating || 
+                            hotel.stars || 
+                            0
+          
+          // Amenities fra statisk info eller søkeresultat
           const allAmenities: string[] = []
-          if (hotel.amenities && Array.isArray(hotel.amenities)) {
+          
+          // Først fra statisk info (mer komplett)
+          if (staticInfo?.amenities && Array.isArray(staticInfo.amenities)) {
+            staticInfo.amenities.forEach((amenity: any) => {
+              if (typeof amenity === 'string') {
+                allAmenities.push(amenity)
+              } else if (amenity.name) {
+                allAmenities.push(amenity.name)
+              } else if (amenity.amenity_name) {
+                allAmenities.push(amenity.amenity_name)
+              }
+            })
+          }
+          
+          // Hvis ikke nok amenities fra statisk info, legg til fra søkeresultat
+          if (allAmenities.length === 0 && hotel.amenities && Array.isArray(hotel.amenities)) {
             hotel.amenities.forEach((amenity: any) => {
               if (typeof amenity === 'string') {
                 allAmenities.push(amenity)
@@ -393,18 +444,15 @@ class RateHawkClient {
             })
           }
           
-          // Hvis vi trenger mer detaljer, kan vi lazy-load fra dump eller /hotel/info/
-          // Men for søkeresultater er dette nok
-          
           // Legg til bestillingsgebyr (7% markup for Kulbruk.no)
           const BOOKING_FEE_PERCENT = 7 // 7% bestillingsgebyr - konkurransedyktig
           const priceWithFee = minPrice * (1 + BOOKING_FEE_PERCENT / 100)
           
-          hotels.push({
-            id: hotel.id || hotel.hid?.toString() || '',
+          return {
+            id: hotelId?.toString() || '',
             name: hotelName,
             address: hotelAddress,
-            rating: hotel.star_rating || hotel.stars || 0,
+            rating: starRating,
             price: {
               amount: Math.round(priceWithFee),
               currency: currency,
@@ -413,8 +461,12 @@ class RateHawkClient {
             image: hotelImage,
             amenities: allAmenities,
             distance: hotel.distance || '0 km'
-          })
+          }
         })
+        
+        // Vent på alle hoteller å bli prosessert
+        const processedHotels = await Promise.all(hotelPromises)
+        hotels.push(...processedHotels)
       }
 
       console.log('🏨 Parsed hotels sample:', hotels.slice(0, 2))
