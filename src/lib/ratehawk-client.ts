@@ -173,8 +173,6 @@ class RateHawkClient {
       'denmark': 'dk',
       'danmark': 'dk',
       'dk': 'dk',
-      'finland': 'fi',
-      'finland': 'fi',
       'fi': 'fi',
       'united states': 'us',
       'usa': 'us',
@@ -236,12 +234,14 @@ class RateHawkClient {
       let searchMethod = 'unknown'
       let lastError: any = null
       
-      // Hvis vi søker etter test hotel direkte, bruk hotel ID søk
-      if (params.destination === '8473727') {
-        console.log('🏨 Searching by hotel ID:', params.destination)
+      // Hvis region ID er et stort tall (> 10M), er det sannsynligvis et hotel ID
+      const isHotelId = parseInt(regionId) > 10000000 || regionId === '8473727' || regionId === 'test_hotel_do_not_book'
+      
+      if (isHotelId) {
+        console.log('🏨 Searching by hotel ID:', regionId)
         searchMethod = 'hotel_ids'
         const hotelParams = {
-          hids: [parseInt(params.destination)],
+          hids: [parseInt(regionId)],
           checkin: params.checkIn,
           checkout: params.checkOut,
           residency: residency,
@@ -253,7 +253,8 @@ class RateHawkClient {
           data = await this.makeRequest('/search/serp/hotels/', hotelParams, 'POST')
         } catch (error: any) {
           lastError = error
-          console.warn('⚠️ Hotel ID search failed, trying fallback:', error.message)
+          console.warn('⚠️ Hotel ID search failed:', error.message)
+          throw error // Hvis hotel søk feiler, kast error
         }
       } else {
         // FØRST: Prøv REGION søk
@@ -354,9 +355,16 @@ class RateHawkClient {
       if (limitedHotelData && Array.isArray(limitedHotelData) && limitedHotelData.length > 0) {
         // Prosesser hoteller parallelt for bedre ytelse
         const hotelPromises = limitedHotelData.map(async (hotel: any) => {
+          // Beregn antall netter
+          const checkInDate = new Date(params.checkIn)
+          const checkOutDate = new Date(params.checkOut)
+          const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24))
+          
+          console.log('📅 Beregner pris for', nights, 'netter')
+          
           // RateHawk returnerer hoteller med rates array
           // Finn billigste rate for å vise pris
-          let minPrice = 0
+          let totalPrice = 0
           let currency = 'NOK'
           
           if (hotel.rates && hotel.rates.length > 0) {
@@ -368,9 +376,23 @@ class RateHawkClient {
             })
             
             const cheapestRate = sortedRates[0]
-            minPrice = parseFloat(cheapestRate.payment_options?.payment_types?.[0]?.amount || '0')
+            totalPrice = parseFloat(cheapestRate.payment_options?.payment_types?.[0]?.amount || '0')
             currency = cheapestRate.payment_options?.payment_types?.[0]?.currency_code || 'NOK'
           }
+          
+          // Legg til bestillingsgebyr (7% markup for Kulbruk.no)
+          const BOOKING_FEE_PERCENT = 7
+          const totalPriceWithFee = totalPrice * (1 + BOOKING_FEE_PERCENT / 100)
+          
+          // Beregn pris per natt
+          const pricePerNight = nights > 0 ? totalPriceWithFee / nights : totalPriceWithFee
+          
+          console.log('💰 Prisberegning:', {
+            totalPrice,
+            totalPriceWithFee: totalPriceWithFee.toFixed(2),
+            nights,
+            pricePerNight: pricePerNight.toFixed(2)
+          })
           
           // Hent statisk info fra /hotel/info/ for bedre data (stjerner, adresse, amenities)
           const hotelId = hotel.id || hotel.hid
@@ -405,10 +427,32 @@ class RateHawkClient {
           }
           
           // Bilde fra statisk info eller søkeresultat
-          const hotelImage = staticInfo?.images?.[0]?.url || 
-                            hotel.image || 
-                            hotel.images?.[0]?.url || 
-                            'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80'
+          let hotelImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%23ddd" width="800" height="450"/%3E%3Ctext fill="%23999" font-family="Arial" font-size="32" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3EIngen bilde%3C/text%3E%3C/svg%3E'
+          
+          // 1. Fra statisk info (best kvalitet)
+          if (staticInfo?.images && Array.isArray(staticInfo.images) && staticInfo.images.length > 0) {
+            // RateHawk returnerer images som array av strings (URLs) eller objekter
+            const firstImage = staticInfo.images[0]
+            if (typeof firstImage === 'string') {
+              // Direkte URL string - erstatt {size} placeholder med faktisk størrelse
+              hotelImage = firstImage.replace('{size}', '1024x768')
+            } else if (firstImage?.url) {
+              // Objekt med url property
+              hotelImage = firstImage.url.replace('{size}', '1024x768')
+            }
+          }
+          
+          // 2. Fra søkeresultat hotel object (fallback)
+          if (hotelImage.startsWith('data:image')) {
+            if (hotel.image) {
+              hotelImage = typeof hotel.image === 'string' ? hotel.image : hotel.image.url || hotel.image
+            } else if (hotel.images && Array.isArray(hotel.images) && hotel.images.length > 0) {
+              const firstImage = hotel.images[0]
+              hotelImage = typeof firstImage === 'string' ? firstImage : (firstImage.url || firstImage)
+            }
+          }
+          
+          console.log('🖼️ Hotel', hotelId, 'image:', hotelImage.substring(0, 100))
           
           // Stjerner fra statisk info eller søkeresultat
           const starRating = staticInfo?.star_rating || 
@@ -417,36 +461,89 @@ class RateHawkClient {
                             hotel.stars || 
                             0
           
-          // Amenities fra statisk info eller søkeresultat
+          // Amenities fra søkeresultat eller statisk info
           const allAmenities: string[] = []
           
-          // Først fra statisk info (mer komplett)
+          // 1. Fra statisk info amenity_groups FØRST (mest komplette data)
+          if (staticInfo?.amenity_groups && Array.isArray(staticInfo.amenity_groups)) {
+            staticInfo.amenity_groups.forEach((group: any) => {
+              if (group.amenities && Array.isArray(group.amenities)) {
+                group.amenities.forEach((amenity: any) => {
+                  const amenityName = typeof amenity === 'string' ? amenity : (amenity.name || amenity.amenity_name)
+                  if (amenityName && !allAmenities.includes(this.formatAmenityName(amenityName))) {
+                    allAmenities.push(this.formatAmenityName(amenityName))
+                  }
+                })
+              }
+            })
+          }
+          
+          // 2. Fra søkeresultat rates (rom-spesifikke amenities)
+          if (hotel.rates && hotel.rates.length > 0) {
+            const cheapestRate = hotel.rates[0]
+            if (cheapestRate.amenities_data && Array.isArray(cheapestRate.amenities_data)) {
+              cheapestRate.amenities_data.forEach((amenity: string) => {
+                const formatted = this.formatAmenityName(amenity)
+                if (!allAmenities.includes(formatted)) {
+                  allAmenities.push(formatted)
+                }
+              })
+            }
+          }
+          
+          // 3. Fra hotell-nivå amenities
+          if (hotel.amenities && Array.isArray(hotel.amenities)) {
+            hotel.amenities.forEach((amenity: any) => {
+              const amenityName = typeof amenity === 'string' ? amenity : (amenity.name || amenity.amenity_name)
+              if (amenityName && !allAmenities.includes(this.formatAmenityName(amenityName))) {
+                allAmenities.push(this.formatAmenityName(amenityName))
+              }
+            })
+          }
+          
+          // 4. Fra statisk info flat amenities list (fallback)
           if (staticInfo?.amenities && Array.isArray(staticInfo.amenities)) {
             staticInfo.amenities.forEach((amenity: any) => {
-              if (typeof amenity === 'string') {
-                allAmenities.push(amenity)
-              } else if (amenity.name) {
-                allAmenities.push(amenity.name)
-              } else if (amenity.amenity_name) {
-                allAmenities.push(amenity.amenity_name)
+              const amenityName = typeof amenity === 'string' ? amenity : (amenity.name || amenity.amenity_name)
+              if (amenityName && !allAmenities.includes(this.formatAmenityName(amenityName))) {
+                allAmenities.push(this.formatAmenityName(amenityName))
               }
             })
           }
           
-          // Hvis ikke nok amenities fra statisk info, legg til fra søkeresultat
-          if (allAmenities.length === 0 && hotel.amenities && Array.isArray(hotel.amenities)) {
-            hotel.amenities.forEach((amenity: any) => {
-              if (typeof amenity === 'string') {
-                allAmenities.push(amenity)
-              } else if (amenity.name) {
-                allAmenities.push(amenity.name)
+          // 5. Legg til måltid som amenity hvis inkludert
+          if (hotel.rates && hotel.rates.length > 0) {
+            const cheapestRate = hotel.rates[0]
+            if (cheapestRate.meal_data?.has_breakfast) {
+              if (!allAmenities.some(a => a.toLowerCase().includes('breakfast') || a.toLowerCase().includes('frokost'))) {
+                allAmenities.push('Frokost inkludert')
               }
-            })
+            }
           }
           
-          // Legg til bestillingsgebyr (7% markup for Kulbruk.no)
-          const BOOKING_FEE_PERCENT = 7 // 7% bestillingsgebyr - konkurransedyktig
-          const priceWithFee = minPrice * (1 + BOOKING_FEE_PERCENT / 100)
+          // Formater avstand - vis avstand fra sentrum hvis tilgjengelig
+          let distanceText = 'Sentrum'
+          if (hotel.distance) {
+            // RateHawk returnerer avstand som string eller number i km
+            const distanceValue = typeof hotel.distance === 'string' 
+              ? parseFloat(hotel.distance) 
+              : hotel.distance
+            
+            if (distanceValue > 0) {
+              if (distanceValue < 1) {
+                distanceText = `${Math.round(distanceValue * 1000)}m fra sentrum`
+              } else {
+                distanceText = `${distanceValue.toFixed(1)}km fra sentrum`
+              }
+            }
+          } else if (staticInfo?.facts?.beach_distance) {
+            // Vis avstand til strand hvis tilgjengelig
+            const beachDist = staticInfo.facts.beach_distance
+            distanceText = `${beachDist}m til strand`
+          } else if (staticInfo?.location?.geo) {
+            // Fallback til koordinater hvis ingen avstand
+            distanceText = 'Se kart for plassering'
+          }
           
           return {
             id: hotelId?.toString() || '',
@@ -454,13 +551,16 @@ class RateHawkClient {
             address: hotelAddress,
             rating: starRating,
             price: {
-              amount: Math.round(priceWithFee),
+              amount: Math.round(pricePerNight),
               currency: currency,
-              perNight: true
+              perNight: true,
+              totalPrice: Math.round(totalPriceWithFee),
+              nights: nights
             },
             image: hotelImage,
+            images: this.parseAllImages(staticInfo?.images), // Alle bilder for galleriet
             amenities: allAmenities,
-            distance: hotel.distance || '0 km'
+            distance: distanceText
           }
         })
         
@@ -475,11 +575,8 @@ class RateHawkClient {
         success: true,
         hotels: hotels,
         searchId: data?.data?.search_id || data?.search_id || `search_${Date.now()}`,
-        totalResults: hotelData.length,
-        // Send med fallback-info hvis det er en fallback
-        _fallback: data?._fallback || false,
-        _fallback_reason: data?._fallback_reason || null
-      }
+        totalResults: hotelData.length
+      } as RateHawkHotelSearchResponse
 
     } catch (error: any) {
       console.error('❌ RateHawk Hotel Search Error:', error)
@@ -504,9 +601,9 @@ class RateHawkClient {
         error: userFriendlyError,
         technicalError: errorMessage,
         hotels: [],
-        searchId: null,
+        searchId: '',
         totalResults: 0
-      }
+      } as RateHawkHotelSearchResponse
     }
   }
 
@@ -567,6 +664,7 @@ class RateHawkClient {
     try {
       const fs = await import('fs')
       const path = await import('path')
+      // @ts-ignore - simple-zstd doesn't have types
       const zstd = await import('simple-zstd')
       
       // Dump lagres i /dump mappen
@@ -692,8 +790,8 @@ class RateHawkClient {
           }
         }
         
-        stream.on('data', (chunk: string) => {
-          buffer += chunk
+        stream.on('data', (chunk: string | Buffer) => {
+          buffer += chunk.toString()
           readLineByLine()
         })
         
@@ -752,6 +850,14 @@ class RateHawkClient {
       console.log('🏨 Fetching static hotel info from /hotel/info/:', params)
       const data = await this.makeRequest('/hotel/info/', params, 'POST')
       
+      console.log('🏨 Static info response for', params.id || params.hid, ':', {
+        hasData: !!data?.data,
+        hasImages: !!data?.data?.images,
+        imagesCount: data?.data?.images?.length || 0,
+        hasAmenities: !!data?.data?.amenities,
+        amenitiesCount: data?.data?.amenities?.length || 0
+      })
+      
       if (data?.data) {
         return data.data
       }
@@ -763,13 +869,244 @@ class RateHawkClient {
     }
   }
 
+  // Parse alle bilder fra RateHawk images array
+  private parseAllImages(images: any[] | undefined): string[] {
+    if (!images || !Array.isArray(images)) {
+      return []
+    }
+
+    const parsedImages: string[] = []
+    
+    for (const img of images) {
+      if (typeof img === 'string') {
+        // Direkte URL string - erstatt {size} placeholder
+        parsedImages.push(img.replace('{size}', '1024x768'))
+      } else if (img?.url) {
+        // Objekt med url property
+        parsedImages.push(img.url.replace('{size}', '1024x768'))
+      }
+    }
+
+    return parsedImages
+  }
+
+  // Parse amenity groups fra hotel static info
+  private parseAmenityGroups(amenityGroups: any[] | undefined): any[] {
+    if (!amenityGroups || !Array.isArray(amenityGroups)) {
+      return []
+    }
+
+    return amenityGroups.map(group => ({
+      group_name: this.translateAmenityGroupName(group.group_name || 'Andre'),
+      amenities: (group.amenities || []).map((amenity: any) => ({
+        name: this.formatAmenityName(amenity.name || amenity.amenity_name || amenity),
+        icon: this.getAmenityIcon(amenity.name || amenity.amenity_name || amenity)
+      }))
+    })).filter(group => group.amenities.length > 0)
+  }
+
+  // Oversett amenity group navn til norsk
+  private translateAmenityGroupName(groupName: string): string {
+    const groupMap: Record<string, string> = {
+      'general': 'Generelt',
+      'internet': 'Internett',
+      'parking': 'Parkering',
+      'reception_services': 'Resepsjonstjenester',
+      'entertainment_and_family_services': 'Underholdning og familie',
+      'food_and_drinks': 'Mat og drikke',
+      'pool_and_wellness': 'Basseng og velvære',
+      'business_facilities': 'Bedriftsfasiliteter',
+      'accessibility': 'Tilgjengelighet',
+      'pets': 'Kjæledyr',
+      'cleaning_services': 'Rengjøringstjenester',
+      'bathroom': 'Bad',
+      'bedroom': 'Soverom',
+      'kitchen': 'Kjøkken',
+      'room_amenities': 'Romsservice',
+      'outdoors': 'Utendørs',
+      'activities': 'Aktiviteter'
+    }
+    return groupMap[groupName.toLowerCase()] || groupName
+  }
+
+  // Få ikon for amenity (for fremtidig bruk med ikon-bibliotek)
+  private getAmenityIcon(amenityName: string): string {
+    const iconMap: Record<string, string> = {
+      'wifi': 'wifi',
+      'parking': 'car',
+      'pool': 'waves',
+      'gym': 'dumbbell',
+      'restaurant': 'utensils',
+      'bar': 'glass',
+      'spa': 'sparkles',
+      'pet': 'paw'
+    }
+    
+    const key = amenityName.toLowerCase()
+    for (const [keyword, icon] of Object.entries(iconMap)) {
+      if (key.includes(keyword)) {
+        return icon
+      }
+    }
+    return 'check'
+  }
+
+  // Hent hotell-anmeldelser fra reviews dump eller hotel info
+  async getHotelReviews(hotelId: string): Promise<any[]> {
+    try {
+      if (!this.apiKey || !this.accessToken) {
+        console.warn('⚠️ No API credentials for reviews')
+        return []
+      }
+
+      console.log('⭐ Fetching reviews for hotel:', hotelId)
+
+      // Prøv først å hente fra hotel/info (kan inneholde reviews)
+      const staticInfo = await this.getHotelStaticInfo(hotelId)
+      
+      if (staticInfo?.reviews && Array.isArray(staticInfo.reviews) && staticInfo.reviews.length > 0) {
+        console.log('⭐ Found', staticInfo.reviews.length, 'reviews in static info')
+        return this.parseReviews(staticInfo.reviews)
+      }
+
+      console.log('⭐ No reviews found for hotel:', hotelId)
+      return []
+    } catch (error: any) {
+      console.warn('⚠️ Failed to fetch reviews:', error.message)
+      return []
+    }
+  }
+
+  // Parse reviews til lesbart format
+  private parseReviews(reviews: any[]): any[] {
+    if (!reviews || !Array.isArray(reviews)) {
+      return []
+    }
+
+    return reviews.slice(0, 10).map(review => ({
+      author: review.author || review.user_name || 'Anonym',
+      date: review.date || review.created_at || null,
+      rating: review.rating || review.score || 0,
+      title: review.title || null,
+      text: review.text || review.comment || review.review || '',
+      pros: review.pros || null,
+      cons: review.cons || null
+    })).filter(review => review.text && review.text.length > 10)
+  }
+
+  // Formater amenity navn til lesbart format
+  private formatAmenityName(amenity: string): string {
+    // Map RateHawk amenity-koder til norske navn
+    const amenityMap: Record<string, string> = {
+      // Basis
+      'free-wifi': 'Gratis WiFi',
+      'wifi': 'WiFi',
+      'parking': 'Parkering',
+      'free-parking': 'Gratis parkering',
+      
+      // Rom
+      'air-conditioning': 'Aircondition',
+      'air-conditioned': 'Aircondition',
+      'heating': 'Oppvarming',
+      'tv': 'TV',
+      'television': 'TV',
+      'safe': 'Safe',
+      'minibar': 'Minibar',
+      'balcony': 'Balkong',
+      'terrace': 'Terrasse',
+      'bathtub': 'Badekar',
+      'shower': 'Dusj',
+      'hairdryer': 'Føner',
+      'iron': 'Strykejern',
+      'desk': 'Skrivebord',
+      
+      // Senger
+      'king-bed': 'King size seng',
+      'queen-bed': 'Queen size seng',
+      'double-bed': 'Dobbeltseng',
+      'twin-beds': 'To enkeltsenger',
+      
+      // Hotell fasiliteter
+      'swimming-pool': 'Svømmebasseng',
+      'pool': 'Basseng',
+      'indoor-pool': 'Innendørs basseng',
+      'outdoor-pool': 'Utendørs basseng',
+      'gym': 'Treningssenter',
+      'fitness-center': 'Treningssenter',
+      'fitness': 'Treningssenter',
+      'spa': 'Spa',
+      'sauna': 'Badstu',
+      'restaurant': 'Restaurant',
+      'bar': 'Bar',
+      'breakfast': 'Frokost',
+      'breakfast-buffet': 'Frokostbuffet',
+      'room-service': 'Romservice',
+      '24-hour-front-desk': '24-timers resepsjon',
+      'concierge': 'Concierge',
+      'elevator': 'Heis',
+      'lift': 'Heis',
+      
+      // Spesielle
+      'pet-friendly': 'Kjæledyr tillatt',
+      'pets-allowed': 'Kjæledyr tillatt',
+      'family-rooms': 'Familierom',
+      'non-smoking': 'Røykfritt',
+      'non-smoking-rooms': 'Røykfrie rom',
+      'accessible': 'Tilgjenglighet',
+      'wheelchair-accessible': 'Rullestoltilgjengelig',
+      
+      // Business
+      'business-center': 'Forretningssenter',
+      'meeting-rooms': 'Møterom',
+      'conference-facilities': 'Konferansefasiliteter',
+      
+      // Internet
+      'free-wifi-in-all-rooms': 'Gratis WiFi i alle rom',
+      'free-internet': 'Gratis internett',
+      
+      // Kjøkken
+      'kitchenette': 'Tekjøkken',
+      'kitchen': 'Kjøkken',
+      'microwave': 'Mikrobølgeovn',
+      'refrigerator': 'Kjøleskap',
+      'coffee-maker': 'Kaffetrakter',
+    }
+    
+    // Sjekk om vi har en direkte mapping
+    const lowerAmenity = amenity.toLowerCase().replace(/_/g, '-')
+    if (amenityMap[lowerAmenity]) {
+      return amenityMap[lowerAmenity]
+    }
+    
+    // Ellers, kapitiser første bokstav og erstatt bindestreker/underscores
+    return amenity
+      .replace(/_/g, ' ')
+      .replace(/-/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
   // Hent region ID fra destinasjon
   private async getRegionId(destination: string): Promise<string | null> {
     try {
       console.log('🔍 Getting region ID for:', destination)
 
-      // Sjekk om destination allerede er et region ID (numerisk streng)
+      // VIKTIG: Sjekk om destinasjonen er et hotel ID (test hotel eller hotel fra multicomplete)
+      // Hotels fra multicomplete har hid (numeric) eller id (string)
+      if (destination === '8473727' || destination === 'test_hotel_do_not_book') {
+        console.log('🔍 This is TEST HOTEL ID - will search by hotel ID')
+        return destination
+      }
+
+      // Sjekk om destination allerede er et region ID (numerisk streng > 10000)
       if (/^\d+$/.test(destination)) {
+        const destNum = parseInt(destination)
+        // Hotel IDs er typisk 7-8 sifre, region IDs er typisk 4 sifre eller store tall
+        if (destNum > 10000000) {
+          console.log('🔍 This looks like a HOTEL ID (large number):', destination)
+          return destination // Dette er sannsynligvis et hotel ID
+        }
         console.log('🔍 Destination is already a region ID:', destination)
         return destination
       }
@@ -907,9 +1244,31 @@ class RateHawkClient {
           staticInfo.region?.country_name || staticInfo.country?.name
         ].filter(Boolean).join(', ') : (hotelData.address || 'Address not available')
         
-        const hotelImage = staticInfo?.images?.[0]?.url || hotelData.image || hotelData.images?.[0]?.url || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80'
+        // Hent bilde - RateHawk returnerer images som array av strings eller objekter
+        let hotelImage = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80'
+        if (staticInfo?.images && Array.isArray(staticInfo.images) && staticInfo.images.length > 0) {
+          const firstImage = staticInfo.images[0]
+          if (typeof firstImage === 'string') {
+            hotelImage = firstImage.replace('{size}', '1024x768')
+          } else if (firstImage?.url) {
+            hotelImage = firstImage.url.replace('{size}', '1024x768')
+          }
+        } else if (hotelData.image) {
+          hotelImage = typeof hotelData.image === 'string' ? hotelData.image : hotelData.image.url || hotelImage
+        } else if (hotelData.images && Array.isArray(hotelData.images) && hotelData.images.length > 0) {
+          const firstImage = hotelData.images[0]
+          hotelImage = typeof firstImage === 'string' ? firstImage : (firstImage.url || hotelImage)
+        }
         
         const starRating = staticInfo?.star_rating || staticInfo?.stars || hotelData.star_rating || hotelData.stars || 0
+
+        // Hent anmeldelser hvis mulig
+        let reviews: any[] = []
+        try {
+          reviews = await this.getHotelReviews(params.hotelId || params.hid?.toString() || '')
+        } catch (error) {
+          console.warn('⚠️ Could not fetch reviews:', error)
+        }
 
         // Parse rom-typer og rates
         const rooms: any[] = []
@@ -939,7 +1298,14 @@ class RateHawkClient {
             name: hotelName,
             address: hotelAddress,
             image: hotelImage,
+            images: this.parseAllImages(staticInfo?.images || hotelData.images),
             star_rating: starRating,
+            amenity_groups: this.parseAmenityGroups(staticInfo?.amenity_groups),
+            description: staticInfo?.description_struct || hotelData.description || null,
+            check_in_time: staticInfo?.check_in_time || null,
+            check_out_time: staticInfo?.check_out_time || null,
+            reviews: reviews,
+            review_count: reviews.length,
             rooms: rooms,
             total_rooms: rooms.length
           }
@@ -1261,8 +1627,9 @@ class RateHawkClient {
       }
 
       // Extract cancellation penalties fra order info
-      const penalties = orderInfoResult.orderInfo?.policies?.cancellation_penalties || 
-                        orderInfoResult.orderInfo?.cancellation_penalties ||
+      const orderInfo = orderInfoResult.orderInfo as any
+      const penalties = orderInfo?.policies?.cancellation_penalties || 
+                        orderInfo?.cancellation_penalties ||
                         null
 
       return {
@@ -1325,8 +1692,11 @@ class RateHawkClient {
   // Hent populære destinasjoner for autocomplete (ekte data fra RateHawk regioner)
   private async getPopularDestinations() {
     // Returner en kuratert liste over populære destinasjoner
-    // Disse er basert på vanlige søk og kan utvides
-    const popularDestinations = [
+    // Shuffle for å vise forskjellige destinasjoner hver gang
+    const allDestinations = [
+      // Test hotel først (viktig for testing!)
+      { id: '8473727', name: 'Test Hotel (Do Not Book)', country: 'Test', type: 'hotel' },
+      
       // Europa
       { id: '2563', name: 'Oslo', country: 'Norway', type: 'city' },
       { id: '2275', name: 'Stockholm', country: 'Sweden', type: 'city' },
@@ -1370,15 +1740,23 @@ class RateHawkClient {
       { id: '2385', name: 'United States', country: 'United States', type: 'country' },
       { id: '2440', name: 'Canada', country: 'Canada', type: 'country' },
       { id: '2515', name: 'Thailand', country: 'Thailand', type: 'country' },
-
-      // Test hotell for sandbox - det eneste hotellet som kan bookes uten kostnad
-      { id: '8473727', name: 'Test Hotel Do Not Book', country: 'Test', type: 'hotel' }
     ]
 
-    return popularDestinations
+    // Shuffle array for å vise forskjellige destinasjoner hver gang (behold test hotel først)
+    const testHotel = allDestinations[0] // Test hotel
+    const others = allDestinations.slice(1) // Resten
+    
+    // Fisher-Yates shuffle
+    for (let i = others.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [others[i], others[j]] = [others[j], others[i]]
+    }
+
+    // Returner test hotel + 19 tilfeldige andre
+    return [testHotel, ...others.slice(0, 19)]
   }
 
-  // Søk etter destinasjoner (autocomplete) - bruker region dump (multicomplete ikke tilgjengelig i sandbox)
+  // Søk etter destinasjoner (autocomplete) - bruker RateHawk multicomplete API
   async searchDestinations(query: string) {
     try {
       console.log('📍 RateHawk Destination Search:', query)
@@ -1387,67 +1765,176 @@ class RateHawkClient {
         throw new Error('RateHawk API credentials missing')
       }
 
-      console.log('📍 Using curated destination list for autocomplete (multicomplete not available in sandbox)')
+      // Prøv først RateHawk multicomplete API
+      try {
+        console.log('📍 Attempting RateHawk /search/multicomplete/ API')
+        
+        const response = await this.makeRequest('/search/multicomplete/', {
+          query: query || 'oslo', // Default søk hvis tomt
+          language: 'en'
+          // Ingen lookFor parameter - API returnerer både regions og hotels automatisk
+        }, 'POST')
 
-      // Bruk kuratert liste over populære destinasjoner (med ekte RateHawk region IDs)
-      const destinations = await this.getPopularDestinations()
-      console.log('📍 Got destinations:', destinations.length)
+        console.log('📍 Multicomplete response:', {
+          status: response?.status,
+          hasData: !!response?.data,
+          regions: response?.data?.regions?.length || 0,
+          hotels: response?.data?.hotels?.length || 0
+        })
 
-      // Hvis query er tom, returner alle populære destinasjoner
-      if (!query.trim()) {
-        console.log('📍 Empty query, returning all destinations')
-        return destinations.map((dest: any) => ({
+        const destinations: any[] = []
+
+        // Parse regions fra response.data.regions
+        if (response?.data?.regions && Array.isArray(response.data.regions)) {
+          response.data.regions.slice(0, 10).forEach((region: any) => { // Maks 10 regions
+            destinations.push({
+              id: region.id?.toString(),
+              name: region.name,
+              type: region.type?.toLowerCase() || 'region',
+              country: region.country_code || ''
+            })
+          })
+        }
+
+        // Parse hotels fra response.data.hotels
+        if (response?.data?.hotels && Array.isArray(response.data.hotels)) {
+          response.data.hotels.slice(0, 5).forEach((hotel: any) => { // Maks 5 hotels
+            destinations.push({
+              id: hotel.hid?.toString() || hotel.id?.toString(),
+              name: hotel.name,
+              type: 'hotel',
+              country: ''
+            })
+          })
+        }
+
+        // ALLTID legg til test hotel i resultatene (for testing)
+        const hasTestHotel = destinations.some(d => d.id === '8473727')
+        if (!hasTestHotel) {
+          destinations.unshift({
+            id: '8473727',
+            name: 'Test Hotel (Do Not Book)',
+            type: 'hotel',
+            country: 'Test'
+          })
+        }
+
+        console.log('✅ Found destinations via multicomplete API:', destinations.length)
+        
+        if (destinations.length > 0) {
+          return destinations.slice(0, 20) // Returner maks 20 resultater
+        }
+
+        // Hvis multicomplete ikke returnerte noe, fall tilbake til region dump
+        console.log('📍 Multicomplete returned no results, trying region dump')
+      } catch (multiError: any) {
+        console.warn('⚠️ Multicomplete API failed:', multiError.message)
+        console.log('📍 Falling back to region dump method')
+      }
+
+      // FALLBACK: Bruk region dump hvis multicomplete feiler eller ikke støttes
+      try {
+        console.log('📍 Attempting region dump API')
+        
+        const dumpResponse = await this.makeRequest('/hotel/region/dump/', {
+          language: 'en'
+        }, 'POST') // POST for region dump
+
+        console.log('📍 Region dump response:', {
+          type: typeof dumpResponse,
+          isArray: Array.isArray(dumpResponse),
+          keys: dumpResponse ? Object.keys(dumpResponse).slice(0, 5) : []
+        })
+
+        let regions: any[] = []
+
+        // Parse response - RateHawk kan returnere URL til dump fil
+        if (typeof dumpResponse === 'object' && dumpResponse !== null) {
+          if (dumpResponse.data?.url) {
+            // Response inneholder URL til dump fil - vi må laste den ned
+            console.log('📍 Got dump URL, need to download:', dumpResponse.data.url)
+            console.warn('⚠️ Region dump requires file download - not implemented yet')
+            // For nå, skip dette og bruk fallback
+            throw new Error('Region dump file download not implemented')
+          } else if (Array.isArray(dumpResponse)) {
+            regions = dumpResponse
+          } else if (dumpResponse.data && Array.isArray(dumpResponse.data)) {
+            regions = dumpResponse.data
+          } else if (dumpResponse.regions && Array.isArray(dumpResponse.regions)) {
+            regions = dumpResponse.regions
+          }
+        }
+
+        console.log('📍 Total regions from dump:', regions.length)
+
+        // Filtrer og map regions
+        let filteredRegions = regions
+
+        if (query.trim()) {
+          const searchTerm = query.toLowerCase()
+          filteredRegions = regions.filter((region: any) => {
+            const name = region.name?.toLowerCase() || ''
+            const countryName = region.country_name?.toLowerCase() || ''
+            const id = region.id?.toString().toLowerCase() || ''
+            return name.includes(searchTerm) || countryName.includes(searchTerm) || id.includes(searchTerm)
+          })
+        }
+
+        // Sorter etter relevans
+        filteredRegions.sort((a: any, b: any) => {
+          const aName = a.name?.toLowerCase() || ''
+          const bName = b.name?.toLowerCase() || ''
+          const searchTerm = query.toLowerCase()
+
+          if (query.trim()) {
+            const aStarts = aName.startsWith(searchTerm)
+            const bStarts = bName.startsWith(searchTerm)
+            if (aStarts && !bStarts) return -1
+            if (!aStarts && bStarts) return 1
+          }
+
+          return aName.localeCompare(bName)
+        })
+
+        const destinations = filteredRegions.slice(0, 20).map((region: any) => ({
+          id: region.id?.toString() || region.region_id?.toString() || '',
+          name: region.name || region.region_name || '',
+          type: region.type || 'region',
+          country: region.country_name || region.country || ''
+        }))
+
+        console.log('✅ Found destinations via region dump:', destinations.length)
+        return destinations
+
+      } catch (dumpError: any) {
+        console.error('❌ Region dump also failed:', dumpError.message)
+        
+        // SISTE FALLBACK: Bruk kuratert liste med populære destinasjoner
+        console.log('📍 Using curated popular destinations as final fallback')
+        const popularDestinations = await this.getPopularDestinations()
+        
+        // Filtrer hvis det er et søk
+        let filteredDestinations = popularDestinations
+        if (query.trim()) {
+          const searchTerm = query.toLowerCase()
+          filteredDestinations = popularDestinations.filter((dest: any) => {
+            const name = dest.name?.toLowerCase() || ''
+            const country = dest.country?.toLowerCase() || ''
+            const id = dest.id?.toLowerCase() || ''
+            return name.includes(searchTerm) || country.includes(searchTerm) || id.includes(searchTerm)
+          })
+        }
+        
+        const results = filteredDestinations.slice(0, 20).map((dest: any) => ({
           id: dest.id,
           name: dest.name,
           type: dest.type || 'city',
           country: dest.country
         }))
+        
+        console.log('✅ Returning curated destinations:', results.length)
+        return results
       }
-
-      // Filtrer destinasjoner basert på query
-      const filteredDestinations = destinations.filter((dest: any) => {
-        const name = dest.name?.toLowerCase() || ''
-        const country = dest.country?.toLowerCase() || ''
-        const id = dest.id?.toLowerCase() || ''
-        const searchTerm = query.toLowerCase()
-
-        return name.includes(searchTerm) || country.includes(searchTerm) || id.includes(searchTerm)
-      })
-
-      // Sorter etter relevans (eksakt ID treff først, så starter med query, så inneholder)
-      const sortedDestinations = filteredDestinations.sort((a: any, b: any) => {
-        const aName = a.name?.toLowerCase() || ''
-        const aId = a.id?.toLowerCase() || ''
-        const bName = b.name?.toLowerCase() || ''
-        const bId = b.id?.toLowerCase() || ''
-        const searchTerm = query.toLowerCase()
-
-        // Prioriter eksakt ID treff
-        const aExactId = aId === searchTerm
-        const bExactId = bId === searchTerm
-        if (aExactId && !bExactId) return -1
-        if (!aExactId && bExactId) return 1
-
-        // Deretter navn som starter med søketerm
-        const aStarts = aName.startsWith(searchTerm)
-        const bStarts = bName.startsWith(searchTerm)
-        if (aStarts && !bStarts) return -1
-        if (!aStarts && bStarts) return 1
-
-        // Til slutt alfabetisk sortering
-        return aName.localeCompare(bName)
-      })
-
-      // Returner topp 10 resultater
-      const results = sortedDestinations.slice(0, 10).map((dest: any) => ({
-        id: dest.id?.toString() || '',
-        name: dest.name || '',
-        type: dest.type || 'city',
-        country: dest.country || ''
-      }))
-
-      console.log('✅ Found destinations via curated list:', results.length)
-      return results
 
     } catch (error) {
       console.error('❌ RateHawk Destination Search Error:', error)

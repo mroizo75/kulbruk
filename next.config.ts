@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'picsum.photos' },
+      { protocol: 'https', hostname: 'cdn.worldota.net' }, // RateHawk CDN
     ],
   },
   eslint: {
@@ -23,7 +24,7 @@ const nextConfig: NextConfig = {
     
     const baseDirectives = [
       "default-src 'self'",
-      "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com https://avatars.githubusercontent.com https://images.unsplash.com https://picsum.photos",
+      "img-src 'self' data: blob: https: http:",
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       "frame-src https://www.google.com https://www.youtube.com https://player.vimeo.com https://js.stripe.com",

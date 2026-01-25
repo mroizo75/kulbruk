@@ -51,8 +51,11 @@ export interface RateHawkHotel {
     amount: number
     currency: string
     perNight: boolean
+    totalPrice?: number
+    nights?: number
   }
   image: string
+  images?: string[] // Array med alle bilder for galleriet
   amenities: string[]
   distance: string
 }
@@ -63,10 +66,33 @@ export interface RateHawkHotelSearchResponse {
   searchId: string
   totalResults: number
   error?: string
+  technicalError?: string
 }
 
 export interface RateHawkDestination {
   id: string
   name: string
   type: 'city' | 'hotel' | 'landmark'
+}
+
+// Hotel Review Types
+export interface HotelReview {
+  author: string
+  date: string
+  rating: number
+  title?: string
+  text: string
+  pros?: string
+  cons?: string
+}
+
+export interface HotelAmenityGroup {
+  group_name: string
+  amenities: HotelAmenity[]
+}
+
+export interface HotelAmenity {
+  name: string
+  amenity_name?: string
+  icon?: string
 }

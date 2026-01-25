@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Bed, Star, MapPin, Wifi, Car, Utensils, Loader2 } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Bed, Star, MapPin, Wifi, Car, Utensils, Loader2, ArrowUpDown } from 'lucide-react'
 import { RateHawkHotel } from '@/lib/types'
 import HotelDetailsDialog from './hotel-details-dialog'
 
@@ -26,11 +27,28 @@ interface HotelResultsProps {
 export default function HotelResults({ hotels, searchParams, isLoading }: HotelResultsProps) {
   const [selectedHotel, setSelectedHotel] = useState<{ id: string; name: string } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<'price-asc' | 'price-desc' | 'rating-desc' | 'rating-asc'>('price-asc')
 
   const handleViewDetails = (hotel: RateHawkHotel) => {
     setSelectedHotel({ id: hotel.id, name: hotel.name })
     setDialogOpen(true)
   }
+
+  // Sorter hoteller
+  const sortedHotels = [...hotels].sort((a, b) => {
+    switch (sortBy) {
+      case 'price-asc':
+        return a.price.amount - b.price.amount
+      case 'price-desc':
+        return b.price.amount - a.price.amount
+      case 'rating-desc':
+        return b.rating - a.rating
+      case 'rating-asc':
+        return a.rating - b.rating
+      default:
+        return 0
+    }
+  })
 
   if (isLoading) {
     return (
@@ -85,13 +103,13 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
     <div className="space-y-6">
       {/* Results Header */}
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               Hotellresultater
             </h2>
             <p className="text-gray-600">
-              {hotels.length} hoteller funnet
+              {sortedHotels.length} hoteller funnet
               {searchParams && (
                 <span className="ml-2">
                   • {new Date(searchParams.checkIn).toLocaleDateString('nb-NO')} - {new Date(searchParams.checkOut).toLocaleDateString('nb-NO')}
@@ -100,28 +118,48 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
               )}
             </p>
           </div>
-          <Badge variant="secondary" className="px-3 py-1">
-            {hotels.length} resultater
-          </Badge>
+          <div className="flex items-center gap-4">
+            <Badge variant="secondary" className="px-3 py-1">
+              {sortedHotels.length} resultater
+            </Badge>
+            
+            {/* Sortering */}
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="h-4 w-4 text-gray-500" />
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Sorter etter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="price-asc">Pris: Lav til høy</SelectItem>
+                  <SelectItem value="price-desc">Pris: Høy til lav</SelectItem>
+                  <SelectItem value="rating-desc">Stjerner: Høyest først</SelectItem>
+                  <SelectItem value="rating-asc">Stjerner: Lavest først</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Hotel Cards */}
       <div className="space-y-4">
-        {hotels.map((hotel) => (
+        {sortedHotels.map((hotel) => (
           <Card key={hotel.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-            <div className="flex flex-col md:flex-row">
+            <div className="flex flex-col md:flex-row gap-0">
               {/* Hotel Image */}
-              <div className="md:w-80 h-48 md:h-auto bg-gray-200 flex-shrink-0">
-                <img
-                  src={hotel.image}
-                  alt={hotel.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = 'https://via.placeholder.com/320x200?text=No+Image'
-                  }}
-                />
+              <div className="md:w-80 h-56 md:h-auto flex-shrink-0 relative p-3">
+                <div className="relative w-full h-full rounded-lg overflow-hidden">
+                  <img
+                    src={hotel.image}
+                    alt={hotel.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="320" height="200"%3E%3Crect fill="%23e5e7eb" width="320" height="200"/%3E%3Ctext fill="%239ca3af" font-family="Arial" font-size="16" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3EIngen bilde%3C/text%3E%3C/svg%3E'
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Hotel Details */}
@@ -154,19 +192,24 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
                     <div className="text-sm text-gray-600">
                       per natt
                     </div>
+                    {hotel.price.totalPrice && hotel.price.nights && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {hotel.price.totalPrice} {hotel.price.currency} totalt ({hotel.price.nights} {hotel.price.nights === 1 ? 'natt' : 'netter'})
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Amenities */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {hotel.amenities.slice(0, 4).map((amenity, index) => (
-                    <Badge key={index} variant="outline" className="text-xs">
+                  {hotel.amenities.slice(0, 6).map((amenity, index) => (
+                    <Badge key={index} variant="secondary" className="text-sm px-3 py-1">
                       {amenity}
                     </Badge>
                   ))}
-                  {hotel.amenities.length > 4 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{hotel.amenities.length - 4} flere
+                  {hotel.amenities.length > 6 && (
+                    <Badge variant="secondary" className="text-sm px-3 py-1 bg-gray-200">
+                      +{hotel.amenities.length - 6} flere
                     </Badge>
                   )}
                 </div>
@@ -195,7 +238,7 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
       </div>
 
       {/* Load More / Pagination could go here */}
-      {hotels.length >= 10 && (
+      {sortedHotels.length >= 10 && (
         <div className="text-center py-8">
           <Button variant="outline">
             Last flere resultater
