@@ -1,21 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { validatePassword, validateEmail, sanitizeString } from '@/lib/validation'
+import { applyRateLimit } from '@/lib/rate-limit'
+import crypto from 'crypto'
 
-// Opprett eller oppgrader en bruker til admin via Postman.
-// Sikres med ADMIN_SETUP_TOKEN i headers: x-admin-setup-token
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitResult = await applyRateLimit(request, 3, 3600000)
+    if (rateLimitResult) return rateLimitResult
+
     const setupToken = request.headers.get('x-admin-setup-token') || ''
     const expected = process.env.ADMIN_SETUP_TOKEN || ''
 
-    if (!expected) {
+    if (!expected || expected.length < 32) {
       return NextResponse.json(
-        { error: 'ADMIN_SETUP_TOKEN er ikke satt i miljøvariabler' },
+        { error: 'ADMIN_SETUP_TOKEN er ikke konfigurert korrekt' },
         { status: 500 }
       )
     }
 
-    if (setupToken !== expected) {
+    const tokenMatch = crypto.timingSafeEqual(
+      Buffer.from(setupToken),
+      Buffer.from(expected)
+    )
+
+    if (!tokenMatch) {
       return NextResponse.json(
         { error: 'Ugyldig eller manglende x-admin-setup-token' },
         { status: 401 }
@@ -37,9 +46,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (password.length < 6) {
+    const emailValidation = validateEmail(email)
+    if (!emailValidation.valid) {
+      return NextResponse.json({ error: emailValidation.error }, { status: 400 })
+    }
+
+    const passwordValidation = validatePassword(password)
+    if (!passwordValidation.valid) {
       return NextResponse.json(
-        { error: 'Passord må være minst 6 tegn' },
+        { 
+          error: 'Passord oppfyller ikke sikkerhetskravene',
+          details: passwordValidation.errors 
+        },
         { status: 400 }
       )
     }
@@ -47,15 +65,19 @@ export async function POST(request: NextRequest) {
     const bcrypt = await import('bcryptjs')
     const passwordHash = await bcrypt.hash(password, 12)
 
-    const existing = await prisma.user.findUnique({ where: { email } })
+    const normalizedEmail = email.toLowerCase().trim()
+    const sanitizedFirstName = firstName ? sanitizeString(firstName, 50) : null
+    const sanitizedLastName = lastName ? sanitizeString(lastName, 50) : null
+
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
 
     if (existing) {
       const updated = await prisma.user.update({
-        where: { email },
+        where: { email: normalizedEmail },
         data: {
           role: 'admin',
-          firstName: typeof firstName === 'string' ? firstName : existing.firstName,
-          lastName: typeof lastName === 'string' ? lastName : existing.lastName,
+          firstName: sanitizedFirstName || existing.firstName,
+          lastName: sanitizedLastName || existing.lastName,
           passwordHash,
           updatedAt: new Date(),
         },
@@ -67,10 +89,10 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.user.create({
       data: {
-        email,
-        name: [firstName, lastName].filter(Boolean).join(' ') || null,
-        firstName: firstName || null,
-        lastName: lastName || null,
+        email: normalizedEmail,
+        name: [sanitizedFirstName, sanitizedLastName].filter(Boolean).join(' ') || null,
+        firstName: sanitizedFirstName,
+        lastName: sanitizedLastName,
         role: 'admin',
         passwordHash,
         emailVerified: new Date(),
@@ -80,7 +102,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, action: 'created', user: created })
   } catch (error) {
-    console.error('create-admin error:', error)
     return NextResponse.json({ error: 'Intern serverfeil' }, { status: 500 })
   }
 }

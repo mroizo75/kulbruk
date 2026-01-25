@@ -5,7 +5,11 @@ const nextConfig: NextConfig = {
   /* config options here */
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'picsum.photos' },
     ],
   },
   eslint: {
@@ -16,19 +20,26 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     const isDev = process.env.NODE_ENV !== 'production'
+    
     const baseDirectives = [
       "default-src 'self'",
-      "img-src 'self' data: blob: https:",
+      "img-src 'self' data: blob: https://res.cloudinary.com https://lh3.googleusercontent.com https://avatars.githubusercontent.com https://images.unsplash.com",
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       "frame-src https://www.google.com https://www.youtube.com https://player.vimeo.com https://js.stripe.com",
     ]
-    // Inntil vi setter opp nonce/hash: tillat inline/eval både dev og prod for å unngå blokkering + Stripe
-    const scriptDirectives = [
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com",
-      "script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
-      "script-src-attr 'self' 'unsafe-inline'",
-    ]
+    
+    const scriptDirectives = isDev
+      ? [
+          "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com",
+          "script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+          "script-src-attr 'self' 'unsafe-inline'",
+        ]
+      : [
+          "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+          "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com",
+        ]
+    
     const connectDirectives = ["connect-src 'self' https: ws: wss: https://api.stripe.com"]
 
     const csp = [...baseDirectives, ...scriptDirectives, ...connectDirectives].join('; ')
@@ -47,7 +58,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Cache uploads aggressivt; filene har unike navn
         source: '/uploads/:path*',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },

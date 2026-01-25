@@ -7,10 +7,8 @@ import type { UserRole } from "./types"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { getServerSession } from "next-auth/next"
 
-// NextAuth v4 konfig
 export const authOptions: NextAuthOptions = {
-  // Tillat lokale/dev-hosts uten å feile på UntrustedHost
-  trustHost: true,
+  trustHost: process.env.NODE_ENV === 'development',
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
@@ -20,7 +18,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Passord', type: 'password' },
       },
       async authorize(creds) {
-        const email = String(creds?.email || '')
+        const email = String(creds?.email || '').toLowerCase().trim()
         const password = String(creds?.password || '')
         if (!email || !password) return null
         const user = await prisma.user.findUnique({ 
@@ -47,14 +45,12 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_SECRET!,
     }),
   ],
-  // Aktiver Credentials for klassisk registrering/logg inn
-  // Vi bruker egen DB-kolonne passwordHash, og validerer manuelt
-  // Registrering gjøres i egen API-route, der vi hasher passord og oppretter bruker
   experimental: {
     enableWebAuthn: false,
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
   },
   pages: {
     signIn: "/sign-in",

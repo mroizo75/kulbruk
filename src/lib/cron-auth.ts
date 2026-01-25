@@ -1,22 +1,32 @@
 import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 
 export function ensureCronAuthorized(req: Request): NextResponse | null {
   const secret = process.env.CRON_SECRET
-  if (!secret) {
-    // Hvis ingen secret er satt, blokker for sikkerhet
-    return NextResponse.json({ error: 'Cron disabled: missing CRON_SECRET' }, { status: 503 })
+  if (!secret || secret.length < 32) {
+    return NextResponse.json({ error: 'Cron disabled: CRON_SECRET not configured properly' }, { status: 503 })
   }
+  
   const headerKey = req.headers.get('x-cron-key') || req.headers.get('X-CRON-KEY')
-  let provided = headerKey || null
+  const provided = headerKey || null
+
   if (!provided) {
-    try {
-      const url = new URL(req.url)
-      provided = url.searchParams.get('cron_key') || url.searchParams.get('key')
-    } catch {}
+    return NextResponse.json({ error: 'Unauthorized: missing x-cron-key header' }, { status: 401 })
   }
-  if (!provided || provided !== secret) {
+
+  try {
+    const tokenMatch = crypto.timingSafeEqual(
+      Buffer.from(provided),
+      Buffer.from(secret)
+    )
+    
+    if (!tokenMatch) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
   return null
 }
 

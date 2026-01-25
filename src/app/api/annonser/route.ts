@@ -1,30 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { notifyNewListing } from '@/lib/notification-manager'
+import { sanitizeString } from '@/lib/validation'
+import { sanitizeErrorForClient, logError } from '@/lib/errors'
+import { applyRateLimit } from '@/lib/rate-limit'
 import { generateShortCode } from '@/lib/utils'
 
-// Bruk delt Prisma-klient
-
-// GET - Hent annonser med filtrering og paginering
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     
-    // Query parametere
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '12')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '12')))
     const category = searchParams.get('category')
     const location = searchParams.get('location')
     const minPrice = searchParams.get('minPrice')
     const maxPrice = searchParams.get('maxPrice')
     const search = searchParams.get('search')
     const status = searchParams.get('status') || 'APPROVED'
-    const userId = searchParams.get('userId') // For å hente brukerens egne annonser
+    const userId = searchParams.get('userId')
     
     const skip = (page - 1) * limit
 
-    // Bygg where-clause
     const where: any = {}
     
     if (status) {
@@ -43,25 +40,31 @@ export async function GET(request: NextRequest) {
     
     if (location) {
       where.location = {
-        contains: location
+        contains: sanitizeString(location, 100)
       }
     }
     
     if (minPrice || maxPrice) {
       where.price = {}
-      if (minPrice) where.price.gte = parseFloat(minPrice)
-      if (maxPrice) where.price.lte = parseFloat(maxPrice)
+      if (minPrice) {
+        const min = parseFloat(minPrice)
+        if (!isNaN(min) && min >= 0) where.price.gte = min
+      }
+      if (maxPrice) {
+        const max = parseFloat(maxPrice)
+        if (!isNaN(max) && max >= 0) where.price.lte = max
+      }
     }
     
     if (search) {
+      const sanitizedSearch = sanitizeString(search, 100)
       where.OR = [
-        { title: { contains: search } },
-        { description: { contains: search } },
-        { shortCode: { contains: search } }
+        { title: { contains: sanitizedSearch } },
+        { description: { contains: sanitizedSearch } },
+        { shortCode: { contains: sanitizedSearch } }
       ]
     }
 
-    // Hent annonser med relasjoner
     const [listings, total] = await Promise.all([
       prisma.listing.findMany({
         where,
@@ -76,7 +79,7 @@ export async function GET(request: NextRequest) {
           category: true,
           images: {
             orderBy: { sortOrder: 'asc' },
-            take: 1 // Kun hovedbilde for liste
+            take: 1
           }
         },
         orderBy: { createdAt: 'desc' },
@@ -86,7 +89,6 @@ export async function GET(request: NextRequest) {
       prisma.listing.count({ where })
     ])
 
-    // Map listings to include necessary fields for Fort gjort
     const mappedListings = listings.map(listing => ({
       ...listing,
       enableFortGjort: listing.enableFortGjort,
@@ -105,22 +107,20 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Feil ved henting av annonser:', error)
+    logError(error, { endpoint: 'GET /api/annonser' })
+    const clientError = sanitizeErrorForClient(error)
     return NextResponse.json(
-      { error: 'Kunne ikke hente annonser' },
+      { error: clientError.message },
       { status: 500 }
     )
   }
 }
 
-// POST - Opprett ny annonse
 export async function POST(request: NextRequest) {
   try {
-    // Debugging: sjekk headers
-    const authHeader = request.headers.get('authorization')
+    const rateLimitResult = await applyRateLimit(request, 10, 3600000)
+    if (rateLimitResult) return rateLimitResult
 
-    
-    // Auth.js v5
     const session = await auth()
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -129,13 +129,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Finn eller opprett bruker i databasen basert på e‑post
     let dbUser = await prisma.user.findUnique({
       where: { email: session.user.email },
     })
 
     if (!dbUser) {
-      // Sett standardverdier ved første opprettelse
       dbUser = await prisma.user.create({
         data: {
           email: session.user.email,
@@ -147,12 +145,10 @@ export async function POST(request: NextRequest) {
       })
     }
     
-    // Bruk database user ID for listing
     const dbUserId = dbUser.id
 
     const data = await request.json()
     
-    // Valider påkrevde felt
     const required = ['title', 'description', 'price', 'categoryId', 'location']
     for (const field of required) {
       if (!data[field]) {
@@ -163,7 +159,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Håndhev vilkår-samtykke
     if (!data.acceptedTermsAt) {
       return NextResponse.json(
         { error: 'Mangler aksept av vilkår/personvern' },
@@ -171,12 +166,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Enricher vehicleSpec fra Vegvesen hvis registreringsnummer er oppgitt
+
     let enrichedVehicleSpec: any = null
     if (data?.vehicleSpec?.registrationNumber) {
       try {
+        const regNumber = sanitizeString(data.vehicleSpec.registrationNumber, 20)
         const origin = new URL(request.url).origin
-        const res = await fetch(`${origin}/api/vegvesen?regNumber=${encodeURIComponent(String(data.vehicleSpec.registrationNumber))}`, {
+        const res = await fetch(`${origin}/api/vegvesen?regNumber=${encodeURIComponent(regNumber)}`, {
           cache: 'no-store'
         })
         if (res.ok) {
@@ -184,14 +180,13 @@ export async function POST(request: NextRequest) {
           const carData = json?.carData
           if (carData) {
             enrichedVehicleSpec = {
-              registrationNumber: data.vehicleSpec.registrationNumber,
+              registrationNumber: regNumber,
               mileage: data.vehicleSpec.mileage ?? null,
               nextInspection: data.vehicleSpec.nextInspection ? new Date(data.vehicleSpec.nextInspection) : null,
               accidents: data.vehicleSpec.accidents ?? null,
               serviceHistory: data.vehicleSpec.serviceHistory ?? null,
               modifications: data.vehicleSpec.modifications ?? null,
               additionalEquipment: data.vehicleSpec.additionalEquipment ?? null,
-              // Fra Vegvesen - grunnleggende
               make: carData.make ?? null,
               model: carData.model ?? null,
               year: carData.year ?? null,
@@ -200,7 +195,6 @@ export async function POST(request: NextRequest) {
               color: carData.color ?? null,
               power: carData.maxPower ?? null,
               co2Emission: carData.co2Emissions ?? null,
-              // Fra Vegvesen - utvidet
               bodyType: carData.bodyType ?? null,
               engineSize: carData.engineSize ?? null,
               cylinderCount: carData.cylinderCount ?? null,
@@ -230,17 +224,16 @@ export async function POST(request: NextRequest) {
               fuelConsumptionCombined: carData.fuelConsumption?.combined ?? null,
               fuelConsumptionCity: carData.fuelConsumption?.city ?? null,
               fuelConsumptionHighway: carData.fuelConsumption?.highway ?? null,
-                                    tireSpecs: carData.tires ?? null,
-                      abs: carData.abs ?? null,
-                      airbags: carData.airbags ?? null,
-                      // Omregistreringsavgift fra Skatteetaten
-                      omregistreringsavgift: carData.omregistreringsavgift ?? null,
-                      omregAvgiftDato: carData.omregAvgiftDato ? new Date(carData.omregAvgiftDato) : null,
+              tireSpecs: carData.tires ?? null,
+              abs: carData.abs ?? null,
+              airbags: carData.airbags ?? null,
+              omregistreringsavgift: carData.omregistreringsavgift ?? null,
+              omregAvgiftDato: carData.omregAvgiftDato ? new Date(carData.omregAvgiftDato) : null,
             }
           }
         }
       } catch (e) {
-        console.warn('Kunne ikke berike VehicleSpec fra Vegvesen:', e)
+        logError(e, { context: 'vegvesen enrichment' })
       }
     }
 
@@ -256,21 +249,19 @@ export async function POST(request: NextRequest) {
     const listing = await prisma.listing.create({
       data: {
         shortCode,
-        title: data.title,
-        description: data.description,
+        title: sanitizeString(data.title, 200),
+        description: sanitizeString(data.description, 5000),
         price: typeof data.price === 'number' ? data.price : parseFloat(String(data.price)),
-        location: data.location,
-        // varighet 1 måned
+        location: sanitizeString(data.location, 100),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         categoryId: data.categoryId,
-        userId: dbUserId, // Bruker database user ID, ikke Clerk ID
-        contactEmail: data.contactEmail,
-        contactPhone: data.contactPhone,
-        contactName: data.contactName,
+        userId: dbUserId,
+        contactEmail: data.contactEmail ? sanitizeString(data.contactEmail, 254) : null,
+        contactPhone: data.contactPhone ? sanitizeString(data.contactPhone, 20) : null,
+        contactName: data.contactName ? sanitizeString(data.contactName, 100) : null,
         showAddress: !!data.showAddress,
-        status: 'PENDING', // Alle nye annonser venter på godkjenning
+        status: 'PENDING',
         enableFortGjort: !!data.enableFortGjort,
-        // Opprett VehicleSpec dersom sendt inn
         ...((data.vehicleSpec || enrichedVehicleSpec) ? {
           vehicleSpec: {
             create: {
@@ -304,7 +295,6 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Audit: logg aksept av vilkår ved opprettelse
     try {
       await prisma.auditLog.create({
         data: {
@@ -316,19 +306,18 @@ export async function POST(request: NextRequest) {
         }
       })
     } catch (e) {
-      console.warn('Kunne ikke skrive audit-logg for vilkårssamtykke', e)
+      logError(e, { context: 'audit log creation' })
     }
 
-    // Håndter bildeopplasting
-    if (data.images && data.images.length > 0) {
-
+    if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+      const MAX_IMAGES = 20
+      const images = data.images.slice(0, MAX_IMAGES)
       
-      // Opprett bilder i databasen
-      const imagePromises = data.images.map((image: any, index: number) => 
+      const imagePromises = images.map((image: any, index: number) => 
         prisma.image.create({
           data: {
-            url: image.url,
-            altText: image.altText || `Bilde ${index + 1}`,
+            url: sanitizeString(image.url, 2048),
+            altText: sanitizeString(image.altText || `Bilde ${index + 1}`, 200),
             sortOrder: image.sortOrder || index,
             isMain: image.isMain || index === 0,
             listingId: listing.id
@@ -337,11 +326,10 @@ export async function POST(request: NextRequest) {
       )
       
       await Promise.all(imagePromises)
-
     }
 
-    // Send real-time notification til admin/moderatorer
     try {
+      const { notifyNewListing } = await import('@/lib/notification-manager')
       notifyNewListing({
         id: listing.id,
         title: listing.title,
@@ -351,11 +339,8 @@ export async function POST(request: NextRequest) {
           lastName: listing.user.lastName
         }
       })
-      
-
     } catch (notificationError) {
-      // Notification error - continue without failing
-      // Ikke la notification-feil stoppe annonse-opprettelsen
+      logError(notificationError, { context: 'notification' })
     }
 
     return NextResponse.json({
@@ -366,9 +351,10 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('Feil ved opprettelse av annonse:', error)
+    logError(error, { endpoint: 'POST /api/annonser' })
+    const clientError = sanitizeErrorForClient(error)
     return NextResponse.json(
-      { error: 'Kunne ikke opprette annonse' },
+      { error: clientError.message },
       { status: 500 }
     )
   }
