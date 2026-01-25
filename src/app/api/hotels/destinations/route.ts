@@ -8,17 +8,7 @@ export async function GET(request: NextRequest) {
 
     console.log('📍 API: Destination search:', query)
 
-    if (!query.trim()) {
-      return NextResponse.json({
-        success: true,
-        destinations: [
-          { id: 'OSL', name: 'Oslo, Norway', type: 'city' },
-          { id: 'CPH', name: 'Copenhagen, Denmark', type: 'city' },
-          { id: 'BER', name: 'Berlin, Germany', type: 'city' }
-        ]
-      })
-    }
-
+    // Hent destinasjoner fra RateHawk (inkludert når query er tom - får populære destinasjoner)
     const destinations = await ratehawkClient.searchDestinations(query)
 
     console.log('📍 API: Found destinations:', destinations?.length || 0)

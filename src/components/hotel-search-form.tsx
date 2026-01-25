@@ -70,8 +70,6 @@ export default function HotelSearchForm({ onSearch, isLoading = false }: HotelSe
 
   // Search destinations using API
   const searchDestinations = useCallback(async (query: string) => {
-    if (!query.trim()) return []
-
     console.log('🏨 Searching destinations:', query)
 
     try {
@@ -88,7 +86,7 @@ export default function HotelSearchForm({ onSearch, isLoading = false }: HotelSe
       console.error('❌ Destination search error:', error)
     }
 
-    // Ingen fallback - returner tomt array hvis API feiler
+    // Returnerer tomt array hvis API feiler
     return []
   }, [])
 
