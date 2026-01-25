@@ -45,5 +45,12 @@ next-env.d.ts
 # RateHawk hotel dump files (store locally, don't commit)
 /dump/
 
-# Markdown documentation files (not committed)
+# Local documentation and test files (not committed)
+/docs/
 /markdown/
+/test/
+*.test.md
+*.draft.md
+*DRAFT*.md
+*TODO*.md
+systemsjekk*.md
