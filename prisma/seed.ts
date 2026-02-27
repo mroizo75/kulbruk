@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+const SUPPORT_TEST_ADMIN_EMAIL = process.env.SUPPORT_TEST_ADMIN_EMAIL || 'support-test@kulbruk.no'
+const SUPPORT_TEST_ADMIN_PASSWORD = process.env.SUPPORT_TEST_ADMIN_PASSWORD || 'Support2025!Kulbruk'
+
 const categories = [
   {
     name: 'Biler',
@@ -90,7 +93,7 @@ const categories = [
 ]
 
 async function main() {
-  console.log('🌱 Starter seeding av kategorier...')
+  console.log('🌱 Starter seeding...')
 
   // Slett eksisterende kategorier (kun for development)
   await prisma.category.deleteMany()
@@ -102,6 +105,28 @@ async function main() {
     })
     console.log(`✅ Opprettet kategori: ${created.name}`)
   }
+
+  // Opprett support test admin (for logg-eksport)
+  const bcrypt = await import('bcryptjs')
+  const passwordHash = await bcrypt.hash(SUPPORT_TEST_ADMIN_PASSWORD, 12)
+  const supportAdmin = await prisma.user.upsert({
+    where: { email: SUPPORT_TEST_ADMIN_EMAIL },
+    update: {
+      role: 'admin',
+      passwordHash,
+      emailVerified: new Date(),
+    },
+    create: {
+      email: SUPPORT_TEST_ADMIN_EMAIL,
+      name: 'Support Test Admin',
+      firstName: 'Support',
+      lastName: 'Test',
+      role: 'admin',
+      passwordHash,
+      emailVerified: new Date(),
+    },
+  })
+  console.log(`✅ Support test admin: ${supportAdmin.email}`)
 
   console.log('🎉 Seeding fullført!')
 }

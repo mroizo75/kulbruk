@@ -1054,6 +1054,24 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// --------- Support session (hotel request logging) ---------
+
+model HotelRequestLog {
+  id               String   @id @default(cuid())
+  supportSessionId String
+  path             String
+  method           String
+  requestBody      String?  @db.LongText
+  responseStatus   Int?
+  responsePreview  String?  @db.LongText
+  durationMs       Int?
+  createdAt        DateTime @default(now())
+
+  @@index([supportSessionId])
+  @@index([createdAt])
+  @@map("hotel_request_logs")
+}
+
 // --------- Meldinger ---------
 
 model Conversation {

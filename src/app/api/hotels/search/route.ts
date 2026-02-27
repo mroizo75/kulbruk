@@ -4,8 +4,12 @@ import { RateHawkHotelSearchParams } from '@/lib/types'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getSupportSessionId, logHotelRequest } from '@/lib/support-session-logger'
 
 export async function POST(request: NextRequest) {
+  const start = Date.now()
+  const supportSessionId = getSupportSessionId(request)
+
   try {
     console.log('🏨 API: Hotel search request received')
 
@@ -45,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Hvis søket feilet, returner feilmelding med riktig status code
     if (!result.success) {
-      return NextResponse.json(
+      const res = NextResponse.json(
         {
           success: false,
           error: result.error || 'Hotel search failed',
@@ -55,28 +59,62 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 } // 400 Bad Request for brukerfeil, ikke 500
       )
+      if (supportSessionId) {
+        void logHotelRequest({
+          supportSessionId,
+          path: '/api/hotels/search',
+          method: 'POST',
+          requestBody: body,
+          responseStatus: 400,
+          responseBody: { success: false, error: result.error, technicalError: result.technicalError, hotels: [], totalResults: 0 },
+          durationMs: Date.now() - start,
+        })
+      }
+      return res
     }
 
-    return NextResponse.json(result)
+    const res = NextResponse.json(result)
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/search',
+        method: 'POST',
+        requestBody: body,
+        responseStatus: 200,
+        responseBody: result as Record<string, unknown>,
+        durationMs: Date.now() - start,
+      })
+    }
+    return res
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string }
     console.error('❌ API: Hotel search error:', error)
-    
+
     // Parse feilmelding for bedre brukeropplevelse
     let userFriendlyError = 'Kunne ikke søke etter hoteller'
-    if (error.message?.includes('region') || error.message?.includes('cannot be searched')) {
+    if (err.message?.includes('region') || err.message?.includes('cannot be searched')) {
       userFriendlyError = 'Denne destinasjonen kan ikke søkes. Prøv Oslo eller test hotel (ID: 8473727).'
     }
-    
-    return NextResponse.json(
-      {
-        success: false,
-        error: userFriendlyError,
-        technicalError: error.message || 'Unknown error',
-        hotels: [],
-        totalResults: 0
-      },
-      { status: 500 }
-    )
+
+    const errorBody = {
+      success: false,
+      error: userFriendlyError,
+      technicalError: err.message || 'Unknown error',
+      hotels: [],
+      totalResults: 0,
+    }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/search',
+        method: 'POST',
+        requestBody: null,
+        responseStatus: 500,
+        responseBody: errorBody,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(errorBody, { status: 500 })
   }
 }

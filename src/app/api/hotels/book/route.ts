@@ -8,10 +8,14 @@ import { stripe } from '@/lib/stripe'
 import { resend } from '@/lib/resend'
 import { HotelBookingConfirmationEmail } from '@/lib/email-templates/hotel-booking-confirmation'
 import { render } from '@react-email/render'
+import { getSupportSessionId, logHotelRequest } from '@/lib/support-session-logger'
 
 const { logger } = Sentry
 
 export async function POST(request: NextRequest) {
+  const start = Date.now()
+  const supportSessionId = getSupportSessionId(request)
+
   return Sentry.startSpan(
     {
       op: 'http.server',
@@ -32,18 +36,36 @@ export async function POST(request: NextRequest) {
         logger.debug(logger.fmt`Booking request for partnerOrderId: ${partnerOrderId}`)
 
     if (!partnerOrderId || !guestInfo || !paymentType) {
-      return NextResponse.json({
-        success: false,
-        error: 'Missing required parameters: partnerOrderId, guestInfo, paymentType'
-      }, { status: 400 })
+      const errRes = { success: false, error: 'Missing required parameters: partnerOrderId, guestInfo, paymentType' }
+      if (supportSessionId) {
+        void logHotelRequest({
+          supportSessionId,
+          path: '/api/hotels/book',
+          method: 'POST',
+          requestBody: body,
+          responseStatus: 400,
+          responseBody: errRes,
+          durationMs: Date.now() - start,
+        })
+      }
+      return NextResponse.json(errRes, { status: 400 })
     }
 
     // Validate guest info
     if (!guestInfo.firstName || !guestInfo.lastName || !guestInfo.email || !guestInfo.phone) {
-      return NextResponse.json({
-        success: false,
-        error: 'Missing guest information'
-      }, { status: 400 })
+      const errRes = { success: false, error: 'Missing guest information' }
+      if (supportSessionId) {
+        void logHotelRequest({
+          supportSessionId,
+          path: '/api/hotels/book',
+          method: 'POST',
+          requestBody: body,
+          responseStatus: 400,
+          responseBody: errRes,
+          durationMs: Date.now() - start,
+        })
+      }
+      return NextResponse.json(errRes, { status: 400 })
     }
 
     // Automatisk kontoopprettelse hvis ikke innlogget
@@ -115,10 +137,19 @@ export async function POST(request: NextRequest) {
           })
           span.setAttribute('bookingSuccess', false)
           span.setAttribute('bookingError', bookingResult.error || 'Unknown error')
-          return NextResponse.json({
-            success: false,
-            error: bookingResult.error || 'Failed to create booking'
-          }, { status: 500 })
+          const errRes = { success: false, error: bookingResult.error || 'Failed to create booking' }
+          if (supportSessionId) {
+            void logHotelRequest({
+              supportSessionId,
+              path: '/api/hotels/book',
+              method: 'POST',
+              requestBody: body,
+              responseStatus: 500,
+              responseBody: errRes,
+              durationMs: Date.now() - start,
+            })
+          }
+          return NextResponse.json(errRes, { status: 500 })
         }
 
         span.setAttribute('bookingSuccess', true)
@@ -307,7 +338,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        return NextResponse.json({
+        const resBody = {
           success: isSuccess,
           booking: {
             orderId: bookingResult.data.order_id,
@@ -318,20 +349,40 @@ export async function POST(request: NextRequest) {
             data3DS: finalStatus.data?.data_3ds,
             error: finalStatus.error
           }
-        })
-
-      } catch (error: any) {
+        }
+        if (supportSessionId) {
+          void logHotelRequest({
+            supportSessionId,
+            path: '/api/hotels/book',
+            method: 'POST',
+            requestBody: body,
+            responseStatus: 200,
+            responseBody: resBody,
+            durationMs: Date.now() - start,
+          })
+        }
+        return NextResponse.json(resBody)
+      } catch (error: unknown) {
+        const err = error as { message?: string }
         logger.error('Booking error', {
-          partnerOrderId,
-          error: error.message || String(error)
+          partnerOrderId: (error as any)?.partnerOrderId,
+          error: err.message || String(error)
         })
         Sentry.captureException(error)
-        span.setAttribute('error', error.message || String(error))
-        return NextResponse.json({
-          success: false,
-          error: error.message || 'Failed to create booking',
-          details: error.message
-        }, { status: 500 })
+        span.setAttribute('error', err.message || String(error))
+        const errRes = { success: false, error: err.message || 'Failed to create booking', details: err.message }
+        if (supportSessionId) {
+          void logHotelRequest({
+            supportSessionId,
+            path: '/api/hotels/book',
+            method: 'POST',
+            requestBody: null,
+            responseStatus: 500,
+            responseBody: errRes,
+            durationMs: Date.now() - start,
+          })
+        }
+        return NextResponse.json(errRes, { status: 500 })
       }
     }
   )

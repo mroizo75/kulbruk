@@ -1,11 +1,19 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import HotelSearchForm from '@/components/hotel-search-form'
 import HotelResults from '@/components/hotel-results'
 import { Card, CardContent } from '@/components/ui/card'
 import { Bed, Star, MapPin, Wifi, Car, Utensils } from 'lucide-react'
 import { RateHawkHotel } from '@/lib/types'
+
+interface PopularDestination {
+  id: string
+  name: string
+  country: string
+  hotels: string
+  image: string
+}
 
 interface HotelSearchFormData {
   destination: string
@@ -16,11 +24,15 @@ interface HotelSearchFormData {
   rooms: number
 }
 
+const PLACEHOLDER_SVG = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%23e5e7eb" width="800" height="450"/%3E%3Ctext fill="%239ca3af" font-family="system-ui" font-size="24" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3E' + encodeURIComponent('Laster...') + '%3C/text%3E%3C/svg%3E'
+
 export default function HotellPage() {
   const [searchResults, setSearchResults] = useState<RateHawkHotel[] | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchParams, setSearchParams] = useState<HotelSearchFormData | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [popularDestinations, setPopularDestinations] = useState<PopularDestination[]>([])
+  const resultsRef = useRef<HTMLDivElement>(null)
 
   const handleHotelSearch = async (data: HotelSearchFormData) => {
     console.log('🏨 Client: Initiating hotel search:', data)
@@ -64,6 +76,23 @@ export default function HotellPage() {
     }
   }
 
+  useEffect(() => {
+    if (!isSearching && (searchResults !== null || searchError) && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [isSearching, searchResults, searchError])
+
+  useEffect(() => {
+    fetch('/api/hotels/popular-destinations')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.destinations) {
+          setPopularDestinations(data.destinations)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       {/* Hero Section */}
@@ -89,7 +118,7 @@ export default function HotellPage() {
 
       {/* Search Results Section */}
       {(searchResults !== null || searchError) && (
-        <div className="container mx-auto px-4 py-8">
+        <div ref={resultsRef} className="container mx-auto px-4 py-8">
           {searchError && (
             <div className={`border rounded-lg p-4 mb-6 ${
               searchError.includes('⚠️') || searchError.includes('fallback')
@@ -183,26 +212,45 @@ export default function HotellPage() {
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12">Populære destinasjoner</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[
-              { name: 'Oslo', image: 'https://via.placeholder.com/300x200?text=Oslo', hotels: '500+ hoteller' },
-              { name: 'Bergen', image: 'https://via.placeholder.com/300x200?text=Bergen', hotels: '200+ hoteller' },
-              { name: 'Trondheim', image: 'https://via.placeholder.com/300x200?text=Trondheim', hotels: '150+ hoteller' },
-              { name: 'Stavanger', image: 'https://via.placeholder.com/300x200?text=Stavanger', hotels: '180+ hoteller' }
-            ].map((destination) => (
-              <Card key={destination.name} className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                <div className="aspect-video bg-gray-200">
-                  <img
-                    src={destination.image}
-                    alt={destination.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-lg mb-1">{destination.name}</h3>
-                  <p className="text-gray-600 text-sm">{destination.hotels}</p>
-                </CardContent>
-              </Card>
-            ))}
+            {(popularDestinations.length > 0 ? popularDestinations : [
+              { id: '2563', name: 'Oslo', country: 'Norge', hotels: '500+ hoteller', image: PLACEHOLDER_SVG },
+              { id: '1953', name: 'København', country: 'Danmark', hotels: '400+ hoteller', image: PLACEHOLDER_SVG },
+              { id: '1775', name: 'Paris', country: 'Frankrike', hotels: '3000+ hoteller', image: PLACEHOLDER_SVG },
+              { id: '1869', name: 'London', country: 'Storbritannia', hotels: '2000+ hoteller', image: PLACEHOLDER_SVG },
+            ]).map((destination) => {
+              const tomorrow = new Date()
+              tomorrow.setDate(tomorrow.getDate() + 1)
+              const dayAfter = new Date(tomorrow)
+              dayAfter.setDate(dayAfter.getDate() + 1)
+              const defaultSearch = {
+                destination: destination.id,
+                checkIn: tomorrow.toISOString().split('T')[0],
+                checkOut: dayAfter.toISOString().split('T')[0],
+                adults: 2,
+                children: 0,
+                rooms: 1,
+              }
+              return (
+                <Card
+                  key={destination.id}
+                  className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
+                  onClick={() => handleHotelSearch(defaultSearch)}
+                >
+                  <div className="aspect-video bg-gray-200 overflow-hidden">
+                    <img
+                      src={destination.image}
+                      alt={destination.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-lg mb-1">{destination.name}</h3>
+                    <p className="text-gray-500 text-sm mb-1">{destination.country}</p>
+                    <p className="text-gray-600 text-sm">{destination.hotels}</p>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </div>
       </div>

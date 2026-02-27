@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ratehawkClient } from '@/lib/ratehawk-client'
+import { getSupportSessionId, logHotelRequest } from '@/lib/support-session-logger'
 
 export async function GET(request: NextRequest) {
+  const start = Date.now()
+  const supportSessionId = getSupportSessionId(request)
+
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q') || ''
@@ -19,15 +23,25 @@ export async function GET(request: NextRequest) {
 
     console.log('📍 API: Found destinations:', destinations?.length || 0)
 
-    return NextResponse.json({
-      success: true,
-      destinations: destinations || []
-    })
+    const resBody = { success: true, destinations: destinations || [] }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/destinations',
+        method: 'GET',
+        requestBody: { q },
+        responseStatus: 200,
+        responseBody: resBody,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(resBody)
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string; name?: string }
     console.error('❌ API: Destination search error:', {
-      message: error.message,
-      name: error.name,
+      message: err.message,
+      name: err.name,
       hasCredentials: {
         keyId: !!process.env.RATEHAWK_KEY_ID,
         apiKey: !!process.env.RATEHAWK_API_KEY
@@ -44,15 +58,23 @@ export async function GET(request: NextRequest) {
       { id: '1783', name: 'Amsterdam, Netherlands', type: 'city', country: 'Netherlands' },
       { id: '8473727', name: 'Test Hotel Do Not Book', type: 'hotel', country: 'Test' }
     ]
-    
-    return NextResponse.json(
-      {
-        success: true,
-        destinations: fallbackDestinations,
-        _fallback: true,
-        _error: process.env.NODE_ENV === 'development' ? error.message : 'Using fallback destinations'
-      },
-      { status: 200 } // Return 200 med fallback i stedet for 500
-    )
+    const fallbackRes = {
+      success: true,
+      destinations: fallbackDestinations,
+      _fallback: true,
+      _error: process.env.NODE_ENV === 'development' ? err.message : 'Using fallback destinations',
+    }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/destinations',
+        method: 'GET',
+        requestBody: null,
+        responseStatus: 200,
+        responseBody: fallbackRes,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(fallbackRes, { status: 200 }) // Return 200 med fallback i stedet for 500
   }
 }

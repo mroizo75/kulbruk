@@ -6,6 +6,7 @@ import ConditionalNavbar from '@/components/conditional-navbar'
 import ConditionalFooter from '@/components/conditional-footer'
 import CookieConsent from '@/components/cookie-consent'
 import SessionProvider from '@/components/session-provider'
+import { SupportSessionInitializer } from '@/components/support-session-initializer'
 import { FavoritesProvider } from '@/contexts/favorites-context'
 import './globals.css'
 import '@/sentry.client.config'
@@ -57,6 +58,9 @@ export default function RootLayout({
             <ConditionalFooter />
           </Suspense>
           <Toaster position="top-right" richColors />
+          <Suspense fallback={null}>
+            <SupportSessionInitializer />
+          </Suspense>
           <CookieConsent />
           </FavoritesProvider>
         </SessionProvider>

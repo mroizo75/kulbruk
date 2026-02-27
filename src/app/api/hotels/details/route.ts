@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ratehawkClient } from '@/lib/ratehawk-client'
+import { getSupportSessionId, logHotelRequest } from '@/lib/support-session-logger'
 
 export async function POST(request: NextRequest) {
+  const start = Date.now()
+  const supportSessionId = getSupportSessionId(request)
+
   try {
     console.log('🏨 API: Hotel details request received')
 
@@ -30,26 +34,52 @@ export async function POST(request: NextRequest) {
     })
 
     if (!result.success) {
-      return NextResponse.json({
-        success: false,
-        error: result.error || 'Failed to fetch hotel details'
-      }, { status: 500 })
+      const errRes = { success: false, error: result.error || 'Failed to fetch hotel details' }
+      if (supportSessionId) {
+        void logHotelRequest({
+          supportSessionId,
+          path: '/api/hotels/details',
+          method: 'POST',
+          requestBody: body,
+          responseStatus: 500,
+          responseBody: errRes,
+          durationMs: Date.now() - start,
+        })
+      }
+      return NextResponse.json(errRes, { status: 500 })
     }
 
     console.log('✅ API: Hotel details fetched successfully')
 
-    return NextResponse.json({
-      success: true,
-      hotel: result.hotel
-    })
-
-  } catch (error: any) {
+    const resBody = { success: true, hotel: result.hotel }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/details',
+        method: 'POST',
+        requestBody: body,
+        responseStatus: 200,
+        responseBody: resBody,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(resBody)
+  } catch (error: unknown) {
+    const err = error as { message?: string }
     console.error('❌ API: Hotel details error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error.message || 'Failed to fetch hotel details',
-      details: error.message
-    }, { status: 500 })
+    const errRes = { success: false, error: err.message || 'Failed to fetch hotel details', details: err.message }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/details',
+        method: 'POST',
+        requestBody: null,
+        responseStatus: 500,
+        responseBody: errRes,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(errRes, { status: 500 })
   }
 }
 

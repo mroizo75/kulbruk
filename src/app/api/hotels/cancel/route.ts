@@ -3,8 +3,12 @@ import { ratehawkClient } from '@/lib/ratehawk-client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getSupportSessionId, logHotelRequest } from '@/lib/support-session-logger'
 
 export async function POST(request: NextRequest) {
+  const start = Date.now()
+  const supportSessionId = getSupportSessionId(request)
+
   try {
     console.log('❌ API: Cancel booking request received')
 
@@ -15,20 +19,38 @@ export async function POST(request: NextRequest) {
     console.log('❌ API: Cancel booking for:', partnerOrderId)
 
     if (!partnerOrderId) {
-      return NextResponse.json({
-        success: false,
-        error: 'Missing required parameter: partnerOrderId'
-      }, { status: 400 })
+      const errRes = { success: false, error: 'Missing required parameter: partnerOrderId' }
+      if (supportSessionId) {
+        void logHotelRequest({
+          supportSessionId,
+          path: '/api/hotels/cancel',
+          method: 'POST',
+          requestBody: body,
+          responseStatus: 400,
+          responseBody: errRes,
+          durationMs: Date.now() - start,
+        })
+      }
+      return NextResponse.json(errRes, { status: 400 })
     }
 
     // Call RateHawk cancel booking
     const cancelResult = await ratehawkClient.cancelBooking(partnerOrderId)
 
     if (!cancelResult.success) {
-      return NextResponse.json({
-        success: false,
-        error: cancelResult.error || 'Failed to cancel booking'
-      }, { status: 500 })
+      const errRes = { success: false, error: cancelResult.error || 'Failed to cancel booking' }
+      if (supportSessionId) {
+        void logHotelRequest({
+          supportSessionId,
+          path: '/api/hotels/cancel',
+          method: 'POST',
+          requestBody: body,
+          responseStatus: 500,
+          responseBody: errRes,
+          durationMs: Date.now() - start,
+        })
+      }
+      return NextResponse.json(errRes, { status: 500 })
     }
 
     // Oppdater booking status i database
@@ -46,18 +68,35 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ API: Booking cancelled successfully')
 
-    return NextResponse.json({
-      success: true,
-      message: 'Booking cancelled successfully'
-    })
-
-  } catch (error: any) {
+    const resBody = { success: true, message: 'Booking cancelled successfully' }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/cancel',
+        method: 'POST',
+        requestBody: body,
+        responseStatus: 200,
+        responseBody: resBody,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(resBody)
+  } catch (error: unknown) {
+    const err = error as { message?: string }
     console.error('❌ API: Cancel booking error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error.message || 'Failed to cancel booking',
-      details: error.message
-    }, { status: 500 })
+    const errRes = { success: false, error: err.message || 'Failed to cancel booking', details: err.message }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/cancel',
+        method: 'POST',
+        requestBody: null,
+        responseStatus: 500,
+        responseBody: errRes,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(errRes, { status: 500 })
   }
 }
 

@@ -1356,6 +1356,13 @@ class RateHawkClient {
       const data = await this.makeRequest('/hotel/order/booking/form/', requestParams, 'POST')
       console.log('🔍 Raw booking form response:', JSON.stringify(data, null, 2))
 
+      if (data?.status === 'error' && data?.error === 'sandbox_restriction') {
+        return {
+          success: false,
+          error: 'Hotellbooking er ikke tilgjengelig i testmodus. Full booking blir aktivert i produksjon.',
+        }
+      }
+
       // Parse RateHawk booking form response
       if (data?.data) {
         return {
@@ -1370,7 +1377,7 @@ class RateHawkClient {
         }
       }
 
-      throw new Error('Booking form creation failed - no data returned')
+      throw new Error(data?.error || 'Booking form creation failed - no data returned')
 
     } catch (error: any) {
       console.error('❌ RateHawk Booking Form Error:', error)

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ratehawkClient } from '@/lib/ratehawk-client'
+import { getSupportSessionId, logHotelRequest } from '@/lib/support-session-logger'
 
 export async function POST(request: NextRequest) {
+  const start = Date.now()
+  const supportSessionId = getSupportSessionId(request)
+
   try {
     console.log('🔍 API: Prebook request received')
 
@@ -29,26 +33,52 @@ export async function POST(request: NextRequest) {
     })
 
     if (!result.success) {
-      return NextResponse.json({
-        success: false,
-        error: result.error || 'Failed to prebook rate'
-      }, { status: 500 })
+      const errRes = { success: false, error: result.error || 'Failed to prebook rate' }
+      if (supportSessionId) {
+        void logHotelRequest({
+          supportSessionId,
+          path: '/api/hotels/prebook',
+          method: 'POST',
+          requestBody: body,
+          responseStatus: 500,
+          responseBody: errRes,
+          durationMs: Date.now() - start,
+        })
+      }
+      return NextResponse.json(errRes, { status: 500 })
     }
 
     console.log('✅ API: Prebook successful')
 
-    return NextResponse.json({
-      success: true,
-      prebookData: result.data
-    })
-
-  } catch (error: any) {
+    const resBody = { success: true, prebookData: result.data }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/prebook',
+        method: 'POST',
+        requestBody: body,
+        responseStatus: 200,
+        responseBody: resBody,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(resBody)
+  } catch (error: unknown) {
+    const err = error as { message?: string }
     console.error('❌ API: Prebook error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error.message || 'Failed to prebook rate',
-      details: error.message
-    }, { status: 500 })
+    const errRes = { success: false, error: err.message || 'Failed to prebook rate', details: err.message }
+    if (supportSessionId) {
+      void logHotelRequest({
+        supportSessionId,
+        path: '/api/hotels/prebook',
+        method: 'POST',
+        requestBody: null,
+        responseStatus: 500,
+        responseBody: errRes,
+        durationMs: Date.now() - start,
+      })
+    }
+    return NextResponse.json(errRes, { status: 500 })
   }
 }
 
