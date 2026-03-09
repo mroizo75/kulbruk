@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
         let session = await getServerSession(authOptions)
         const body = await request.json()
-        const { partnerOrderId, guestInfo, paymentType, paymentIntentId, remarks } = body
+        const { partnerOrderId, bookHash, childAges, guestInfo, paymentType, paymentIntentId, remarks } = body
 
         span.setAttribute('partnerOrderId', partnerOrderId)
         span.setAttribute('guestEmail', guestInfo?.email || 'unknown')
@@ -117,11 +117,13 @@ export async function POST(request: NextRequest) {
             bookingSpan.setAttribute('partnerOrderId', partnerOrderId)
             bookingSpan.setAttribute('paymentType', paymentType.type)
             return await ratehawkClient.finishBooking({
+              bookHash: bookHash || '',
               partnerOrderId,
               userEmail: guestInfo.email,
               userPhone: guestInfo.phone,
               firstName: guestInfo.firstName,
               lastName: guestInfo.lastName,
+              childAges: Array.isArray(childAges) ? childAges : [],
               paymentType: paymentType.type,
               amount: paymentType.amount,
               currencyCode: paymentType.currency_code,
@@ -130,14 +132,18 @@ export async function POST(request: NextRequest) {
           }
         )
 
-        if (!bookingResult.success) {
-          logger.error('Failed to create booking', {
-            partnerOrderId,
-            error: bookingResult.error
-          })
+        // Finale feil fra finishBooking stopper prosessen umiddelbart
+        if (!bookingResult.success && (bookingResult as any).isFinal) {
+          const errorCode = (bookingResult as any).error
+          const userMessage =
+            errorCode === 'booking_form_expired'
+              ? 'Bookingsesjonen er utløpt. Vennligst start på nytt.'
+              : errorCode === 'rate_not_found'
+              ? 'Rommet er ikke lenger tilgjengelig.'
+              : 'En feil oppsto. Vennligst kontakt support.'
+          logger.error('Final booking error from finishBooking', { partnerOrderId, errorCode })
           span.setAttribute('bookingSuccess', false)
-          span.setAttribute('bookingError', bookingResult.error || 'Unknown error')
-          const errRes = { success: false, error: bookingResult.error || 'Failed to create booking' }
+          const errRes = { success: false, error: userMessage }
           if (supportSessionId) {
             void logHotelRequest({
               supportSessionId,
@@ -153,17 +159,19 @@ export async function POST(request: NextRequest) {
         }
 
         span.setAttribute('bookingSuccess', true)
-        span.setAttribute('orderId', bookingResult.data.order_id)
+        span.setAttribute('orderId', bookingResult.data?.order_id ?? 0)
 
-        // Check booking status (polling)
-        // According to docs: poll every 5 seconds until status is 'ok', '3ds', or 'error'
+        // Finale feil fra /finish/status/ som stopper polling
+        const FINAL_STATUS_ERRORS = ['block', 'charge', '3ds', 'soldout', 'provider', 'book_limit', 'not_allowed', 'booking_finish_did_not_succeed']
+
+        // Poll /finish/status/ hvert 5. sek, maks 180 sek (36 forsøk)
         let statusCheckAttempts = 0
-        const maxAttempts = 12 // 12 * 5 sec = 60 sec max
+        const maxAttempts = 36
         let finalStatus: any = null
 
         while (statusCheckAttempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, statusCheckAttempts === 0 ? 1000 : 5000))
-          
+          await new Promise(resolve => setTimeout(resolve, statusCheckAttempts === 0 ? 2000 : 5000))
+
           const statusResult = await Sentry.startSpan(
             {
               op: 'http.client',
@@ -179,67 +187,33 @@ export async function POST(request: NextRequest) {
           if (statusResult.status === 'ok') {
             finalStatus = { status: 'confirmed', ...statusResult }
             break
-          } else if (statusResult.status === '3ds') {
-            // 3D Secure required - return to frontend for handling
+          } else if (statusResult.error === '3ds' || statusResult.status === '3ds') {
             finalStatus = { status: '3ds_required', ...statusResult }
             break
-          } else if (statusResult.status === 'error') {
-            finalStatus = { status: 'failed', error: statusResult.error, ...statusResult }
+          } else if (statusResult.status === 'error' && FINAL_STATUS_ERRORS.includes(statusResult.error || '')) {
+            // Final feil – stopp polling og gi generell brukermelding
+            finalStatus = {
+              status: 'failed',
+              error: 'En feil oppsto. Vennligst kontakt support.',
+              ...statusResult
+            }
             break
           }
-          // If 'processing', continue polling
-          
+          // Ikke-finale feil (timeout, unknown, 5xx, processing): fortsett polling
+
           statusCheckAttempts++
         }
 
         if (!finalStatus) {
-          logger.warn('Booking status check timeout', {
-            partnerOrderId,
-            attempts: statusCheckAttempts
-          })
+          logger.warn('Booking status check timeout', { partnerOrderId, attempts: statusCheckAttempts })
           finalStatus = { status: 'timeout', error: 'Booking status check timeout' }
         }
 
         span.setAttribute('finalStatus', finalStatus.status)
         span.setAttribute('statusCheckAttempts', statusCheckAttempts)
 
-        // Hent order info (inkludert HCN) hvis booking er bekreftet
-        let hcn: string | null = null
-        if (finalStatus.status === 'ok' || finalStatus.status === 'confirmed') {
-          const orderId = bookingResult.data.order_id
-          if (orderId > 0) {
-            try {
-              const orderInfoResult = await Sentry.startSpan(
-                {
-                  op: 'http.client',
-                  name: 'RateHawk getOrderInfo',
-                },
-                async (hcnSpan) => {
-                  hcnSpan.setAttribute('orderId', orderId)
-                  return await ratehawkClient.getOrderInfo(orderId)
-                }
-              )
-
-              if (orderInfoResult.success && orderInfoResult.orderInfo?.hcn) {
-                hcn = orderInfoResult.orderInfo.hcn
-                logger.info('HCN retrieved', { orderId, hcn })
-                span.setAttribute('hcn', hcn)
-              } else {
-                logger.warn('Could not retrieve HCN', {
-                  orderId,
-                  error: orderInfoResult.error
-                })
-              }
-            } catch (error) {
-              logger.warn('Error fetching order info', {
-                orderId,
-                error: error instanceof Error ? error.message : String(error)
-              })
-              Sentry.captureException(error)
-              // Ikke stopp booking hvis HCN henting feiler
-            }
-          }
-        }
+        // HCN hentes ikke her – /order/info/ brukes kun som historikk og kan ta opptil 1 minutt
+        const hcn: string | null = null
 
         // Lagre booking i database (nå har vi alltid en userId)
         if (userId) {
@@ -285,8 +259,7 @@ export async function POST(request: NextRequest) {
         // RateHawk returnerer 'ok' for vellykket booking i sandbox
         const isSuccess = finalStatus.status === 'ok' || finalStatus.status === 'confirmed'
 
-        // Send bekreftelse-epost til kunde (hvis ønskelig)
-        // Note: RateHawk sender også bekreftelse-epost, så dette er valgfritt
+        // Send vår egen bekreftelse-epost til gjesten (RateHawk sender til corporate email)
         if (isSuccess && userId && paymentType) {
           try {
             await Sentry.startSpan(
@@ -301,16 +274,16 @@ export async function POST(request: NextRequest) {
                 const emailHtml = render(
                   HotelBookingConfirmationEmail({
                     guestName: `${guestInfo.firstName} ${guestInfo.lastName}`,
-                    hotelName: 'Hotellbooking', // TODO: Hent faktisk hotellnavn fra booking data
-                    checkIn: new Date().toISOString(), // TODO: Hent faktiske datoer fra booking data
-                    checkOut: new Date().toISOString(),
-                    adults: 2, // TODO: Fra booking data
-                    children: 0,
-                    rooms: 1,
+                    hotelName: body.hotelName || 'Hotellbooking',
+                    checkIn: body.checkIn || new Date().toISOString(),
+                    checkOut: body.checkOut || new Date().toISOString(),
+                    adults: body.adults || 2,
+                    children: Array.isArray(childAges) ? childAges.length : 0,
+                    rooms: body.rooms || 1,
                     totalPrice: paymentType.amount || '0',
                     currency: paymentType.currency_code || 'NOK',
                     confirmationCode: partnerOrderId,
-                    bookingId: bookingResult.data.order_id.toString()
+                    bookingId: bookingResult.data?.order_id?.toString() || partnerOrderId
                   })
                 )
 
@@ -334,7 +307,6 @@ export async function POST(request: NextRequest) {
               error: emailError instanceof Error ? emailError.message : String(emailError)
             })
             Sentry.captureException(emailError)
-            // Ikke stopp bookingen hvis epost feiler
           }
         }
 

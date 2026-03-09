@@ -69,10 +69,10 @@ export default function RecentlyViewedStrip() {
   if (!items || items.length === 0) return null
 
   return (
-    <section className="py-6 sm:py-8 bg-gray-50">
+    <section className="py-6 sm:py-8" style={{ backgroundColor: '#FFF7ED', borderTop: '1px solid #EDE0D2' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Du så nylig</h2>
+          <h2 className="text-xl sm:text-2xl font-bold" style={{ color: '#1A0F08' }}>Du så nylig</h2>
           <Button
             variant="outline"
             className="text-xs"

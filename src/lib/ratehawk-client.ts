@@ -3,6 +3,19 @@ import { RateHawkHotelSearchParams, RateHawkHotelSearchResponse } from '@/lib/ty
 
 const { logger } = Sentry
 
+async function runWithConcurrency<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length)
+  let next = 0
+  async function worker() {
+    while (next < tasks.length) {
+      const i = next++
+      results[i] = await tasks[i]()
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker))
+  return results
+}
+
 // RateHawk Hotel API Client
 class RateHawkClient {
   private apiKey: string
@@ -10,6 +23,9 @@ class RateHawkClient {
   private baseUrl: string
   private hotelDumpCache: Map<string, any> = new Map() // Cache hotel dump data
   private dumpLastFetched: number | null = null
+  // In-memory cache for /hotel/info/ – overlever i prosessens levetid
+  // Forhindrer å treffe rate-limit (30 req/60s) ved parallelle søk
+  private hotelInfoCache: Map<string, any | null> = new Map()
 
   constructor() {
     this.apiKey = process.env.RATEHAWK_KEY_ID || ''
@@ -223,22 +239,33 @@ class RateHawkClient {
 
       console.log('🏨 Found region ID:', regionId)
 
-      // B2B API: Format for guests: array av objekter, ett per rom
-      const guests = [{
-        adults: params.adults,
-        children: params.children && params.children.length > 0 ? params.children : []
-      }]
+      // Bygg guests-array korrekt: ett objekt per rom med riktig adults/children per rom
+      // RateHawk krever: [{ adults: 2, children: [5, 10] }, { adults: 1, children: [] }]
+      let guests: { adults: number; children: number[] }[]
+      if (params.roomConfigs && params.roomConfigs.length > 0) {
+        guests = params.roomConfigs.map(room => ({
+          adults: room.adults,
+          children: room.childAges || []
+        }))
+      } else {
+        // Fallback: én rom-blokk med totalt antall voksne og alle barnealdre
+        guests = [{
+          adults: params.adults,
+          children: params.children && params.children.length > 0 ? params.children : []
+        }]
+      }
 
       // Bruk riktig søke-metode basert på destinasjon med fallback-strategi
       let data
       let searchMethod = 'unknown'
       let lastError: any = null
-      
-      // Hvis region ID er et stort tall (> 10M), er det sannsynligvis et hotel ID
-      const isHotelId = parseInt(regionId) > 10000000 || regionId === '8473727' || regionId === 'test_hotel_do_not_book'
+
+      // Hvis destinasjonstypen er 'hotel' (satt av autocomplete) bruker vi /search/serp/hotels/
+      // med numerisk HID. Ellers bruker vi region-søk.
+      const isHotelId = params.destinationType === 'hotel' && /^\d+$/.test(regionId)
       
       if (isHotelId) {
-        console.log('🏨 Searching by hotel ID:', regionId)
+        console.log('🏨 Searching by hotel HID:', regionId)
         searchMethod = 'hotel_ids'
         const hotelParams = {
           hids: [parseInt(regionId)],
@@ -253,8 +280,8 @@ class RateHawkClient {
           data = await this.makeRequest('/search/serp/hotels/', hotelParams, 'POST')
         } catch (error: any) {
           lastError = error
-          console.warn('⚠️ Hotel ID search failed:', error.message)
-          throw error // Hvis hotel søk feiler, kast error
+          console.warn('⚠️ Hotel HID search failed:', error.message)
+          throw error
         }
       } else {
         // FØRST: Prøv REGION søk
@@ -318,7 +345,7 @@ class RateHawkClient {
                 `Kunne ikke søke etter hoteller i denne destinasjonen. ` +
                 `Region-søk feilet: "${errorMessage}". ` +
                 `Geo-søk feilet: "${geoErrorMessage}". ` +
-                `Dette kan skyldes sandbox-begrensninger. Prøv å søke etter Oslo (region 2563) eller test hotel (ID: 8473727).`
+                `Dette kan skyldes sandbox-begrensninger. Prøv å søke etter Oslo eller en annen by.`
               )
             }
           } else {
@@ -348,13 +375,13 @@ class RateHawkClient {
       
       console.log('🏨 Total hotels received from API:', hotelData.length)
       
-      // BEGRENS til 20 hoteller FØR parsing for å spare ressurser
-      const limitedHotelData = hotelData.slice(0, 20)
-      console.log('🏨 Processing first 20 hotels only')
+      // BEGRENS til 15 hoteller for å holde oss under 30 req/60s-grensen på /hotel/info/
+      const limitedHotelData = hotelData.slice(0, 15)
+      console.log('🏨 Processing first 15 hotels')
       
       if (limitedHotelData && Array.isArray(limitedHotelData) && limitedHotelData.length > 0) {
-        // Prosesser hoteller parallelt for bedre ytelse
-        const hotelPromises = limitedHotelData.map(async (hotel: any) => {
+        // Prosesser hoteller med begrenset samtidighet for å unngå endpoint_exceeded_limit
+        const hotelTasks = limitedHotelData.map((hotel: any) => async () => {
           // Beregn antall netter
           const checkInDate = new Date(params.checkIn)
           const checkOutDate = new Date(params.checkOut)
@@ -394,24 +421,29 @@ class RateHawkClient {
             pricePerNight: pricePerNight.toFixed(2)
           })
           
-          // Hent statisk info fra /hotel/info/ for bedre data (stjerner, adresse, amenities)
+          // Hent statisk info for hotellnavn, adresse, bilder og stjerner
+          // TODO: Erstatt med regional dump-oppslag (DB) for å overholde 30 RPM-grensen
           const hotelId = hotel.id || hotel.hid
           let staticInfo: any = null
-          
           if (hotelId) {
             try {
-              staticInfo = await this.getHotelStaticInfo(hotelId.toString(), typeof hotelId === 'number' ? hotelId : undefined)
+              staticInfo = await this.getHotelStaticInfo(
+                hotelId.toString(),
+                typeof hotelId === 'number' ? hotelId : undefined
+              )
             } catch (error) {
               logger.warn('Could not fetch static info for hotel', {
                 hotelId,
                 error: error instanceof Error ? error.message : String(error)
               })
-              // Fortsett med søkeresultat-data hvis static info feiler
             }
           }
           
           // Bruk statisk info hvis tilgjengelig, ellers fallback til søkeresultat
-          const hotelName = staticInfo?.name || staticInfo?.hotel_name || hotel.name || hotel.hotel_name || 'Hotel ID: ' + hotelId
+          const hotelName = staticInfo?.name || staticInfo?.hotel_name || hotel.name || hotel.hotel_name
+            || (hotelId ? hotelId.toString().replace(/_/g, ' ').split(' ')
+                .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+              : 'Ukjent hotell')
           
           // Adresse fra statisk info eller søkeresultat
           let hotelAddress = 'Address not available'
@@ -564,8 +596,8 @@ class RateHawkClient {
           }
         })
         
-        // Vent på alle hoteller å bli prosessert
-        const processedHotels = await Promise.all(hotelPromises)
+        // Kjør maks 3 parallelle /hotel/info/-kall for å unngå rate-limit
+        const processedHotels = await runWithConcurrency(hotelTasks, 3)
         hotels.push(...processedHotels)
       }
 
@@ -586,7 +618,7 @@ class RateHawkClient {
       let userFriendlyError = 'Kunne ikke søke etter hoteller'
       
       if (errorMessage.includes('invalid region_id') || errorMessage.includes('cannot be searched')) {
-        userFriendlyError = 'Denne destinasjonen kan ikke søkes i sandbox-miljøet. Prøv å søke etter Oslo eller test hotel (ID: 8473727).'
+        userFriendlyError = 'Denne destinasjonen kan ikke søkes i sandbox-miljøet. Prøv å søke etter Oslo eller en annen by.'
       } else if (errorMessage.includes('RateHawk API credentials missing')) {
         userFriendlyError = 'API-nøkler mangler. Kontakt support.'
       } else if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
@@ -646,8 +678,6 @@ class RateHawkClient {
       'SFO': { lat: 37.7749, lon: -122.4194 }, // San Francisco
       'MIA': { lat: 25.7617, lon: -80.1918 }, // Miami
       
-      // Test hotel - bruk Oslo koordinater
-      '8473727': { lat: 59.9139, lon: 10.7522 },
     }
     
     return knownCoordinates[destination] || knownCoordinates[regionId] || { lat: 40.7128, lon: -74.0060 } // Default NYC for testing
@@ -835,10 +865,12 @@ class RateHawkClient {
         return null
       }
 
-      const params: any = {
-        language: 'en'
+      const cacheKey = hid ? `hid:${hid}` : `id:${hotelId}`
+      if (this.hotelInfoCache.has(cacheKey)) {
+        return this.hotelInfoCache.get(cacheKey)
       }
 
+      const params: any = { language: 'en' }
       if (hid) {
         params.hid = hid
       } else if (hotelId) {
@@ -849,24 +881,39 @@ class RateHawkClient {
 
       console.log('🏨 Fetching static hotel info from /hotel/info/:', params)
       const data = await this.makeRequest('/hotel/info/', params, 'POST')
-      
-      console.log('🏨 Static info response for', params.id || params.hid, ':', {
-        hasData: !!data?.data,
-        hasImages: !!data?.data?.images,
-        imagesCount: data?.data?.images?.length || 0,
-        hasAmenities: !!data?.data?.amenities,
-        amenitiesCount: data?.data?.amenities?.length || 0
-      })
-      
-      if (data?.data) {
-        return data.data
-      }
-      
-      return null
+
+      const result = data?.data ?? null
+      this.hotelInfoCache.set(cacheKey, result)
+      return result
     } catch (error: any) {
       console.warn('⚠️ Failed to fetch static hotel info:', error.message)
+      // Cache null så vi ikke prøver igjen for dette hotellet
+      const cacheKey = hid ? `hid:${hid}` : `id:${hotelId}`
+      this.hotelInfoCache.set(cacheKey, null)
       return null
     }
+  }
+
+  private normalizeImageUrl(raw: string): string {
+    let url = raw.includes('{size}') ? raw.replace('{size}', '1024x768') : raw
+    if (url.startsWith('//')) url = 'https:' + url
+    url = url.replace(/^https?:\/\/\/+/, 'https://')
+    url = url
+      .replace(/cddn\.worldota\.net/g, 'cdn.worldota.net')
+      .replace(/cdn\.worlldota\.net/g, 'cdn.worldota.net')
+      .replace(/cdn\.woorldota\.net/g, 'cdn.worldota.net')
+      .replace(/cdn\.worldota\.\.net/g, 'cdn.worldota.net')
+      .replace(/cdn\.worldota\.neet/g, 'cdn.worldota.net')
+      .replace(/\/\/worlldota\.net/g, '//cdn.worldota.net')
+    url = url.replace(/(cdn\.worldota\.net\/)tt\//, '$1t/')
+    url = url.replace(/\/contentt\//g, '/content/')
+    url = url.replace(/\/contennt\//g, '/content/')
+    url = url.replace(/\/conntent\//g, '/content/')
+    url = url.replace(/^htttps:\/\//, 'https://')
+    url = url.replace(/^httpps:\/\//, 'https://')
+    url = url.replace(/^httpss:\/\//, 'https://')
+    url = url.replace(/\.(JPEG|JPG|PNG|WEBP|GIF)$/, (ext) => ext.toLowerCase())
+    return url
   }
 
   // Parse alle bilder fra RateHawk images array
@@ -875,15 +922,34 @@ class RateHawkClient {
       return []
     }
 
+    const normalize = (raw: string): string => {
+      let url = raw.includes('{size}') ? raw.replace('{size}', '1024x768') : raw
+      if (url.startsWith('//')) url = 'https:' + url
+      url = url.replace(/^https?:\/\/\/+/, 'https://')
+      url = url
+        .replace(/cddn\.worldota\.net/g, 'cdn.worldota.net')
+        .replace(/cdn\.worlldota\.net/g, 'cdn.worldota.net')
+        .replace(/cdn\.woorldota\.net/g, 'cdn.worldota.net')
+        .replace(/cdn\.worldota\.\.net/g, 'cdn.worldota.net')
+        .replace(/cdn\.worldota\.neet/g, 'cdn.worldota.net')
+        .replace(/\/\/worlldota\.net/g, '//cdn.worldota.net')
+      url = url.replace(/(cdn\.worldota\.net\/)tt\//, '$1t/')
+      url = url.replace(/\/contentt\//g, '/content/')
+      url = url.replace(/^htttps:\/\//, 'https://')
+      url = url.replace(/^httpps:\/\//, 'https://')
+      url = url.replace(/^httpss:\/\//, 'https://')
+      url = url.replace(/\.(JPEG|JPG|PNG|WEBP|GIF)$/, (ext) => ext.toLowerCase())
+      return url
+    }
+
     const parsedImages: string[] = []
-    
     for (const img of images) {
       if (typeof img === 'string') {
-        // Direkte URL string - erstatt {size} placeholder
-        parsedImages.push(img.replace('{size}', '1024x768'))
+        parsedImages.push(normalize(img))
       } else if (img?.url) {
-        // Objekt med url property
-        parsedImages.push(img.url.replace('{size}', '1024x768'))
+        parsedImages.push(normalize(img.url))
+      } else if (img?.tmpl) {
+        parsedImages.push(normalize(img.tmpl))
       }
     }
 
@@ -998,78 +1064,215 @@ class RateHawkClient {
   private formatAmenityName(amenity: string): string {
     // Map RateHawk amenity-koder til norske navn
     const amenityMap: Record<string, string> = {
-      // Basis
+      // Internett
       'free-wifi': 'Gratis WiFi',
       'wifi': 'WiFi',
+      'free-wifi-in-all-rooms': 'Gratis WiFi i alle rom',
+      'free-internet': 'Gratis internett',
+      'internet': 'Internett',
+      'wired-internet': 'Kablet internett',
+
+      // Parkering
       'parking': 'Parkering',
       'free-parking': 'Gratis parkering',
-      
-      // Rom
+      'garage-parking': 'Garasje',
+      'private-parking': 'Privat parkering',
+      'secured-parking': 'Sikret parkering',
+      'valet-parking': 'Valet-parkering',
+
+      // Rom – luft/temperatur
       'air-conditioning': 'Aircondition',
       'air-conditioned': 'Aircondition',
       'heating': 'Oppvarming',
+      'fan': 'Vifte',
+
+      // Rom – elektronikk
       'tv': 'TV',
       'television': 'TV',
+      'flat-screen-tv': 'Flatskjerm-TV',
+      'cable-tv': 'Kabel-TV',
+      'satellite-tv': 'Satellitt-TV',
+      'telephone': 'Telefon',
       'safe': 'Safe',
+      'laptop-safe': 'Laptop-safe',
+      'alarm-clock': 'Vekkerklokke',
+
+      // Rom – møbler
       'minibar': 'Minibar',
       'balcony': 'Balkong',
       'terrace': 'Terrasse',
+      'patio': 'Uteplass',
+      'desk': 'Skrivebord',
+      'sofa': 'Sofa',
+      'seating-area': 'Sitteområde',
+      'dressing-room': 'Omkledningsrom',
+      'closet': 'Garderobe',
+      'wardrobe': 'Garderobe',
+      'ironing-facilities': 'Strykefasiliteter',
+      'iron': 'Strykejern',
+      'iron-and-board': 'Strykejern og brett',
+
+      // Bad
       'bathtub': 'Badekar',
       'shower': 'Dusj',
-      'hairdryer': 'Føner',
-      'iron': 'Strykejern',
-      'desk': 'Skrivebord',
-      
+      'hairdryer': 'Hårtørker',
+      'hair-dryer': 'Hårtørker',
+      'toilet': 'Toalett',
+      'bidet': 'Bide',
+      'towels': 'Håndklær',
+      'toiletries': 'Toalettartikler',
+      'slippers': 'Tøfler',
+      'bathrobe': 'Badekappe',
+      'shared-bathroom': 'Delt bad',
+      'private-bathroom': 'Privat bad',
+      'en-suite-bathroom': 'Eget bad',
+
       // Senger
-      'king-bed': 'King size seng',
-      'queen-bed': 'Queen size seng',
+      'king-bed': 'King size-seng',
+      'king-size-bed': 'King size-seng',
+      'queen-bed': 'Queen size-seng',
+      'queen-size-bed': 'Queen size-seng',
       'double-bed': 'Dobbeltseng',
       'twin-beds': 'To enkeltsenger',
-      
-      // Hotell fasiliteter
+      'single-bed': 'Enkelseng',
+      'bunk-beds': 'Køyesenger',
+      'sofa-bed': 'Sofaseng',
+      'extra-bed': 'Ekstraseng',
+      'baby-crib': 'Babyseng',
+      'crib': 'Barneseng',
+
+      // Utsikt
+      'view-city': 'Utsikt mot by',
+      'city-view': 'Utsikt mot by',
+      'view-sea': 'Havutsikt',
+      'sea-view': 'Havutsikt',
+      'ocean-view': 'Havutsikt',
+      'view-garden': 'Hageutsikt',
+      'garden-view': 'Hageutsikt',
+      'view-pool': 'Bassengutsikt',
+      'pool-view': 'Bassengutsikt',
+      'view-mountain': 'Fjellutsikt',
+      'mountain-view': 'Fjellutsikt',
+      'view-lake': 'Sjøutsikt',
+      'lake-view': 'Sjøutsikt',
+      'street-view': 'Gateutsikt',
+      'courtyard-view': 'Gårdsutsikt',
+
+      // Hotell – basseng
       'swimming-pool': 'Svømmebasseng',
       'pool': 'Basseng',
       'indoor-pool': 'Innendørs basseng',
       'outdoor-pool': 'Utendørs basseng',
+      'heated-pool': 'Oppvarmet basseng',
+      'infinity-pool': 'Uendelighetsbasseng',
+      'hot-tub': 'Boblebad',
+      'jacuzzi': 'Jacuzzi',
+      'whirlpool': 'Boblebad',
+
+      // Hotell – velvære
       'gym': 'Treningssenter',
       'fitness-center': 'Treningssenter',
       'fitness': 'Treningssenter',
+      'fitness-room': 'Treningsrom',
       'spa': 'Spa',
       'sauna': 'Badstu',
+      'steam-room': 'Dampbad',
+      'massage': 'Massasje',
+      'wellness-center': 'Velværesenter',
+
+      // Hotell – mat og drikke
       'restaurant': 'Restaurant',
       'bar': 'Bar',
       'breakfast': 'Frokost',
+      'breakfast-included': 'Frokost inkludert',
       'breakfast-buffet': 'Frokostbuffet',
+      'buffet-breakfast': 'Frokostbuffet',
+      'all-inclusive': 'Alt inkludert',
+      'half-board': 'Halvpensjon',
+      'full-board': 'Helpensjon',
       'room-service': 'Romservice',
-      '24-hour-front-desk': '24-timers resepsjon',
+      'mini-kitchen': 'Tekjøkken',
+      'vending-machine': 'Automat',
+
+      // Hotell – tjenester
+      '24-hour-front-desk': '24t resepsjon',
+      '24-hour-reception': '24t resepsjon',
+      'front-desk': 'Resepsjon',
+      'reception': 'Resepsjon',
       'concierge': 'Concierge',
       'elevator': 'Heis',
       'lift': 'Heis',
-      
-      // Spesielle
-      'pet-friendly': 'Kjæledyr tillatt',
-      'pets-allowed': 'Kjæledyr tillatt',
-      'family-rooms': 'Familierom',
-      'non-smoking': 'Røykfritt',
-      'non-smoking-rooms': 'Røykfrie rom',
-      'accessible': 'Tilgjenglighet',
-      'wheelchair-accessible': 'Rullestoltilgjengelig',
-      
+      'luggage-storage': 'Bagasjeoppbevaring',
+      'safe-deposit-box': 'Safe',
+      'currency-exchange': 'Valutaveksling',
+      'laundry': 'Vaskeri',
+      'laundry-service': 'Vaskeritjeneste',
+      'dry-cleaning': 'Renseri',
+      'wake-up-service': 'Vekkertjeneste',
+      'shuttle-service': 'Shuttlebuss',
+      'airport-shuttle': 'Flyplass-shuttle',
+      'car-rental': 'Bilutleie',
+      'tour-desk': 'Turistskranke',
+      'tickets-service': 'Billetttjeneste',
+      'ATM': 'Minibank',
+      'atm': 'Minibank',
+
       // Business
       'business-center': 'Forretningssenter',
       'meeting-rooms': 'Møterom',
       'conference-facilities': 'Konferansefasiliteter',
-      
-      // Internet
-      'free-wifi-in-all-rooms': 'Gratis WiFi i alle rom',
-      'free-internet': 'Gratis internett',
-      
+      'fax': 'Faks',
+      'printing': 'Skrivertjeneste',
+
       // Kjøkken
       'kitchenette': 'Tekjøkken',
       'kitchen': 'Kjøkken',
       'microwave': 'Mikrobølgeovn',
       'refrigerator': 'Kjøleskap',
+      'fridge': 'Kjøleskap',
       'coffee-maker': 'Kaffetrakter',
+      'coffee-machine': 'Kaffemaskin',
+      'kettle': 'Vannkoker',
+      'electric-kettle': 'Elektrisk vannkoker',
+      'dishwasher': 'Oppvaskmaskin',
+      'oven': 'Ovn',
+      'stovetop': 'Koketopp',
+      'toaster': 'Brødrister',
+      'cookware': 'Kokekar',
+      'dining-area': 'Spiseområde',
+      'dining-table': 'Spisebord',
+
+      // Utendørs
+      'garden': 'Hage',
+      'bbq': 'Grill (BBQ)',
+      'beach': 'Strand',
+      'beach-access': 'Strandadgang',
+      'beach-front': 'Strandlinje',
+      'sun-deck': 'Soldekk',
+      'terrace-sun': 'Terrasse/soldekk',
+
+      // Spesielle
+      'pet-friendly': 'Kjæledyr tillatt',
+      'pets-allowed': 'Kjæledyr tillatt',
+      'pets': 'Kjæledyr tillatt',
+      'family-rooms': 'Familierom',
+      'family-friendly': 'Familievennlig',
+      'kids-club': 'Barneclub',
+      'playground': 'Lekeplass',
+      'non-smoking': 'Røykfritt',
+      'non-smoking-rooms': 'Røykfrie rom',
+      'smoking-allowed': 'Røyking tillatt',
+      'accessible': 'Tilgjengelig',
+      'wheelchair-accessible': 'Rullestoltilgjengelig',
+      'disability-facilities': 'Tilpasset funksjonshemmede',
+
+      // Ekstra
+      'newspapers': 'Aviser',
+      'library': 'Bibliotek',
+      'chapel': 'Kapell',
+      'casino': 'Kasino',
+      'entertainment': 'Underholdning',
+      'nightclub': 'Nattklubb',
     }
     
     // Sjekk om vi har en direkte mapping
@@ -1091,13 +1294,6 @@ class RateHawkClient {
   private async getRegionId(destination: string): Promise<string | null> {
     try {
       console.log('🔍 Getting region ID for:', destination)
-
-      // VIKTIG: Sjekk om destinasjonen er et hotel ID (test hotel eller hotel fra multicomplete)
-      // Hotels fra multicomplete har hid (numeric) eller id (string)
-      if (destination === '8473727' || destination === 'test_hotel_do_not_book') {
-        console.log('🔍 This is TEST HOTEL ID - will search by hotel ID')
-        return destination
-      }
 
       // Sjekk om destination allerede er et region ID (numerisk streng > 10000)
       if (/^\d+$/.test(destination)) {
@@ -1121,7 +1317,6 @@ class RateHawkClient {
         'AMS': '1783', // Amsterdam
         'STO': '2275', // Stockholm
         'ROM': '1991', // Rome
-        '8473727': '2563' // Test hotel - prøver Oslo region som test
       }
 
       // Hvis destinasjonen er en kjent IATA kode, returner tilsvarende region ID
@@ -1184,8 +1379,9 @@ class RateHawkClient {
     checkIn: string
     checkOut: string
     adults: number
-    children?: number
+    children?: number[]
     rooms?: number
+    roomConfigs?: { adults: number; childAges: number[] }[]
     currency?: string
   }) {
     try {
@@ -1195,11 +1391,10 @@ class RateHawkClient {
         throw new Error('RateHawk API credentials missing')
       }
 
-      // Bygg guests array
-      const guests = [{
-        adults: params.adults,
-        children: params.children ? Array(params.children).fill(0) : []
-      }]
+      // Bygg guests array per rom hvis roomConfigs er tilgjengelig
+      const guests = params.roomConfigs && params.roomConfigs.length > 0
+        ? params.roomConfigs.map(r => ({ adults: r.adults, children: r.childAges || [] }))
+        : [{ adults: params.adults, children: Array.isArray(params.children) ? params.children : [] }]
 
       // Bygg request basert på om vi har hotelId (string) eller hid (number)
       // Note: getHotelDetails brukes ikke direkte med userCountry, men kan utvides senere
@@ -1225,7 +1420,7 @@ class RateHawkClient {
       console.log('🏨 Making /search/hp/ request:', requestParams)
 
       const data = await this.makeRequest('/search/hp/', requestParams, 'POST')
-      console.log('🏨 Raw hotelpage response:', JSON.stringify(data, null, 2))
+      console.log('🏨 HP response:', { status: data?.status, hotelsCount: data?.data?.hotels?.length ?? 0 })
 
       // Parse RateHawk hotelpage response
       if (data?.data?.hotels && data.data.hotels.length > 0) {
@@ -1270,22 +1465,219 @@ class RateHawkClient {
           console.warn('⚠️ Could not fetch reviews:', error)
         }
 
+        // Bygg rom-gruppe-bilderegister fra statisk info (/hotel/info/ returnerer room_groups med bilder)
+        // Lagre ALLE grupper (også uten bilder) for rg_ext-matching, men bilder kun der de finnes
+        const rawGroups: any[] = staticInfo?.room_groups || []
+
+        const normalizeImageUrl = (raw: string) => this.normalizeImageUrl(raw)
+
+        const parseGroupPhotos = (group: any): string[] => {
+          const photos: string[] = []
+          const srcImages = Array.isArray(group.images) ? group.images : []
+          const srcImagesExt = Array.isArray(group.images_ext) ? group.images_ext : []
+          const combined = [...srcImages, ...srcImagesExt]
+          if (combined.length > 0) {
+            const first = combined[0]
+            console.log(`🖼️ group "${group.name}" image[0] raw object:`, JSON.stringify(first).substring(0, 150))
+            console.log(`🖼️   typeof: ${typeof first}, fields:`, typeof first === 'object' ? Object.keys(first || {}) : 'string')
+          }
+          combined.slice(0, 2).forEach((img: any) => {
+            const raw = typeof img === 'string' ? img : (img.url || img.tmpl || img.src || img.original || img.path || '')
+            if (raw) {
+              const resolved = normalizeImageUrl(raw)
+              console.log(`🖼️   FULL raw: [${raw}]`)
+              console.log(`🖼️   FULL res: [${resolved}]`)
+            }
+          })
+          combined.slice(0, 6).forEach((img: any) => {
+            const raw = typeof img === 'string' ? img : (img.url || img.tmpl || img.src || img.original || img.path || '')
+            if (raw) {
+              const resolved = normalizeImageUrl(raw)
+              photos.push(resolved)
+            } else {
+              console.log(`🖼️ UKJENT FORMAT:`, JSON.stringify(img).substring(0, 100))
+            }
+          })
+          return photos
+        }
+
+        // Map: room_group_id → { photos, name, rg_ext, size_sqm, view, bathroom_desc, bedding_desc, room_amenities }
+        const groupById = new Map<number, {
+          photos: string[]
+          name: string
+          rg_ext: any
+          size_sqm: number | null
+          view: string | null
+          bathroom_desc: string | null
+          bedding_desc: string | null
+          room_amenities: string[]
+        }>()
+        rawGroups.forEach((group: any) => {
+          if (group.room_group_id !== undefined) {
+            const sizeSqm: number | null = group.area_sqm || group.size_sqm || group.size || null
+            const viewRaw = group.rg_ext?.view_trans || group.view_trans || group.view || null
+            const view: string | null = Array.isArray(viewRaw) ? (viewRaw[0] ?? null) : (typeof viewRaw === 'string' ? viewRaw : null)
+            // Detaljerte bad- og sengebeskrivelser fra name_struct
+            const bathroom_desc: string | null = group.name_struct?.bathroom || null
+            const bedding_desc: string | null = group.name_struct?.bedding_type || null
+            // Rom-spesifikke fasiliteter fra room_amenities
+            const room_amenities: string[] = Array.isArray(group.room_amenities)
+              ? group.room_amenities.map((a: any) => this.formatAmenityName(typeof a === 'string' ? a : (a.name || '')))
+              : []
+            groupById.set(Number(group.room_group_id), {
+              photos: parseGroupPhotos(group),
+              name: (group.name || '').toLowerCase().trim(),
+              rg_ext: group.rg_ext || {},
+              size_sqm: sizeSqm,
+              view,
+              bathroom_desc,
+              bedding_desc,
+              room_amenities,
+            })
+          }
+        })
+
+        console.log('🖼️ Room groups totalt:', rawGroups.length, '– med bilder:', [...groupById.values()].filter(g => g.photos.length > 0).length)
+
         // Parse rom-typer og rates
         const rooms: any[] = []
         if (hotelData.rates && hotelData.rates.length > 0) {
           hotelData.rates.forEach((rate: any) => {
+            // 1. Prøv bilder direkte fra rate.room_data_trans (HP-endpoint)
+            const roomPhotos: string[] = []
+            if (rate.room_data_trans?.main_photo) {
+              roomPhotos.push(rate.room_data_trans.main_photo.replace('{size}', '640x480'))
+            }
+            if (Array.isArray(rate.room_data_trans?.photos)) {
+              (rate.room_data_trans.photos as any[]).slice(0, 5).forEach((p: any) => {
+                const url = typeof p === 'string' ? p : (p.url || p.tmpl || '')
+                if (url) roomPhotos.push(url.replace('{size}', '640x480'))
+              })
+            }
+
+            // Normaliser navn: fjern parenteser, ekstra mellomrom, lowercase
+            const normalizeName = (s: string) =>
+              s.toLowerCase().replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim()
+
+            // 2. Match mot room_groups fra /hotel/info/
+            let matchedGroup: { photos: string[]; name: string; rg_ext: any; size_sqm: number | null; view: string | null } | undefined
+            if (groupById.size > 0) {
+              const rateName = normalizeName(rate.room_data_trans?.main_name || rate.room_name || '')
+              const rateType = normalizeName(rate.room_data_trans?.main_room_type || '')
+
+              // 2a. Direkte room_group_id match (mest pålitelig – finnes på HP-rater)
+              if (rate.room_group_id !== undefined) {
+                matchedGroup = groupById.get(Number(rate.room_group_id))
+              }
+
+              // 2b. Eksakt normalisert navn-match
+              if (!matchedGroup) {
+                for (const g of groupById.values()) {
+                  const gNorm = normalizeName(g.name)
+                  if (gNorm === rateName || gNorm === rateType) {
+                    matchedGroup = g; break
+                  }
+                }
+              }
+
+              // 2c. Prefix/inneholder-match på normalisert navn
+              if (!matchedGroup) {
+                for (const g of groupById.values()) {
+                  const gNorm = normalizeName(g.name)
+                  if (gNorm.length > 3 && (rateName.startsWith(gNorm) || rateType.startsWith(gNorm) || gNorm.startsWith(rateName))) {
+                    matchedGroup = g; break
+                  }
+                }
+              }
+
+              // 2d. rg_ext-match inkludert quality for å skille Standard vs Deluxe
+              if (!matchedGroup && rate.rg_ext) {
+                const re = rate.rg_ext
+                // Prøv først med quality
+                for (const g of groupById.values()) {
+                  if (g.photos.length === 0) continue
+                  if (g.rg_ext.class === re.class && g.rg_ext.bedding === re.bedding &&
+                      g.rg_ext.bathroom === re.bathroom && g.rg_ext.quality === re.quality) {
+                    matchedGroup = g; break
+                  }
+                }
+                // Fallback uten quality
+                if (!matchedGroup) {
+                  for (const g of groupById.values()) {
+                    if (g.photos.length === 0) continue
+                    if (g.rg_ext.class === re.class && g.rg_ext.bedding === re.bedding &&
+                        g.rg_ext.bathroom === re.bathroom) {
+                      matchedGroup = g; break
+                    }
+                  }
+                }
+              }
+
+              // 2e. rg_ext-match uten bilder (for size/view selv om ingen bilder)
+              if (!matchedGroup && rate.rg_ext) {
+                const re = rate.rg_ext
+                for (const g of groupById.values()) {
+                  if (g.rg_ext.class === re.class && g.rg_ext.bedding === re.bedding &&
+                      g.rg_ext.quality === re.quality) {
+                    matchedGroup = g; break
+                  }
+                }
+              }
+
+              if (matchedGroup && roomPhotos.length === 0) roomPhotos.push(...matchedGroup.photos)
+            }
+
+            // Filtrer bort /extranet/-URL-er som ikke er offentlig tilgjengelig
+            const finalPhotos = roomPhotos.filter(url => !url.includes('/extranet/'))
+            console.log(`🖼️ Room "${rate.room_name}" finalPhotos (${finalPhotos.length}):`, finalPhotos.slice(0, 2))
+
+            const rdt = rate.room_data_trans || {}
+            const rgExt = rate.rg_ext || {}
+
+            // Kapasitet: rg_ext.capacity hvis > 0, ellers ikke vis noe (0 = ukjent, ikke 0 gjester)
+            const capacity: number = (rgExt.capacity && rgExt.capacity > 0) ? rgExt.capacity : 0
+
+            // Romstørrelse: hent fra matchet room_group (mer pålitelig enn room_data_trans)
+            const sizeSqm: number | null = matchedGroup?.size_sqm ?? rdt.area_sqm ?? rdt.size_sqm ?? null
+
+            // Utsikt: hent fra matchet room_group
+            const view: string | null = matchedGroup?.view ?? null
+
+            // Detaljert bad- og sengebeskrivelse fra name_struct i rom-gruppen
+            const bathroomDesc: string | null = matchedGroup?.bathroom_desc || null
+            const beddingDesc: string | null = matchedGroup?.bedding_desc || null
+
+            // Rom-fasiliteter fra room_group (mer detaljert enn rate.amenities_data)
+            const groupAmenities: string[] = matchedGroup?.room_amenities || []
+
+            console.log(`🛏 Rate "${rate.room_name}" → rg_ext:`, JSON.stringify(rgExt), '| match:', matchedGroup ? `"${matchedGroup.name}" (${matchedGroup.photos.length} bilder)` : 'INGEN', '| size:', sizeSqm, '| view:', view)
+
+            // Ekstra fasiliteter fra room_data_trans.facilities_trans
+            const facilitiesTrans: string[] = Array.isArray(rdt.facilities_trans)
+              ? rdt.facilities_trans.map((f: any) => (typeof f === 'string' ? f : (f.name || '')))
+              : []
+
             rooms.push({
-              match_hash: rate.match_hash,
-              book_hash: rate.book_hash, // book_hash brukes for booking
-              room_name: rate.room_name || 'Standard Room',
-              room_description: rate.room_data_trans || {},
-              meal: rate.meal || 'room_only',
+              book_hash: rate.book_hash,
+              room_name: rate.room_name || 'Standard rom',
+              rg_ext: rgExt,
               meal_data: rate.meal_data || {},
               daily_prices: rate.daily_prices || [],
               payment_options: rate.payment_options || {},
-              cancellation_policies: rate.cancellation_penalties || {},
-              amenities: rate.amenities_data || [],
-              allotment: rate.allotment || 0
+              cancellation_penalties: rate.cancellation_penalties || null,
+              tax_data: rate.payment_options?.payment_types?.[0]?.tax_data || null,
+              amenities: [
+                ...(rate.amenities_data || []).map((a: string) => this.formatAmenityName(a)),
+                ...groupAmenities.filter((a: string) => a && !(rate.amenities_data || []).map((x: string) => this.formatAmenityName(x)).includes(a))
+              ],
+              facilities_trans: facilitiesTrans,
+              allotment: rate.allotment || 0,
+              capacity,
+              size_sqm: sizeSqm,
+              view,
+              bathroom_desc: bathroomDesc,
+              bedding_desc: beddingDesc,
+              images: finalPhotos
             })
           })
         }
@@ -1306,6 +1698,8 @@ class RateHawkClient {
             check_out_time: staticInfo?.check_out_time || null,
             reviews: reviews,
             review_count: reviews.length,
+            metapolicy_struct: staticInfo?.metapolicy_struct || null,
+            metapolicy_extra_info: staticInfo?.metapolicy_extra_info || null,
             rooms: rooms,
             total_rooms: rooms.length
           }
@@ -1368,6 +1762,7 @@ class RateHawkClient {
         return {
           success: true,
           data: {
+            book_hash: data.data.book_hash, // p- hash som skal brukes i finishBooking
             item_id: data.data.item_id,
             order_id: data.data.order_id,
             partner_order_id: data.data.partner_order_id,
@@ -1391,26 +1786,37 @@ class RateHawkClient {
 
   // Start booking process (Step 3: Finish booking)
   async finishBooking(params: {
+    bookHash: string
     partnerOrderId: string
     userEmail: string
     userPhone: string
     firstName: string
     lastName: string
+    childAges?: number[]
     paymentType: 'deposit' | 'now'
     amount: string
     currencyCode: string
     remarks?: string
   }) {
     try {
-      console.log('💳 Finishing booking:', params)
+      logger.info('Finishing booking', { partnerOrderId: params.partnerOrderId })
 
       if (!this.apiKey || !this.accessToken) {
         throw new Error('RateHawk API credentials missing')
       }
 
+      const childGuests = (params.childAges || []).map((age) => ({
+        first_name: params.firstName,
+        last_name: params.lastName,
+        is_child: true as const,
+        age
+      }))
+
       const requestParams = {
+        book_hash: params.bookHash,
         user: {
-          email: params.userEmail,
+          // Corporate email brukes for å forhindre at RateHawk sender voucher med nettopris til gjest
+          email: 'bookings@kulbruk.no',
           phone: params.userPhone,
           comment: params.remarks || ''
         },
@@ -1418,7 +1824,7 @@ class RateHawkClient {
           first_name_original: params.firstName,
           last_name_original: params.lastName,
           phone: params.userPhone,
-          email: params.userEmail
+          email: 'bookings@kulbruk.no'
         },
         partner: {
           partner_order_id: params.partnerOrderId,
@@ -1432,7 +1838,8 @@ class RateHawkClient {
               {
                 first_name: params.firstName,
                 last_name: params.lastName
-              }
+              },
+              ...childGuests
             ]
           }
         ],
@@ -1444,32 +1851,52 @@ class RateHawkClient {
         return_path: 'https://kulbruk.no/hotell/booking-confirmation'
       }
 
-      console.log('💳 Making /hotel/order/booking/finish/ request')
+      logger.debug('Making /hotel/order/booking/finish/ request')
 
       const data = await this.makeRequest('/hotel/order/booking/finish/', requestParams, 'POST')
-      console.log('💳 Raw finish booking response:', JSON.stringify(data, null, 2))
+      logger.debug('Finish booking response received', { status: data?.status, error: data?.error })
 
-      // For deposit payment, data kan være null i sandbox - status 'ok' betyr suksess
-      if (data?.status === 'ok') {
+      // Finale feil som stopper bookingprosessen
+      const FINAL_FINISH_ERRORS = ['booking_form_expired', 'rate_not_found']
+      if (data?.status === 'error' && FINAL_FINISH_ERRORS.includes(data?.error)) {
+        return { success: false as const, isFinal: true, error: data.error }
+      }
+
+      // For ok-status og ikke-finale feil: fortsett til polling
+      return {
+        success: true as const,
+        shouldPoll: true,
+        data: {
+          order_id: data?.data?.order_id || 0,
+          partner_order_id: params.partnerOrderId,
+          status: 'in_progress',
+          item_id: data?.data?.item_id || 0
+        }
+      }
+
+    } catch (error: any) {
+      logger.error('RateHawk Finish Booking Error', {
+        partnerOrderId: params.partnerOrderId,
+        error: error.message
+      })
+      Sentry.captureException(error)
+
+      // 5xx, timeout og unknown er ikke-finale feil – fortsett til polling
+      const statusCode = (error as any).statusCode
+      if (!statusCode || statusCode >= 500) {
         return {
-          success: true,
+          success: true as const,
+          shouldPoll: true,
           data: {
-            order_id: data.data?.order_id || 0,
+            order_id: 0,
             partner_order_id: params.partnerOrderId,
-            status: 'initiated', // Status må sjekkes med check booking
-            item_id: data.data?.item_id || 0
+            status: 'in_progress',
+            item_id: 0
           }
         }
       }
 
-      throw new Error(data?.error || 'Booking finish failed')
-
-    } catch (error: any) {
-      console.error('❌ RateHawk Finish Booking Error:', error)
-      return {
-        success: false,
-        error: error.message || 'Failed to finish booking'
-      }
+      return { success: false as const, isFinal: true, error: error.message || 'Failed to finish booking' }
     }
   }
 
@@ -1701,9 +2128,6 @@ class RateHawkClient {
     // Returner en kuratert liste over populære destinasjoner
     // Shuffle for å vise forskjellige destinasjoner hver gang
     const allDestinations = [
-      // Test hotel først (viktig for testing!)
-      { id: '8473727', name: 'Test Hotel (Do Not Book)', country: 'Test', type: 'hotel' },
-      
       // Europa
       { id: '2563', name: 'Oslo', country: 'Norway', type: 'city' },
       { id: '2275', name: 'Stockholm', country: 'Sweden', type: 'city' },
@@ -1812,17 +2236,6 @@ class RateHawkClient {
               type: 'hotel',
               country: ''
             })
-          })
-        }
-
-        // ALLTID legg til test hotel i resultatene (for testing)
-        const hasTestHotel = destinations.some(d => d.id === '8473727')
-        if (!hasTestHotel) {
-          destinations.unshift({
-            id: '8473727',
-            name: 'Test Hotel (Do Not Book)',
-            type: 'hotel',
-            country: 'Test'
           })
         }
 
@@ -1946,6 +2359,43 @@ class RateHawkClient {
     } catch (error) {
       console.error('❌ RateHawk Destination Search Error:', error)
       throw error
+    }
+  }
+
+  // Hent første tilgjengelige hotellbilde fra en region – brukes kun for destinasjonskort
+  // Gjør maks 5 /hotel/info/-kall sekvensielt for å respektere rate-limit
+  async getRegionPreviewImage(
+    regionId: string,
+    checkIn: string,
+    checkOut: string,
+  ): Promise<string | null> {
+    const PLACEHOLDER = null
+    try {
+      const residency = this.getUserResidency(null)
+      const data = await this.makeRequest('/search/serp/region/', {
+        region_id: parseInt(regionId),
+        checkin: checkIn,
+        checkout: checkOut,
+        residency,
+        language: 'en',
+        guests: [{ adults: 2, children: [] }],
+        currency: 'NOK',
+      }, 'POST')
+
+      const hotels: any[] = data?.data?.hotels || data?.hotels || []
+      if (!hotels.length) return PLACEHOLDER
+
+      // Prøv de første 5 hotellene sekvensielt – stopp ved første bilde
+      for (const h of hotels.slice(0, 5)) {
+        const info = await this.getHotelStaticInfo(h.id, h.hid)
+        if (info?.images?.length) {
+          const raw = typeof info.images[0] === 'string' ? info.images[0] : info.images[0]?.url
+          if (raw) return this.normalizeImageUrl(raw)
+        }
+      }
+      return PLACEHOLDER
+    } catch {
+      return PLACEHOLDER
     }
   }
 

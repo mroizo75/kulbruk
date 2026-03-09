@@ -9,16 +9,17 @@ import { ArrowLeft, MapPin, Star, Wifi, Coffee, Car, Utensils, Check, X, Loader2
 import Link from 'next/link'
 
 interface Room {
-  match_hash: string
+  book_hash: string
   room_name: string
-  room_description: any
-  meal: string
+  room_data_trans: any
   meal_data: any
   daily_prices: any[]
   payment_options: any
-  cancellation_policies: any
+  cancellation_penalties: any
+  tax_data: any
   amenities: string[]
   allotment: number
+  images?: string[]
 }
 
 interface HotelDetails {
@@ -96,16 +97,25 @@ export default function HotelDetailsPage() {
     return `${total.toFixed(0)} NOK`
   }
 
-  // Få måltids-type tekst
-  const getMealText = (meal: string) => {
-    const mealMap: Record<string, string> = {
-      'room_only': 'Kun rom',
-      'breakfast': 'Frokost inkludert',
-      'half_board': 'Halvpensjon',
-      'full_board': 'Helpensjon',
-      'all_inclusive': 'All inclusive'
-    }
-    return mealMap[meal] || meal
+  const MEAL_MAP: Record<string, string> = {
+    'all-inclusive': 'Alt inklusiv',
+    'breakfast': 'Frokost inkludert',
+    'breakfast-buffet': 'Frokostbuffet',
+    'continental-breakfast': 'Kontinental frokost',
+    'full-board': 'Helpensjon',
+    'half-board': 'Halvpensjon',
+    'nomeal': 'Kun rom',
+    'room_only': 'Kun rom',
+    'some-meal': 'Måltid inkludert',
+    'super-all-inclusive': 'Super alt inklusiv',
+    'soft-all-inclusive': 'Myk alt inklusiv',
+    'ultra-all-inclusive': 'Ultra alt inklusiv',
+  }
+
+  const getMealText = (mealData: any): string => {
+    const value = mealData?.value
+    if (!value) return 'Kun rom'
+    return MEAL_MAP[value] || value
   }
 
   if (isLoading) {
@@ -242,7 +252,7 @@ export default function HotelDetailsPage() {
                     <div className="flex items-center mb-3">
                       <Utensils className="h-4 w-4 mr-2 text-green-600" />
                       <span className="text-sm font-medium text-green-600">
-                        {getMealText(room.meal)}
+                        {getMealText(room.meal_data)}
                       </span>
                     </div>
 
@@ -282,9 +292,7 @@ export default function HotelDetailsPage() {
                     <Button 
                       className="bg-green-600 hover:bg-green-700 w-full md:w-auto"
                       onClick={() => {
-                        // TODO: Implementer prebook/booking flow
-                        console.log('Booking room:', room.match_hash)
-                        alert('Booking-funksjonalitet kommer snart!')
+                        window.location.href = `/hotell?destination=${params.id}&checkIn=${checkIn}&checkOut=${checkOut}&adults=${adults}&children=${children}&rooms=${rooms}`
                       }}
                     >
                       Velg dette rommet

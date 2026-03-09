@@ -29,6 +29,13 @@ function PaymentForm({
   onError, 
   guestInfo,
   prebookData,
+  bookHash,
+  childAges,
+  hotelName,
+  checkIn,
+  checkOut,
+  adults,
+  rooms,
   selectedPaymentType,
   remarks,
   isProcessing,
@@ -38,6 +45,13 @@ function PaymentForm({
   onError: (error: string) => void
   guestInfo: any
   prebookData: any
+  bookHash: string
+  childAges: number[]
+  hotelName: string
+  checkIn: string
+  checkOut: string
+  adults: number
+  rooms: number
   selectedPaymentType: any
   remarks?: string
   isProcessing: boolean
@@ -87,6 +101,13 @@ function PaymentForm({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             partnerOrderId: prebookData.partner_order_id,
+            bookHash,
+            childAges,
+            hotelName,
+            checkIn,
+            checkOut,
+            adults,
+            rooms,
             guestInfo,
             paymentType: selectedPaymentType,
             paymentIntentId: paymentIntent.id
@@ -152,14 +173,13 @@ interface HotelBookingDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   roomData: {
-    match_hash: string
     book_hash: string
     room_name: string
     hotel_name: string
     checkIn: string
     checkOut: string
     adults: number
-    children: number
+    children: number[]
     rooms: number
     totalPrice: string
   }
@@ -483,7 +503,7 @@ export default function HotelBookingDialog({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Gjester:</span>
-                    <span>{roomData.adults} voksne, {roomData.children} barn</span>
+                    <span>{roomData.adults} voksne, {Array.isArray(roomData.children) ? roomData.children.length : roomData.children} barn</span>
                   </div>
                   <div className="flex justify-between pt-2 border-t">
                     <span className="font-semibold">Total pris:</span>
@@ -795,6 +815,13 @@ export default function HotelBookingDialog({
                     onError={(err) => setError(err)}
                     guestInfo={guestInfo}
                     prebookData={prebookData}
+                    bookHash={recheckData?.book_hash || prebookData?.book_hash || roomData.book_hash}
+                    childAges={Array.isArray(roomData.children) ? roomData.children : []}
+                    hotelName={roomData.hotel_name}
+                    checkIn={roomData.checkIn}
+                    checkOut={roomData.checkOut}
+                    adults={roomData.adults}
+                    rooms={roomData.rooms}
                     selectedPaymentType={selectedPaymentType}
                     remarks={bookingRemarks}
                     isProcessing={isLoading}

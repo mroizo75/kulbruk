@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     console.log('🏨 API: Hotel details request received')
 
     const body = await request.json()
-    const { hotelId, hid, checkIn, checkOut, adults, children, rooms, currency } = body
+    const { hotelId, hid, checkIn, checkOut, adults, children, rooms, roomConfigs, currency } = body
 
     console.log('🏨 API: Request params:', { hotelId, hid, checkIn, checkOut, adults, children, rooms })
 
@@ -28,8 +28,9 @@ export async function POST(request: NextRequest) {
       checkIn,
       checkOut,
       adults,
-      children: children || 0,
+      children: Array.isArray(children) ? children : [],
       rooms: rooms || 1,
+      roomConfigs: Array.isArray(roomConfigs) ? roomConfigs : undefined,
       currency: currency || 'NOK'
     })
 

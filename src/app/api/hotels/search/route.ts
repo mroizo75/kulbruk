@@ -16,32 +16,35 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('🏨 API: Request body:', body)
 
-    // Hent user country fra session/database
-    let userCountry: string | null = null
-    try {
-      const session = await getServerSession(authOptions)
-      if (session?.user?.email) {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: session.user.email },
-          select: { location: true }
-        })
-        userCountry = dbUser?.location || null
+    // Residency fra skjema brukes direkte (støtter korrekt prissetting per pass)
+    // Fallback til brukerens kontraktland hvis ikke oppgitt
+    let userCountry: string | null = body.residency || null
+    if (!userCountry) {
+      try {
+        const session = await getServerSession(authOptions)
+        if (session?.user?.email) {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: session.user.email },
+            select: { location: true }
+          })
+          userCountry = dbUser?.location || null
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not fetch user country:', error)
       }
-    } catch (error) {
-      console.warn('⚠️ Could not fetch user country:', error)
     }
 
     const params: RateHawkHotelSearchParams = {
       destination: body.destination,
+      destinationType: body.destinationType || '',
       checkIn: body.checkIn,
       checkOut: body.checkOut,
       adults: body.adults || 2,
-      children: body.children || [],
+      children: Array.isArray(body.children) ? body.children : [],
       rooms: body.rooms || 1,
+      roomConfigs: Array.isArray(body.roomConfigs) ? body.roomConfigs : undefined,
       currency: body.currency || 'NOK'
     }
-
-    console.log('🏨 API: Searching hotels with params:', params, 'userCountry:', userCountry)
 
     const result = await ratehawkClient.searchHotels(params, userCountry)
 
@@ -94,7 +97,7 @@ export async function POST(request: NextRequest) {
     // Parse feilmelding for bedre brukeropplevelse
     let userFriendlyError = 'Kunne ikke søke etter hoteller'
     if (err.message?.includes('region') || err.message?.includes('cannot be searched')) {
-      userFriendlyError = 'Denne destinasjonen kan ikke søkes. Prøv Oslo eller test hotel (ID: 8473727).'
+      userFriendlyError = 'Denne destinasjonen kan ikke søkes. Prøv en annen by, f.eks. Oslo.'
     }
 
     const errorBody = {

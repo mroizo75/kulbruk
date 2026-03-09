@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from 'react'
 import HotelSearchForm from '@/components/hotel-search-form'
 import HotelResults from '@/components/hotel-results'
+import HotelDetailsDialog from '@/components/hotel-details-dialog'
 import { Card, CardContent } from '@/components/ui/card'
 import { Bed, Star, MapPin, Wifi, Car, Utensils } from 'lucide-react'
 import { RateHawkHotel } from '@/lib/types'
@@ -15,16 +16,29 @@ interface PopularDestination {
   image: string
 }
 
+interface RoomConfig {
+  adults: number
+  childAges: number[]
+}
+
 interface HotelSearchFormData {
   destination: string
+  destinationLabel?: string
+  destinationType?: string
   checkIn: string
   checkOut: string
-  adults: number
-  children: number
-  rooms: number
+  rooms: RoomConfig[]
+  residency: string
+  currency?: string
 }
 
 const PLACEHOLDER_SVG = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%23e5e7eb" width="800" height="450"/%3E%3Ctext fill="%239ca3af" font-family="system-ui" font-size="24" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3E' + encodeURIComponent('Laster...') + '%3C/text%3E%3C/svg%3E'
+
+interface DebugEntry {
+  ts: string
+  step: string
+  data: unknown
+}
 
 export default function HotellPage() {
   const [searchResults, setSearchResults] = useState<RateHawkHotel[] | null>(null)
@@ -32,47 +46,87 @@ export default function HotellPage() {
   const [searchParams, setSearchParams] = useState<HotelSearchFormData | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [popularDestinations, setPopularDestinations] = useState<PopularDestination[]>([])
+  const [debugLog, setDebugLog] = useState<DebugEntry[]>([])
+  const [showDebug, setShowDebug] = useState(true)
   const resultsRef = useRef<HTMLDivElement>(null)
 
+  // Hotel chunk: direkte dialog når spesifikt hotell velges fra autocomplete
+  const [directHotelId, setDirectHotelId] = useState<string | null>(null)
+  const [directDialogOpen, setDirectDialogOpen] = useState(false)
+  const [directSearchParams, setDirectSearchParams] = useState<HotelSearchFormData | null>(null)
+
+  const dbg = (step: string, data: unknown = {}) => {
+    const entry: DebugEntry = { ts: new Date().toISOString().split('T')[1].slice(0, 12), step, data }
+    console.log(`[DBG] ${entry.ts} ${step}`, data)
+    setDebugLog(prev => [...prev.slice(-49), entry])
+  }
+
   const handleHotelSearch = async (data: HotelSearchFormData) => {
-    console.log('🏨 Client: Initiating hotel search:', data)
+    dbg('1. onSearch kalt', { destination: data.destination, destinationType: data.destinationType, checkIn: data.checkIn, checkOut: data.checkOut, rooms: data.rooms })
+
+    // Hotel chunk: spesifikt hotell valgt → gå direkte til HP uten SERP
+    if (data.destinationType === 'hotel' && data.destination) {
+      dbg('2. Hotel chunk: direkte til HP', { hotelId: data.destination })
+      setDirectHotelId(data.destination)
+      setDirectSearchParams(data)
+      setDirectDialogOpen(true)
+      return
+    }
+
+    dbg('2. Starter vanlig søk')
     setIsSearching(true)
     setSearchParams(data)
     setSearchError(null)
     setSearchResults(null)
 
+    const totalAdults = data.rooms.reduce((s, r) => s + r.adults, 0)
+    const allChildAges = data.rooms.flatMap(r => r.childAges)
+    const requestBody = {
+      destination: data.destination,
+      destinationType: data.destinationType || '',
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      adults: totalAdults,
+      children: allChildAges,
+      rooms: data.rooms.length,
+      roomConfigs: data.rooms,
+      residency: data.residency,
+      currency: data.currency || 'NOK',
+    }
+    dbg('3. Sender POST /api/hotels/search', requestBody)
+
     try {
       const response = await fetch('/api/hotels/search', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
       })
 
+      dbg('4. HTTP-svar mottatt', { status: response.status, ok: response.ok })
       const result = await response.json()
-      console.log('🏨 Client: Search result:', result)
+      dbg('5. JSON parset', { success: result.success, hotelsCount: result.hotels?.length ?? 'N/A', error: result.error ?? null })
 
       if (result.success && result.hotels) {
         setSearchResults(result.hotels)
-        // Hvis dette er en fallback (test hotel), vis varsel
+        dbg('6. ✅ setSearchResults kalt', { count: result.hotels.length })
         if (result._fallback) {
           setSearchError(`⚠️ ${result._fallback_reason || 'Viser test hotel som fallback'}`)
         } else {
-          setSearchError(null) // Clear any previous errors
+          setSearchError(null)
         }
       } else {
-        console.error('🏨 Search failed:', result.error)
-        // Bruk brukervennlig feilmelding fra API
+        dbg('6. ❌ Søk feilet', { error: result.error, technicalError: result.technicalError })
         setSearchError(result.error || 'Søket feilet')
         setSearchResults([])
       }
-    } catch (error: any) {
-      console.error('🏨 Search error:', error)
-      setSearchError(error.message || 'En uventet feil oppstod')
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
+      dbg('5. ❌ fetch-exception', { message: msg })
+      setSearchError(msg || 'En uventet feil oppstod')
       setSearchResults([])
     } finally {
       setIsSearching(false)
+      dbg('7. isSearching = false')
     }
   }
 
@@ -116,6 +170,22 @@ export default function HotellPage() {
         </Suspense>
       </div>
 
+      {/* Hotel chunk: direkte detaljdialog uten SERP */}
+      {directHotelId && directSearchParams && (
+        <HotelDetailsDialog
+          hotelId={directHotelId}
+          open={directDialogOpen}
+          onOpenChange={setDirectDialogOpen}
+          searchParams={{
+            checkIn: directSearchParams.checkIn,
+            checkOut: directSearchParams.checkOut,
+            adults: directSearchParams.rooms.reduce((s, r) => s + r.adults, 0),
+            children: directSearchParams.rooms.flatMap(r => r.childAges),
+            rooms: directSearchParams.rooms.length,
+          }}
+        />
+      )}
+
       {/* Search Results Section */}
       {(searchResults !== null || searchError) && (
         <div ref={resultsRef} className="container mx-auto px-4 py-8">
@@ -151,11 +221,9 @@ export default function HotellPage() {
                       : 'text-red-700'
                   }`}>
                     <p>{searchError}</p>
-                    {!searchError.includes('test hotel') && (
-                      <p className="mt-2 text-xs">
-                        💡 Tips: Prøv å søke etter Oslo eller test hotel (ID: 8473727) for å teste systemet.
-                      </p>
-                    )}
+                    <p className="mt-2 text-xs">
+                      💡 Tips: Prøv en annen destinasjon eller endre datoene.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -167,8 +235,10 @@ export default function HotellPage() {
               hotels={searchResults || []}
               searchParams={searchParams}
               isLoading={isSearching}
+              destinationName={searchParams?.destinationLabel}
             />
           </Suspense>
+
         </div>
       )}
 
@@ -224,11 +294,13 @@ export default function HotellPage() {
               dayAfter.setDate(dayAfter.getDate() + 1)
               const defaultSearch = {
                 destination: destination.id,
+                destinationLabel: `${destination.name}, ${destination.country}`,
+                destinationType: 'city',
                 checkIn: tomorrow.toISOString().split('T')[0],
                 checkOut: dayAfter.toISOString().split('T')[0],
-                adults: 2,
-                children: 0,
-                rooms: 1,
+                rooms: [{ adults: 2, childAges: [] }],
+                residency: 'no',
+                currency: 'NOK',
               }
               return (
                 <Card
@@ -254,6 +326,35 @@ export default function HotellPage() {
           </div>
         </div>
       </div>
+
+      {/* DEBUG-PANEL – kun development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 z-[9999] w-[420px] max-h-[50vh] flex flex-col bg-gray-950 text-green-400 font-mono text-[11px] rounded-xl shadow-2xl border border-gray-700 overflow-hidden">
+          <div
+            className="flex items-center justify-between px-3 py-2 bg-gray-900 cursor-pointer select-none"
+            onClick={() => setShowDebug(v => !v)}
+          >
+            <span className="font-bold text-green-300">🐛 Debug-logg ({debugLog.length} oppføringer)</span>
+            <span className="text-gray-400">{showDebug ? '▼ skjul' : '▲ vis'}</span>
+          </div>
+          {showDebug && (
+            <div className="overflow-y-auto p-3 space-y-1 flex-1">
+              {debugLog.length === 0 && <div className="text-gray-500 italic">Klikk Søk for å se logg...</div>}
+              {debugLog.map((e, i) => (
+                <div key={i} className="border-b border-gray-800 pb-1">
+                  <span className="text-gray-500">{e.ts}</span>{' '}
+                  <span className={e.step.includes('❌') ? 'text-red-400' : e.step.includes('✅') ? 'text-green-300' : 'text-yellow-300'}>
+                    {e.step}
+                  </span>
+                  <pre className="text-gray-400 text-[10px] whitespace-pre-wrap break-all mt-0.5">
+                    {JSON.stringify(e.data, null, 1)}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Amenities Section */}
       <div className="bg-gray-50 py-16">

@@ -1,94 +1,23 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Search, Car, Home, ShoppingBag, Plus, TrendingUp, Clock, MapPin } from 'lucide-react'
+import { Search, Plus, TrendingUp, Flame, Sparkles } from 'lucide-react'
 import CategoriesStrip from '@/components/homepage/categories-strip'
 import RecommendedListings from '@/components/homepage/recommended-listings'
 import RecentlyViewedStrip from '@/components/homepage/recently-viewed-strip'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
-// Hovedkategorier (inspirert av Finn.no)
-const mainCategories = [
-  {
-    id: 'torget',
-    title: 'Torget',
-    icon: ShoppingBag,
-    href: '/annonser/torget',
-    count: '8,543',
-    description: 'Møbler, elektronikk og mer',
-    subcategories: ['Møbler', 'Elektronikk', 'Klær', 'Sport']
-  },
-  {
-    id: 'bil',
-    title: 'Bil og transport',
-    icon: Car,
-    href: '/annonser/bil',
-    count: '2,847',
-    description: 'Biler, motorsykler og båter',
-    subcategories: ['Personbiler', 'Varebiler', 'MC', 'Båter']
-  },
-  {
-    id: 'eiendom',
-    title: 'Eiendom',
-    icon: Home,
-    href: '/annonser/eiendom',
-    count: '1,234',
-    description: 'Boliger til salgs og leie',
-    subcategories: ['Boliger til salgs', 'Boliger til leie', 'Hytter', 'Tomter']
-  }
-]
+const POPULAR_SEARCHES = ['Tesla', 'iPhone', 'Leilighet Oslo', 'IKEA sofa']
 
-// Mock anbefalte annonser (normalt ville kommet fra API)
-const recommendedListings = [
-  {
-    id: '1',
-    title: 'Tesla Model 3 Long Range',
-    price: '385,000',
-    location: 'Oslo',
-    image: '/placeholder-car.jpg',
-    category: 'Bil',
-    timeAgo: '2 timer siden'
-  },
-  {
-    id: '2',
-    title: '3-roms leilighet med balkong',
-    price: '3,200,000',
-    location: 'Bergen',
-    image: '/placeholder-apartment.jpg',
-    category: 'Eiendom',
-    timeAgo: '4 timer siden'
-  },
-  {
-    id: '3',
-    title: 'Sofa 3-seter i god stand',
-    price: '4,500',
-    location: 'Trondheim',
-    image: '/placeholder-sofa.jpg',
-    category: 'Møbler',
-    timeAgo: '1 dag siden'
-  },
-  {
-    id: '4',
-    title: 'iPhone 15 Pro - som ny',
-    price: '12,500',
-    location: 'Stavanger',
-    image: '/placeholder-phone.jpg',
-    category: 'Elektronikk',
-    timeAgo: '3 timer siden'
-  }
+const STATS = [
+  { value: '12,624', label: 'Aktive annonser', color: '#F5A45D' },
+  { value: '486', label: 'Nye i dag', color: '#6EE7B7' },
+  { value: '2.4M+', label: 'Månedlige søk', color: '#93C5FD' },
+  { value: '95%', label: 'Fornøyde brukere', color: '#FCA5A5' },
 ]
 
 export default function HeroSection() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [liveStats, setLiveStats] = useState({
-    activeListings: '12,624',
-    newToday: '486',
-    popularSearches: ['Tesla', 'iPhone', 'Leilighet Oslo', 'IKEA sofa']
-  })
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,140 +27,152 @@ export default function HeroSection() {
   }
 
   return (
-    <div className="bg-white">
-      {/* Hero Section med søk og kategorier */}
-      <section className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-          {/* Header */}
-          <div className="text-center mb-6 sm:mb-8">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 sm:mb-4 leading-tight">
-              Finn det du leter etter på 
-              <span className="text-[#af4c0f]"> Kulbruk.no</span>
-            </h1>
-            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto px-4">
-              Norges markedsplass for trygg kjøp og salg
-            </p>
+    <div style={{ backgroundColor: '#FAF6EF' }}>
+
+      {/* ── HERO ── */}
+      <section
+        className="relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(140deg, #180D06 0%, #2C1508 55%, #1A0E07 100%)',
+        }}
+      >
+        {/* ambient glow blobs */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-40 -top-40 h-[640px] w-[640px] rounded-full opacity-40"
+          style={{ background: 'radial-gradient(circle, #AF4C0F 0%, transparent 65%)' }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-32 -left-32 h-[480px] w-[480px] rounded-full opacity-20"
+          style={{ background: 'radial-gradient(circle, #E8892A 0%, transparent 65%)' }}
+        />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-0 sm:pt-20 sm:pb-0 text-center">
+
+          {/* badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium mb-6"
+            style={{
+              backgroundColor: 'rgba(175,76,15,0.25)',
+              color: '#F5A45D',
+              border: '1px solid rgba(175,76,15,0.45)',
+            }}
+          >
+            <Flame className="h-3.5 w-3.5" />
+            486 nye annonser lagt ut i dag
           </div>
 
-          {/* Søkeboks */}
-          <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-6 sm:mb-8 px-4">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
-              <Input
+          {/* headline */}
+          <h1 className="text-4xl sm:text-5xl lg:text-[3.75rem] font-bold text-white leading-tight tracking-tight mb-4">
+            Finn det du leter etter
+            <br />
+            <span style={{ color: '#F5A45D' }}>på Kulbruk.no</span>
+          </h1>
+          <p className="text-base sm:text-lg mb-8 max-w-lg mx-auto" style={{ color: '#B89F8A' }}>
+            Norges markedsplass for trygg kjøp og salg
+          </p>
+
+          {/* search */}
+          <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-5 px-2 sm:px-0">
+            <div className="relative flex items-center">
+              <Search className="pointer-events-none absolute left-5 z-10 h-5 w-5 text-stone-400" />
+              <input
                 type="text"
                 placeholder="Søk etter biler, leiligheter, møbler..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 sm:pl-12 h-12 sm:h-14 text-base sm:text-lg bg-white border-2 border-gray-200 focus:border-[#af4c0f] focus:ring-[#af4c0f] text-gray-900 placeholder:text-gray-500 rounded-lg"
+                className="w-full rounded-2xl pl-14 pr-36 h-[3.75rem] text-base text-stone-900 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-orange-400"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+                }}
               />
-              <Button 
+              <button
                 type="submit"
-                className="absolute right-2 top-2 h-8 sm:h-10 px-3 sm:px-6 bg-[#af4c0f] hover:bg-[#af4c0f]/90 text-white rounded-md text-sm sm:text-base"
+                className="absolute right-2 h-11 px-7 rounded-xl font-semibold text-white text-sm transition-all hover:brightness-110 active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #AF4C0F, #D0660F)' }}
               >
                 Søk
-              </Button>
+              </button>
             </div>
           </form>
 
-          {/* Populære søk */}
-          <div className="text-center mb-6 sm:mb-8 px-4">
-            <p className="text-xs sm:text-sm text-gray-500 mb-2">Populære søk:</p>
-            <div className="flex flex-wrap justify-center gap-1 sm:gap-2">
-              {liveStats.popularSearches.map((search, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setSearchQuery(search)
-                    window.location.href = `/annonser?search=${encodeURIComponent(search)}`
-                  }}
-                  className="text-xs sm:text-sm text-[#af4c0f] hover:text-[#af4c0f]/80 border border-[#af4c0f]/20 hover:border-[#af4c0f]/40 px-2 sm:px-3 py-1 rounded-full transition-colors"
-                >
-                  {search}
-                </button>
-              ))}
-            </div>
+          {/* popular searches */}
+          <div className="flex flex-wrap justify-center gap-2 mb-9">
+            <span className="text-sm self-center" style={{ color: '#7A6355' }}>Populære:</span>
+            {POPULAR_SEARCHES.map((s) => (
+              <button
+                key={s}
+                onClick={() => { window.location.href = `/annonser?search=${encodeURIComponent(s)}` }}
+                className="text-sm px-3 py-1 rounded-full transition-all hover:brightness-110"
+                style={{
+                  backgroundColor: 'rgba(245,164,93,0.12)',
+                  color: '#F5A45D',
+                  border: '1px solid rgba(245,164,93,0.28)',
+                }}
+              >
+                {s}
+              </button>
+            ))}
           </div>
 
-          {/* Legg ut annonse knapp */}
-          <div className="text-center px-4">
-            <Button asChild size="lg" className="bg-[#af4c0f] hover:bg-[#af4c0f]/90 text-white w-full sm:w-auto">
-              <Link href="/opprett">
-                <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                Legg ut annonse
-              </Link>
-            </Button>
-          </div>
+          {/* CTA */}
+          <Link
+            href="/opprett"
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-white text-base mb-12 transition-all hover:brightness-110 active:scale-95"
+            style={{
+              background: 'linear-gradient(135deg, #AF4C0F, #D0660F)',
+              boxShadow: '0 8px 32px rgba(175,76,15,0.45)',
+            }}
+          >
+            <Plus className="h-5 w-5" />
+            Legg ut annonse
+          </Link>
+        </div>
+
+        {/* stats bar */}
+        <div
+          className="relative grid grid-cols-2 sm:grid-cols-4 text-center"
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.35)',
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+          }}
+        >
+          {STATS.map((s, i) => (
+            <div key={i} className="py-4 px-2">
+              <div className="text-xl sm:text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
+              <div className="text-xs mt-0.5" style={{ color: '#7A6355' }}>{s.label}</div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Kategorier som ikon-stripe */}
+      {/* ── CATEGORIES STRIP ── */}
       <CategoriesStrip />
 
-      {/* Anbefalte annonser – 10 og 10, maks 50 */}
-      <section className="py-6 sm:py-8 bg-white">
+      {/* ── ANBEFALTE ANNONSER ── */}
+      <section className="py-8 sm:py-10" style={{ backgroundColor: '#FAF6EF' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Anbefalte annonser</h2>
-              <p className="text-xs sm:text-sm text-gray-600 mt-1">Basert på dine tidligere søk og interesse</p>
+              <h2 className="text-xl sm:text-2xl font-bold" style={{ color: '#1A0F08' }}>Anbefalte annonser</h2>
+              <p className="text-sm mt-0.5" style={{ color: '#7A6355' }}>Basert på dine tidligere søk og interesser</p>
             </div>
-            <Button asChild variant="outline" className="border-[#af4c0f] text-[#af4c0f] hover:bg-[#af4c0f]/5 w-full sm:w-auto">
-              <Link href="/annonser">Se alle annonser</Link>
-            </Button>
+            <Link
+              href="/annonser"
+              className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border transition-colors hover:bg-orange-50 w-fit"
+              style={{ color: '#AF4C0F', borderColor: '#AF4C0F' }}
+            >
+              Se alle annonser
+            </Link>
           </div>
           <RecommendedListings />
         </div>
       </section>
 
-      {/* Du så nylig */}
+      {/* ── DU SÅ NYLIG ── */}
       <RecentlyViewedStrip />
 
-      {/* Statistikk */}
-      <section className="py-6 sm:py-8 bg-[#af4c0f]/5">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-            <div>
-              <div className="flex items-center justify-center mb-2">
-                <div className="w-8 h-8 bg-[#af4c0f] rounded-full flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-white" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">{liveStats.activeListings}</div>
-              <div className="text-sm text-gray-600">Aktive annonser</div>
-            </div>
-            
-            <div>
-              <div className="flex items-center justify-center mb-2">
-                <div className="w-8 h-8 bg-[#af4c0f] rounded-full flex items-center justify-center">
-                  <Plus className="h-4 w-4 text-white" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">{liveStats.newToday}</div>
-              <div className="text-sm text-gray-600">Nye i dag</div>
-            </div>
-            
-            <div>
-              <div className="flex items-center justify-center mb-2">
-                <div className="w-8 h-8 bg-[#af4c0f] rounded-full flex items-center justify-center">
-                  <Search className="h-4 w-4 text-white" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">2.4M+</div>
-              <div className="text-sm text-gray-600">Månedlige søk</div>
-            </div>
-            
-            <div>
-              <div className="flex items-center justify-center mb-2">
-                <div className="w-8 h-8 bg-[#af4c0f] rounded-full flex items-center justify-center">
-                  <ShoppingBag className="h-4 w-4 text-white" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">95%</div>
-              <div className="text-sm text-gray-600">Fornøyde brukere</div>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   )
 }

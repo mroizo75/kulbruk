@@ -1,19 +1,43 @@
 import { NextResponse } from 'next/server'
 import { ratehawkClient } from '@/lib/ratehawk-client'
 
+// Søkenavn brukt for å slå opp korrekt region-ID via multicomplete
 const DESTINATIONS = [
-  { id: '2563', name: 'Oslo', country: 'Norge', hotels: '500+ hoteller' },
-  { id: '1953', name: 'København', country: 'Danmark', hotels: '400+ hoteller' },
-  { id: '1775', name: 'Paris', country: 'Frankrike', hotels: '3000+ hoteller' },
-  { id: '1869', name: 'London', country: 'Storbritannia', hotels: '2000+ hoteller' },
-] as const
+  { query: 'Oslo', name: 'Oslo', country: 'Norge', hotels: '500+ hoteller' },
+  { query: 'Copenhagen', name: 'København', country: 'Danmark', hotels: '400+ hoteller' },
+  { query: 'Paris', name: 'Paris', country: 'Frankrike', hotels: '3000+ hoteller' },
+  { query: 'London', name: 'London', country: 'Storbritannia', hotels: '2000+ hoteller' },
+]
 
 const PLACEHOLDER_SVG = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%23e5e7eb" width="800" height="450"/%3E%3Ctext fill="%239ca3af" font-family="system-ui" font-size="24" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3E' + encodeURIComponent('Ingen bilde') + '%3C/text%3E%3C/svg%3E'
 
 const CACHE_MS = 60 * 60 * 1000 // 1 time
-let cache: { data: Awaited<ReturnType<typeof fetchDestinationsWithImages>>; timestamp: number } | null = null
+let cache: { data: DestinationResult[]; timestamp: number } | null = null
 
-async function fetchDestinationsWithImages() {
+interface DestinationResult {
+  id: string
+  name: string
+  country: string
+  hotels: string
+  image: string
+}
+
+async function resolveRegionId(query: string): Promise<string | null> {
+  try {
+    const suggestions = await ratehawkClient.searchDestinations(query)
+    // Finn første region/city-resultat (ikke hotel)
+    const region = suggestions.find((s: any) => s.type !== 'hotel')
+    if (region?.id) {
+      console.log(`📍 Resolved "${query}" → region id ${region.id} (${region.name})`)
+      return region.id.toString()
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+async function fetchDestinationsWithImages(): Promise<DestinationResult[]> {
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
   const dayAfter = new Date(tomorrow)
@@ -21,33 +45,25 @@ async function fetchDestinationsWithImages() {
   const checkIn = tomorrow.toISOString().split('T')[0]
   const checkOut = dayAfter.toISOString().split('T')[0]
 
-  const results = await Promise.allSettled(
-    DESTINATIONS.map(async (dest) => {
-      try {
-        const result = await ratehawkClient.searchHotels(
-          {
-            destination: dest.id,
-            checkIn,
-            checkOut,
-            adults: 2,
-            children: [],
-            rooms: 1,
-            currency: 'NOK',
-          },
-          null
-        )
-        const firstWithImage = result.hotels?.find((h) => h.image && !h.image.startsWith('data:image/svg'))
-        return {
-          ...dest,
-          image: firstWithImage?.image || PLACEHOLDER_SVG,
-        }
-      } catch {
-        return { ...dest, image: PLACEHOLDER_SVG }
-      }
-    })
-  )
+  // Prosesser én destinasjon om gangen for å unngå å sprenge rate-limit (30 req/60s)
+  const destinations: DestinationResult[] = []
+  for (const dest of DESTINATIONS) {
+    const regionId = await resolveRegionId(dest.query)
+    if (!regionId) {
+      console.warn(`⚠️ Kunne ikke finne region-ID for "${dest.query}"`)
+      destinations.push({ ...dest, id: '', image: PLACEHOLDER_SVG })
+      continue
+    }
 
-  return results.map((r, i) => (r.status === 'fulfilled' ? r.value : { ...DESTINATIONS[i], image: PLACEHOLDER_SVG }))
+    try {
+      // Hent kun ett bilde for destinasjonskortet – maks 5 /hotel/info/-kall
+      const image = await ratehawkClient.getRegionPreviewImage(regionId, checkIn, checkOut)
+      destinations.push({ ...dest, id: regionId, image: image || PLACEHOLDER_SVG })
+    } catch {
+      destinations.push({ ...dest, id: regionId, image: PLACEHOLDER_SVG })
+    }
+  }
+  return destinations
 }
 
 export async function GET() {
@@ -60,8 +76,8 @@ export async function GET() {
     const data = await fetchDestinationsWithImages()
     cache = { data, timestamp: now }
     return NextResponse.json({ success: true, destinations: data })
-  } catch (error) {
-    const fallback = DESTINATIONS.map((d) => ({ ...d, image: PLACEHOLDER_SVG }))
+  } catch {
+    const fallback = DESTINATIONS.map((d) => ({ ...d, id: '', image: PLACEHOLDER_SVG }))
     return NextResponse.json({ success: true, destinations: fallback })
   }
 }

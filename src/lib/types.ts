@@ -32,13 +32,20 @@ export interface DashboardNavItem {
 }
 
 // RateHawk Hotel API Types
+export interface RoomConfig {
+  adults: number
+  childAges: number[]
+}
+
 export interface RateHawkHotelSearchParams {
   destination: string
+  destinationType?: string
   checkIn: string
   checkOut: string
   adults: number
   children?: number[]
   rooms?: number
+  roomConfigs?: RoomConfig[]   // Per-rom konfigurasjon for korrekt guests-array
   currency?: string
 }
 

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       checkIn,
       checkOut,
       adults,
-      children: children || 0,
+      children: Array.isArray(children) ? children.length : (children || 0),
       rooms: rooms || 1,
       currency: currency || 'NOK'
     })

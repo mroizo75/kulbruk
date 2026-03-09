@@ -5,7 +5,7 @@ import LiveListings from '@/components/live-listings'
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen" style={{ backgroundColor: '#FAF6EF' }}>
       <HeroSection />
     </div>
   )

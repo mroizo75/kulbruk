@@ -9,32 +9,47 @@ import { Bed, Star, MapPin, Wifi, Car, Utensils, Loader2, ArrowUpDown } from 'lu
 import { RateHawkHotel } from '@/lib/types'
 import HotelDetailsDialog from './hotel-details-dialog'
 
+interface RoomConfig {
+  adults: number
+  childAges: number[]
+}
+
 interface HotelSearchFormData {
   destination: string
+  destinationType?: string
   checkIn: string
   checkOut: string
-  adults: number
-  children: number
-  rooms: number
+  rooms: RoomConfig[]
+  residency?: string
+  currency?: string
 }
 
 interface HotelResultsProps {
   hotels: RateHawkHotel[]
   searchParams: HotelSearchFormData | null
   isLoading: boolean
+  destinationName?: string
 }
 
-export default function HotelResults({ hotels, searchParams, isLoading }: HotelResultsProps) {
+const PAGE_SIZE = 5
+
+export default function HotelResults({ hotels, searchParams, isLoading, destinationName }: HotelResultsProps) {
   const [selectedHotel, setSelectedHotel] = useState<{ id: string; name: string } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [sortBy, setSortBy] = useState<'price-asc' | 'price-desc' | 'rating-desc' | 'rating-asc'>('price-asc')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const handleViewDetails = (hotel: RateHawkHotel) => {
     setSelectedHotel({ id: hotel.id, name: hotel.name })
     setDialogOpen(true)
   }
 
-  // Sorter hoteller
+  const handleSortChange = (value: typeof sortBy) => {
+    setSortBy(value)
+    setVisibleCount(PAGE_SIZE)
+  }
+
+  // Sorter og paginer hoteller
   const sortedHotels = [...hotels].sort((a, b) => {
     switch (sortBy) {
       case 'price-asc':
@@ -49,6 +64,8 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
         return 0
     }
   })
+  const visibleHotels = sortedHotels.slice(0, visibleCount)
+  const hasMore = visibleCount < sortedHotels.length
 
   if (isLoading) {
     return (
@@ -72,10 +89,7 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
             Vi fant dessverre ingen hoteller som matcher søket ditt.
           </p>
           <p className="text-sm text-gray-500">
-            Dette kan skyldes API begrensninger eller at destinasjonen ikke støttes.
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Prøv test hotel: <strong>8473727</strong>
+            Prøv en annen destinasjon eller endre datoene og søk på nytt.
           </p>
         </div>
 
@@ -89,9 +103,10 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
             searchParams={{
               checkIn: searchParams.checkIn,
               checkOut: searchParams.checkOut,
-              adults: searchParams.adults,
-              children: searchParams.children,
-              rooms: searchParams.rooms
+              adults: searchParams.rooms.reduce((s, r) => s + r.adults, 0),
+              children: searchParams.rooms.flatMap(r => r.childAges),
+              rooms: searchParams.rooms.length,
+              roomConfigs: searchParams.rooms
             }}
           />
         )}
@@ -106,14 +121,15 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Hotellresultater
+              Hotellresultater{destinationName ? ` – ${destinationName}` : ''}
             </h2>
             <p className="text-gray-600">
               {sortedHotels.length} hoteller funnet
               {searchParams && (
                 <span className="ml-2">
                   • {new Date(searchParams.checkIn).toLocaleDateString('nb-NO')} - {new Date(searchParams.checkOut).toLocaleDateString('nb-NO')}
-                  • {searchParams.adults + searchParams.children} gjester
+                  • {searchParams.rooms.reduce((s, r) => s + r.adults + r.childAges.length, 0)} gjester
+                  • {searchParams.rooms.length} rom
                 </span>
               )}
             </p>
@@ -126,7 +142,7 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
             {/* Sortering */}
             <div className="flex items-center gap-2">
               <ArrowUpDown className="h-4 w-4 text-gray-500" />
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <Select value={sortBy} onValueChange={(value: any) => handleSortChange(value)}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Sorter etter" />
                 </SelectTrigger>
@@ -144,7 +160,7 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
 
       {/* Hotel Cards */}
       <div className="space-y-4">
-        {sortedHotels.map((hotel) => (
+        {visibleHotels.map((hotel) => (
           <Card key={hotel.id} className="overflow-hidden hover:shadow-lg transition-shadow">
             <div className="flex flex-col md:flex-row gap-0">
               {/* Hotel Image */}
@@ -237,10 +253,13 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
         ))}
       </div>
 
-      {/* Load More / Pagination could go here */}
-      {sortedHotels.length >= 10 && (
+      {/* Last flere */}
+      {hasMore && (
         <div className="text-center py-8">
-          <Button variant="outline">
+          <p className="text-sm text-gray-500 mb-3">
+            Viser {visibleCount} av {sortedHotels.length} hoteller
+          </p>
+          <Button variant="outline" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
             Last flere resultater
           </Button>
         </div>
@@ -256,9 +275,10 @@ export default function HotelResults({ hotels, searchParams, isLoading }: HotelR
           searchParams={{
             checkIn: searchParams.checkIn,
             checkOut: searchParams.checkOut,
-            adults: searchParams.adults,
-            children: searchParams.children,
-            rooms: searchParams.rooms
+            adults: searchParams.rooms.reduce((s, r) => s + r.adults, 0),
+            children: searchParams.rooms.flatMap(r => r.childAges),
+            rooms: searchParams.rooms.length,
+            roomConfigs: searchParams.rooms
           }}
         />
       )}

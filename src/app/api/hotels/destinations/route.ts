@@ -55,8 +55,7 @@ export async function GET(request: NextRequest) {
       { id: '1382', name: 'Berlin, Germany', type: 'city', country: 'Germany' },
       { id: '1775', name: 'Paris, France', type: 'city', country: 'France' },
       { id: '1869', name: 'London, United Kingdom', type: 'city', country: 'UK' },
-      { id: '1783', name: 'Amsterdam, Netherlands', type: 'city', country: 'Netherlands' },
-      { id: '8473727', name: 'Test Hotel Do Not Book', type: 'hotel', country: 'Test' }
+      { id: '1783', name: 'Amsterdam, Netherlands', type: 'city', country: 'Netherlands' }
     ]
     const fallbackRes = {
       success: true,
