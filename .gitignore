@@ -42,8 +42,9 @@ next-env.d.ts
 
 /src/generated/prisma
 
-# RateHawk hotel dump files (store locally, don't commit)
+# RateHawk hotel dump files og SQLite-database (lagres lokalt på VPS)
 /dump/
+/data/
 
 # Local documentation and test files (not committed)
 /docs/

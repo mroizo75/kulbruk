@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from '@sentry/nextjs';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // better-sqlite3 er et native addon – skal ikke bundeles av webpack
+  serverExternalPackages: ['better-sqlite3'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },

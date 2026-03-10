@@ -1,5 +1,12 @@
 import * as Sentry from '@sentry/nextjs'
 import { RateHawkHotelSearchParams, RateHawkHotelSearchResponse } from '@/lib/types'
+import {
+  getHotelById,
+  getHotelByHid,
+  recordToApiFormat,
+  rawApiToRecord,
+  upsertHotelBatch,
+} from '@/lib/hotel-static-db'
 
 const { logger } = Sentry
 
@@ -858,17 +865,31 @@ class RateHawkClient {
     return this.hotelDumpCache.get(hotelId.toString())
   }
 
-  // Hent statisk hotelldata fra /hotel/info/ endpoint (raskere enn dump for individuelle hoteller)
+  // Hent statisk hotelldata: SQLite først, deretter /hotel/info/ som fallback
   private async getHotelStaticInfo(hotelId?: string, hid?: number): Promise<any> {
-    try {
-      if (!this.apiKey || !this.accessToken) {
-        return null
-      }
+    const cacheKey = hid ? `hid:${hid}` : `id:${hotelId}`
 
-      const cacheKey = hid ? `hid:${hid}` : `id:${hotelId}`
-      if (this.hotelInfoCache.has(cacheKey)) {
-        return this.hotelInfoCache.get(cacheKey)
+    // 1. In-memory cache (raskest)
+    if (this.hotelInfoCache.has(cacheKey)) {
+      return this.hotelInfoCache.get(cacheKey)
+    }
+
+    // 2. SQLite lokal database (neste raskeste, ingen API-kall)
+    try {
+      let record = hid ? getHotelByHid(hid) : null
+      if (!record && hotelId) record = getHotelById(hotelId)
+      if (record) {
+        const result = recordToApiFormat(record)
+        this.hotelInfoCache.set(cacheKey, result)
+        return result
       }
+    } catch (dbError: any) {
+      console.warn('⚠️ SQLite oppslag feilet:', dbError.message)
+    }
+
+    // 3. Fallback: /hotel/info/ API (kun når hotellet mangler i lokal DB)
+    try {
+      if (!this.apiKey || !this.accessToken) return null
 
       const params: any = { language: 'en' }
       if (hid) {
@@ -879,16 +900,23 @@ class RateHawkClient {
         return null
       }
 
-      console.log('🏨 Fetching static hotel info from /hotel/info/:', params)
+      console.log('🌐 SQLite miss – henter fra /hotel/info/ API:', params)
       const data = await this.makeRequest('/hotel/info/', params, 'POST')
-
       const result = data?.data ?? null
+
+      // Lagre i SQLite for fremtidige oppslag
+      if (result) {
+        try {
+          upsertHotelBatch([result])
+        } catch {
+          // Ignorer skriv-feil – minnet cache dekker resten av sesjonen
+        }
+      }
+
       this.hotelInfoCache.set(cacheKey, result)
       return result
     } catch (error: any) {
-      console.warn('⚠️ Failed to fetch static hotel info:', error.message)
-      // Cache null så vi ikke prøver igjen for dette hotellet
-      const cacheKey = hid ? `hid:${hid}` : `id:${hotelId}`
+      console.warn('⚠️ /hotel/info/ API feilet:', error.message)
       this.hotelInfoCache.set(cacheKey, null)
       return null
     }

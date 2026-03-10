@@ -9,6 +9,9 @@
     "lint": "next lint",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "npx prisma migrate reset && npm run db:seed",
+    "hotels:sync": "tsx scripts/sync-hotel-dump.ts",
+    "hotels:sync:incremental": "tsx scripts/sync-hotel-dump.ts --incremental",
+    "hotels:status": "tsx scripts/sync-hotel-dump.ts --status",
     "sentry:sourcemaps": "sentry-cli sourcemaps inject --org kurs-og-kompetansesystemer-as --project javascript-nextjs ./ && sentry-cli sourcemaps upload --org kurs-og-kompetansesystemer-as --project javascript-nextjs ./"
   },
   "dependencies": {
@@ -34,10 +37,12 @@
     "@stripe/react-stripe-js": "^3.9.0",
     "@stripe/stripe-js": "^7.8.0",
     "@tailwindcss/line-clamp": "^0.4.4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/leaflet": "^1.9.20",
     "@types/uuid": "^10.0.0",
     "amadeus": "^11.0.0",
     "bcryptjs": "^3.0.2",
+    "better-sqlite3": "^12.6.2",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.7.0",
     "clsx": "^2.1.1",
