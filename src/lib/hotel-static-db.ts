@@ -31,6 +31,7 @@ function getDb(): Database.Database {
       star_rating           REAL DEFAULT 0,
       first_image           TEXT,
       images                TEXT,
+      room_groups           TEXT,
       amenity_groups        TEXT,
       amenities             TEXT,
       facts                 TEXT,
@@ -54,6 +55,13 @@ function getDb(): Database.Database {
     );
   `)
 
+  // Migrasjon: legg til room_groups-kolonne i eksisterende databaser som mangler den
+  try {
+    _db.exec('ALTER TABLE hotels ADD COLUMN room_groups TEXT')
+  } catch {
+    // Kolonnen finnes allerede — ignorer
+  }
+
   return _db
 }
 
@@ -70,6 +78,7 @@ export interface HotelStaticRecord {
   star_rating?: number
   first_image?: string
   images?: string[]
+  room_groups?: any[]
   amenity_groups?: Array<{ group_name: string; amenities: string[] }>
   amenities?: string[]
   facts?: Record<string, any>
@@ -106,6 +115,8 @@ export function rawApiToRecord(raw: any): HotelStaticRecord | null {
     star_rating: raw.star_rating ?? raw.stars ?? 0,
     first_image: images[0] ?? undefined,
     images: images.length > 0 ? images : undefined,
+    // Lagre room_groups alltid (inkl. tom array) for å unngå re-henting fra API
+    room_groups: Array.isArray(raw.room_groups) ? raw.room_groups : undefined,
     amenity_groups: raw.amenity_groups ?? undefined,
     amenities: raw.amenities ?? undefined,
     facts: raw.facts ?? undefined,
@@ -134,6 +145,7 @@ export function recordToApiFormat(r: HotelStaticRecord): Record<string, any> {
     country: r.country_name ? { name: r.country_name } : undefined,
     star_rating: r.star_rating ?? 0,
     images: r.images ?? [],
+    room_groups: r.room_groups ?? [],
     amenity_groups: r.amenity_groups ?? [],
     amenities: r.amenities ?? [],
     facts: r.facts ?? {},
@@ -161,6 +173,7 @@ function deserializeRow(row: any): HotelStaticRecord {
     star_rating: row.star_rating ?? 0,
     first_image: row.first_image ?? undefined,
     images: row.images ? JSON.parse(row.images) : undefined,
+    room_groups: row.room_groups ? JSON.parse(row.room_groups) : undefined,
     amenity_groups: row.amenity_groups ? JSON.parse(row.amenity_groups) : undefined,
     amenities: row.amenities ? JSON.parse(row.amenities) : undefined,
     facts: row.facts ? JSON.parse(row.facts) : undefined,
@@ -209,12 +222,12 @@ export function upsertHotelBatch(rawHotels: any[]): number {
   const stmt = db.prepare(`
     INSERT INTO hotels
       (id, hid, name, address, city_name, region_name, country_name,
-       star_rating, first_image, images, amenity_groups, amenities,
+       star_rating, first_image, images, room_groups, amenity_groups, amenities,
        facts, location, description, check_in_time, check_out_time,
        metapolicy_struct, metapolicy_extra_info, kind, updated_at)
     VALUES
       (@id, @hid, @name, @address, @city_name, @region_name, @country_name,
-       @star_rating, @first_image, @images, @amenity_groups, @amenities,
+       @star_rating, @first_image, @images, @room_groups, @amenity_groups, @amenities,
        @facts, @location, @description, @check_in_time, @check_out_time,
        @metapolicy_struct, @metapolicy_extra_info, @kind, @updated_at)
     ON CONFLICT(id) DO UPDATE SET
@@ -227,6 +240,7 @@ export function upsertHotelBatch(rawHotels: any[]): number {
       star_rating           = excluded.star_rating,
       first_image           = excluded.first_image,
       images                = excluded.images,
+      room_groups           = excluded.room_groups,
       amenity_groups        = excluded.amenity_groups,
       amenities             = excluded.amenities,
       facts                 = excluded.facts,
@@ -258,6 +272,7 @@ export function upsertHotelBatch(rawHotels: any[]): number {
         star_rating: r.star_rating ?? 0,
         first_image: r.first_image ?? null,
         images: r.images ? JSON.stringify(r.images) : null,
+        room_groups: r.room_groups !== undefined ? JSON.stringify(r.room_groups) : null,
         amenity_groups: r.amenity_groups ? JSON.stringify(r.amenity_groups) : null,
         amenities: r.amenities ? JSON.stringify(r.amenities) : null,
         facts: r.facts ? JSON.stringify(r.facts) : null,

@@ -875,10 +875,12 @@ class RateHawkClient {
     }
 
     // 2. SQLite lokal database (neste raskeste, ingen API-kall)
+    // Fall gjennom til API hvis room_groups mangler (eldre poster uten rombilder)
     try {
       let record = hid ? getHotelByHid(hid) : null
       if (!record && hotelId) record = getHotelById(hotelId)
-      if (record) {
+      // Bruk cache kun hvis room_groups er hentet (undefined = aldri lagret med room_groups)
+      if (record && record.room_groups !== undefined) {
         const result = recordToApiFormat(record)
         this.hotelInfoCache.set(cacheKey, result)
         return result
