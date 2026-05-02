@@ -182,6 +182,8 @@ export default function HotellPage() {
             adults: directSearchParams.rooms.reduce((s, r) => s + r.adults, 0),
             children: directSearchParams.rooms.flatMap(r => r.childAges),
             rooms: directSearchParams.rooms.length,
+            roomConfigs: directSearchParams.rooms,
+            residency: directSearchParams.residency,
           }}
         />
       )}

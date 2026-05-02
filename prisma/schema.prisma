@@ -1296,6 +1296,19 @@ model SellerStripeAccount {
   @@map("seller_stripe_accounts")
 }
 
+model GooglePlacesCache {
+  id           String   @id @default(cuid())
+  hotelId      String   @unique
+  placeId      String?
+  rating       Float    @default(0)
+  totalRatings Int      @default(0)
+  reviewsJson  String   @db.Text
+  fetchedAt    DateTime @default(now())
+
+  @@index([fetchedAt])
+  @@map("google_places_cache")
+}
+
 model HotelBooking {
   id                String   @id @default(cuid())
   userId            String

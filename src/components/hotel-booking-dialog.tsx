@@ -24,13 +24,19 @@ import { Loader2, Check, User, Mail, Phone, CreditCard, AlertCircle, Lock } from
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
 // Payment Form Component (må være inni Elements wrapper)
+interface ChildGuest {
+  firstName: string
+  lastName: string
+  age: number
+}
+
 function PaymentForm({ 
   onSuccess, 
   onError, 
   guestInfo,
-  prebookData,
+  partnerOrderId,
   bookHash,
-  childAges,
+  childGuests,
   hotelName,
   checkIn,
   checkOut,
@@ -44,9 +50,9 @@ function PaymentForm({
   onSuccess: () => void
   onError: (error: string) => void
   guestInfo: any
-  prebookData: any
+  partnerOrderId: string
   bookHash: string
-  childAges: number[]
+  childGuests: ChildGuest[]
   hotelName: string
   checkIn: string
   checkOut: string
@@ -72,9 +78,6 @@ function PaymentForm({
       setIsProcessing(true)
       setErrorMessage(null)
 
-      console.log('💳 Confirming payment...')
-
-      // Confirm payment with Stripe
       const { error: submitError } = await elements.submit()
       if (submitError) {
         throw new Error(submitError.message)
@@ -93,16 +96,13 @@ function PaymentForm({
       }
 
       if (paymentIntent?.status === 'succeeded') {
-        console.log('✅ Payment succeeded, creating booking...')
-        
-        // Nå som betalingen er OK, opprett bookingen i RateHawk
         const response = await fetch('/api/hotels/book', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            partnerOrderId: prebookData.partner_order_id,
+            partnerOrderId,
             bookHash,
-            childAges,
+            childGuests,
             hotelName,
             checkIn,
             checkOut,
@@ -110,7 +110,8 @@ function PaymentForm({
             rooms,
             guestInfo,
             paymentType: selectedPaymentType,
-            paymentIntentId: paymentIntent.id
+            paymentIntentId: paymentIntent.id,
+            remarks: remarks || ''
           })
         })
 
@@ -195,9 +196,9 @@ export default function HotelBookingDialog({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [prebookData, setPrebookData] = useState<any>(null)
-  const [originalPrice, setOriginalPrice] = useState<number | null>(null) // Original pris fra første prebook
-  const [recheckData, setRecheckData] = useState<any>(null) // Recheck resultat
-  const [priceDifference, setPriceDifference] = useState<number>(0) // Prisendring i prosent
+  const [originalPrice, setOriginalPrice] = useState<number | null>(null)
+  // recheckData: latest prebook session — book_hash (p-), partner_order_id, payment_types, price_changed
+  const [recheckData, setRecheckData] = useState<any>(null)
   const [selectedPaymentType, setSelectedPaymentType] = useState<any>(null)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
 
@@ -208,7 +209,13 @@ export default function HotelBookingDialog({
     email: session?.user?.email || '',
     phone: ''
   })
-  const [bookingRemarks, setBookingRemarks] = useState('') // Special requests/remarks
+  const [bookingRemarks, setBookingRemarks] = useState('')
+  // Individual child names keyed by index
+  const [childGuests, setChildGuests] = useState<ChildGuest[]>(
+    Array.isArray(roomData.children)
+      ? roomData.children.map((age: number) => ({ firstName: '', lastName: '', age }))
+      : []
+  )
 
   // Start recheck automatisk når vi går til recheck step
   useEffect(() => {
@@ -289,10 +296,14 @@ export default function HotelBookingDialog({
       setError('Vennligst fyll ut alle feltene')
       return
     }
+    const missingChildName = childGuests.find(c => !c.firstName || !c.lastName)
+    if (missingChildName) {
+      setError('Vennligst fyll ut navn for alle barn')
+      return
+    }
     
     // Reset recheck data før vi går til recheck step
     setRecheckData(null)
-    setPriceDifference(0)
     setError(null)
     
     // Gå til recheck step (recheck starter automatisk via useEffect)
@@ -339,29 +350,16 @@ export default function HotelBookingDialog({
           span.setAttribute('recheckSuccess', true)
           setRecheckData(data.prebookData)
 
-          // Sammenlign pris med original
-          if (data.prebookData.payment_types && data.prebookData.payment_types.length > 0 && originalPrice) {
+          if (data.prebookData.payment_types && data.prebookData.payment_types.length > 0) {
             const depositType = data.prebookData.payment_types.find((pt: any) => pt.type === 'deposit')
             const paymentType = depositType || data.prebookData.payment_types[0]
             const newPrice = parseFloat(paymentType.amount || '0')
-            
-            // Beregn prosentvis endring
-            const difference = ((newPrice - originalPrice) / originalPrice) * 100
-            setPriceDifference(difference)
-            
-            span.setAttribute('priceDifference', difference)
-            span.setAttribute('newPrice', newPrice)
 
-            // Hvis prisendring >5%, vis varsel (men tillat fortsatt booking)
-            if (Math.abs(difference) > 5) {
-              span.setAttribute('priceChangeExceedsThreshold', true)
-            }
+            span.setAttribute('newPrice', newPrice)
+            span.setAttribute('price_changed', data.prebookData.price_changed ?? false)
 
             setSelectedPaymentType(paymentType)
           }
-
-          // Recheck er ferdig - vis resultat til bruker
-          // Brukeren må bekrefte før vi går til payment
         } catch (err: any) {
           Sentry.captureException(err)
           span.setAttribute('error', err.message || String(err))
@@ -611,6 +609,48 @@ export default function HotelBookingDialog({
                   />
                 </div>
 
+                {/* Barnenavn – ett skjema per barn */}
+                {childGuests.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-gray-700">Barneinformasjon</p>
+                    {childGuests.map((child, idx) => (
+                      <div key={idx} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                        <p className="text-xs text-gray-500 font-medium">
+                          Barn {idx + 1} – {child.age} år
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor={`childFirstName-${idx}`}>Fornavn *</Label>
+                            <Input
+                              id={`childFirstName-${idx}`}
+                              value={child.firstName}
+                              onChange={(e) => {
+                                const updated = [...childGuests]
+                                updated[idx] = { ...updated[idx], firstName: e.target.value }
+                                setChildGuests(updated)
+                              }}
+                              placeholder="Fornavn"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`childLastName-${idx}`}>Etternavn *</Label>
+                            <Input
+                              id={`childLastName-${idx}`}
+                              value={child.lastName}
+                              onChange={(e) => {
+                                const updated = [...childGuests]
+                                updated[idx] = { ...updated[idx], lastName: e.target.value }
+                                setChildGuests(updated)
+                              }}
+                              placeholder="Etternavn"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Booking Remarks / Special Requests */}
                 <div>
                   <Label htmlFor="remarks">Spesielle ønsker (valgfritt)</Label>
@@ -679,30 +719,32 @@ export default function HotelBookingDialog({
                       </CardContent>
                     </Card>
 
-                {/* Prisendring varsel hvis >5% */}
-                {Math.abs(priceDifference) > 5 && (
+                {/* Prisendring varsel basert på API-flagget price_changed */}
+                {recheckData?.price_changed === true && (
                   <Card className="bg-yellow-50 border-yellow-200">
                     <CardContent className="pt-6">
                       <div className="flex items-start">
                         <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
                         <div>
-                          <h4 className="font-semibold text-yellow-900 mb-1">Prisendring oppdaget</h4>
+                          <h4 className="font-semibold text-yellow-900 mb-1">Prisen har endret seg</h4>
                           <p className="text-sm text-yellow-800">
-                            Prisen har endret seg med {priceDifference > 0 ? '+' : ''}{priceDifference.toFixed(2)}% siden du startet booking.
-                            {priceDifference > 0 ? ' Den nye prisen er høyere.' : ' Den nye prisen er lavere.'}
+                            Opprinnelig pris var ikke lenger tilgjengelig. Et alternativt tilbud med tilsvarende romtype og kosttype er funnet.
                           </p>
                           {originalPrice && recheckData?.payment_types?.[0] && (
                             <div className="mt-3 text-xs text-yellow-700">
                               <div className="flex justify-between">
-                                <span>Original pris:</span>
+                                <span>Opprinnelig pris:</span>
                                 <span className="font-medium">{originalPrice.toFixed(2)} NOK</span>
                               </div>
                               <div className="flex justify-between mt-1">
                                 <span>Ny pris:</span>
-                                <span className="font-medium">{parseFloat(recheckData.payment_types[0].amount || '0').toFixed(2)} NOK</span>
+                                <span className="font-medium">
+                                  {parseFloat(recheckData.payment_types[0].amount || '0').toFixed(2)} NOK
+                                </span>
                               </div>
                             </div>
                           )}
+                          <p className="text-xs text-yellow-700 mt-2">Bekreft for å fortsette med den nye prisen.</p>
                         </div>
                       </div>
                     </CardContent>
@@ -814,9 +856,9 @@ export default function HotelBookingDialog({
                     onSuccess={() => setStep('confirmation')}
                     onError={(err) => setError(err)}
                     guestInfo={guestInfo}
-                    prebookData={prebookData}
+                    partnerOrderId={recheckData?.partner_order_id || prebookData?.partner_order_id || ''}
                     bookHash={recheckData?.book_hash || prebookData?.book_hash || roomData.book_hash}
-                    childAges={Array.isArray(roomData.children) ? roomData.children : []}
+                    childGuests={childGuests}
                     hotelName={roomData.hotel_name}
                     checkIn={roomData.checkIn}
                     checkOut={roomData.checkOut}

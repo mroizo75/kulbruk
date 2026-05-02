@@ -106,7 +106,7 @@ export default function HotelDetailsPage() {
     'half-board': 'Halvpensjon',
     'nomeal': 'Kun rom',
     'room_only': 'Kun rom',
-    'some-meal': 'Måltid inkludert',
+    'some-meal': 'Some meal',
     'super-all-inclusive': 'Super alt inklusiv',
     'soft-all-inclusive': 'Myk alt inklusiv',
     'ultra-all-inclusive': 'Ultra alt inklusiv',

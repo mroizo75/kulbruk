@@ -14,22 +14,22 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  console.log('⭐ [reviews route] hotelId:', hotelId, '| name:', hotelName, '| address:', address)
-
   if (!process.env.GOOGLE_PLACES_API_KEY) {
-    console.warn('⭐ [reviews route] GOOGLE_PLACES_API_KEY mangler')
     return NextResponse.json({ rating: 0, totalRatings: 0, reviews: [] })
   }
 
   try {
     const result = await getHotelReviews(hotelId, hotelName, address)
-    console.log('⭐ [reviews route] result:', result ? `rating ${result.rating}, ${result.reviews.length} reviews` : 'null')
-    if (!result) {
-      return NextResponse.json({ rating: 0, totalRatings: 0, reviews: [] })
-    }
-    return NextResponse.json(result)
+    const payload = result ?? { rating: 0, totalRatings: 0, reviews: [] }
+
+    return NextResponse.json(payload, {
+      headers: {
+        // Nettleser cacher 24t, CDN cacher 7 dager — matcher DB TTL
+        'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
+      },
+    })
   } catch (err) {
-    console.error('⭐ [reviews route] feil:', err)
+    console.error('[reviews route] feil:', err)
     return NextResponse.json({ rating: 0, totalRatings: 0, reviews: [] })
   }
 }

@@ -48,7 +48,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errRes, { status: 500 })
     }
 
-    console.log('✅ API: Prebook successful')
+    console.log('✅ API: Prebook successful', {
+      bookHashPrefix: result.data?.book_hash?.substring(0, 2) ?? 'null',
+      price_changed: result.data?.price_changed
+    })
 
     const resBody = { success: true, prebookData: result.data }
     if (supportSessionId) {

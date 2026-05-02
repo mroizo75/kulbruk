@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
         let session = await getServerSession(authOptions)
         const body = await request.json()
-        const { partnerOrderId, bookHash, childAges, guestInfo, paymentType, paymentIntentId, remarks } = body
+        const { partnerOrderId, bookHash, childGuests, guestInfo, paymentType, paymentIntentId, remarks } = body
 
         span.setAttribute('partnerOrderId', partnerOrderId)
         span.setAttribute('guestEmail', guestInfo?.email || 'unknown')
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
               userPhone: guestInfo.phone,
               firstName: guestInfo.firstName,
               lastName: guestInfo.lastName,
-              childAges: Array.isArray(childAges) ? childAges : [],
+              childGuests: Array.isArray(childGuests) ? childGuests : [],
               paymentType: paymentType.type,
               amount: paymentType.amount,
               currencyCode: paymentType.currency_code,

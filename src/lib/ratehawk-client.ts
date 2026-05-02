@@ -1411,6 +1411,7 @@ class RateHawkClient {
     rooms?: number
     roomConfigs?: { adults: number; childAges: number[] }[]
     currency?: string
+    residency?: string
   }) {
     try {
       console.log('🏨 Getting hotel details (hotelpage):', params)
@@ -1425,11 +1426,10 @@ class RateHawkClient {
         : [{ adults: params.adults, children: Array.isArray(params.children) ? params.children : [] }]
 
       // Bygg request basert på om vi har hotelId (string) eller hid (number)
-      // Note: getHotelDetails brukes ikke direkte med userCountry, men kan utvides senere
       const requestParams: any = {
         checkin: params.checkIn,
         checkout: params.checkOut,
-        residency: 'no', // Default, kan utvides til å ta userCountry som parameter
+        residency: this.getUserResidency(params.residency),
         language: 'en',
         guests: guests,
         currency: params.currency || 'NOK',
@@ -1593,35 +1593,12 @@ class RateHawkClient {
               const rateName = normalizeName(rate.room_data_trans?.main_name || rate.room_name || '')
               const rateType = normalizeName(rate.room_data_trans?.main_room_type || '')
 
-              // 2a. Direkte room_group_id match (mest pålitelig – finnes på HP-rater)
-              if (rate.room_group_id !== undefined) {
-                matchedGroup = groupById.get(Number(rate.room_group_id))
-              }
-
-              // 2b. Eksakt normalisert navn-match
-              if (!matchedGroup) {
-                for (const g of groupById.values()) {
-                  const gNorm = normalizeName(g.name)
-                  if (gNorm === rateName || gNorm === rateType) {
-                    matchedGroup = g; break
-                  }
-                }
-              }
-
-              // 2c. Prefix/inneholder-match på normalisert navn
-              if (!matchedGroup) {
-                for (const g of groupById.values()) {
-                  const gNorm = normalizeName(g.name)
-                  if (gNorm.length > 3 && (rateName.startsWith(gNorm) || rateType.startsWith(gNorm) || gNorm.startsWith(rateName))) {
-                    matchedGroup = g; break
-                  }
-                }
-              }
-
-              // 2d. rg_ext-match inkludert quality for å skille Standard vs Deluxe
-              if (!matchedGroup && rate.rg_ext) {
+              // rg_ext is the primary matching field per RateHawk requirement.
+              // It is present in both static (room_groups) and dynamic (rates) data.
+              if (rate.rg_ext) {
                 const re = rate.rg_ext
-                // Prøv først med quality
+
+                // 2a. rg_ext: exact match (class + bedding + bathroom + quality) with photos
                 for (const g of groupById.values()) {
                   if (g.photos.length === 0) continue
                   if (g.rg_ext.class === re.class && g.rg_ext.bedding === re.bedding &&
@@ -1629,7 +1606,8 @@ class RateHawkClient {
                     matchedGroup = g; break
                   }
                 }
-                // Fallback uten quality
+
+                // 2b. rg_ext: match without quality (capacity may differ) with photos
                 if (!matchedGroup) {
                   for (const g of groupById.values()) {
                     if (g.photos.length === 0) continue
@@ -1639,14 +1617,58 @@ class RateHawkClient {
                     }
                   }
                 }
+
+                // 2c. rg_ext: match without bathroom with photos
+                if (!matchedGroup) {
+                  for (const g of groupById.values()) {
+                    if (g.photos.length === 0) continue
+                    if (g.rg_ext.class === re.class && g.rg_ext.bedding === re.bedding) {
+                      matchedGroup = g; break
+                    }
+                  }
+                }
+
+                // 2d. rg_ext: exact match without photos (for size/view metadata)
+                if (!matchedGroup) {
+                  for (const g of groupById.values()) {
+                    if (g.rg_ext.class === re.class && g.rg_ext.bedding === re.bedding &&
+                        g.rg_ext.bathroom === re.bathroom && g.rg_ext.quality === re.quality) {
+                      matchedGroup = g; break
+                    }
+                  }
+                }
+
+                // 2e. rg_ext: match without quality, no photo requirement
+                if (!matchedGroup) {
+                  for (const g of groupById.values()) {
+                    if (g.rg_ext.class === re.class && g.rg_ext.bedding === re.bedding &&
+                        g.rg_ext.bathroom === re.bathroom) {
+                      matchedGroup = g; break
+                    }
+                  }
+                }
               }
 
-              // 2e. rg_ext-match uten bilder (for size/view selv om ingen bilder)
-              if (!matchedGroup && rate.rg_ext) {
-                const re = rate.rg_ext
+              // 2f. Fallback: room_group_id direct match
+              if (!matchedGroup && rate.room_group_id !== undefined) {
+                matchedGroup = groupById.get(Number(rate.room_group_id))
+              }
+
+              // 2g. Fallback: exact normalised name match
+              if (!matchedGroup) {
                 for (const g of groupById.values()) {
-                  if (g.rg_ext.class === re.class && g.rg_ext.bedding === re.bedding &&
-                      g.rg_ext.quality === re.quality) {
+                  const gNorm = normalizeName(g.name)
+                  if (gNorm === rateName || gNorm === rateType) {
+                    matchedGroup = g; break
+                  }
+                }
+              }
+
+              // 2h. Fallback: prefix/contains name match
+              if (!matchedGroup) {
+                for (const g of groupById.values()) {
+                  const gNorm = normalizeName(g.name)
+                  if (gNorm.length > 3 && (rateName.startsWith(gNorm) || rateType.startsWith(gNorm) || gNorm.startsWith(rateName))) {
                     matchedGroup = g; break
                   }
                 }
@@ -1746,9 +1768,9 @@ class RateHawkClient {
   }
 
 
-  // Create booking form (Step 1: Prebook rate before booking)
+  // Prebook rate (Step 1: validate rate from hotelpage, get p- hash)
   async prebookRate(params: {
-    bookHash: string  // Changed from matchHash to bookHash
+    bookHash: string
     checkIn: string
     checkOut: string
     adults: number
@@ -1757,26 +1779,27 @@ class RateHawkClient {
     currency?: string
   }) {
     try {
-      console.log('🔍 Creating booking form (prebook):', params)
+      logger.debug('Creating booking form (prebook)', { bookHash: params.bookHash })
 
       if (!this.apiKey || !this.accessToken) {
         throw new Error('RateHawk API credentials missing')
       }
 
-      // Generate unique partner_order_id
+      // Generate unique partner_order_id for this prebook session
       const partnerOrderId = `KULBRUK_${Date.now()}_${Math.random().toString(36).substring(7)}`
 
       const requestParams = {
         partner_order_id: partnerOrderId,
-        book_hash: params.bookHash,  // Use bookHash directly
+        book_hash: params.bookHash,
+        price_increase_percent: 10,
         language: 'en',
-        user_ip: '82.29.0.86' // Required field - kan evt. hentes fra request
+        user_ip: '82.29.0.86'
       }
 
-      console.log('🔍 Making /hotel/order/booking/form/ request:', requestParams)
+      logger.debug('Making /hotel/order/booking/form/ request')
 
       const data = await this.makeRequest('/hotel/order/booking/form/', requestParams, 'POST')
-      console.log('🔍 Raw booking form response:', JSON.stringify(data, null, 2))
+      logger.debug('Raw booking form response received', { status: data?.status, hasData: !!data?.data })
 
       if (data?.status === 'error' && data?.error === 'sandbox_restriction') {
         return {
@@ -1785,16 +1808,25 @@ class RateHawkClient {
         }
       }
 
-      // Parse RateHawk booking form response
       if (data?.data) {
+        // p- hash is returned in data.data.book_hash — validate it
+        const returnedBookHash: string | null = data.data.book_hash || null
+        if (returnedBookHash && !returnedBookHash.startsWith('p-')) {
+          logger.warn('Prebook returned unexpected book_hash prefix', { bookHash: returnedBookHash })
+        }
+        if (!returnedBookHash) {
+          logger.warn('Prebook did not return book_hash — finish booking will use h- hash as fallback')
+        }
+
         return {
           success: true,
           data: {
-            book_hash: data.data.book_hash, // p- hash som skal brukes i finishBooking
+            book_hash: returnedBookHash,
+            partner_order_id: data.data.partner_order_id || partnerOrderId,
             item_id: data.data.item_id,
             order_id: data.data.order_id,
-            partner_order_id: data.data.partner_order_id,
             payment_types: data.data.payment_types,
+            price_changed: data.data.price_changed ?? false,
             upsell_data: data.data.upsell_data
           }
         }
@@ -1803,7 +1835,7 @@ class RateHawkClient {
       throw new Error(data?.error || 'Booking form creation failed - no data returned')
 
     } catch (error: any) {
-      console.error('❌ RateHawk Booking Form Error:', error)
+      logger.error('RateHawk Booking Form Error', { error: error.message })
       return {
         success: false,
         error: error.message || 'Failed to create booking form'
@@ -1812,7 +1844,7 @@ class RateHawkClient {
   }
 
 
-  // Start booking process (Step 3: Finish booking)
+  // Start booking process (Step 2: Finish booking)
   async finishBooking(params: {
     bookHash: string
     partnerOrderId: string
@@ -1820,24 +1852,27 @@ class RateHawkClient {
     userPhone: string
     firstName: string
     lastName: string
-    childAges?: number[]
+    childGuests?: { firstName: string; lastName: string; age: number }[]
     paymentType: 'deposit' | 'now'
     amount: string
     currencyCode: string
     remarks?: string
   }) {
     try {
-      logger.info('Finishing booking', { partnerOrderId: params.partnerOrderId })
+      logger.info('Finishing booking', {
+        partnerOrderId: params.partnerOrderId,
+        bookHashPrefix: params.bookHash?.substring(0, 2)
+      })
 
       if (!this.apiKey || !this.accessToken) {
         throw new Error('RateHawk API credentials missing')
       }
 
-      const childGuests = (params.childAges || []).map((age) => ({
-        first_name: params.firstName,
-        last_name: params.lastName,
+      const childGuests = (params.childGuests || []).map((child) => ({
+        first_name: child.firstName,
+        last_name: child.lastName,
         is_child: true as const,
-        age
+        age: child.age
       }))
 
       const requestParams = {

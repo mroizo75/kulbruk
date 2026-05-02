@@ -1,4 +1,7 @@
+import { prisma } from '@/lib/prisma'
+
 const PLACES_API_BASE = 'https://maps.googleapis.com/maps/api/place'
+const CACHE_TTL_DAYS = 30
 
 export interface PlaceReview {
   author: string
@@ -21,23 +24,15 @@ async function textSearch(query: string, apiKey: string): Promise<string | null>
   const url = new URL(`${PLACES_API_BASE}/textsearch/json`)
   url.searchParams.set('query', query)
   url.searchParams.set('type', 'lodging')
-  // Inkluder place_id i fields så vi slipper ekstra runde-trip
   url.searchParams.set('fields', 'place_id')
   url.searchParams.set('key', apiKey)
 
-  console.log('⭐ Google textSearch URL (uten key):', url.toString().replace(apiKey, '***'))
-
-  // Ikke cache – vi vil alltid ha ferske resultater
   const res = await fetch(url.toString(), { cache: 'no-store' })
-  if (!res.ok) {
-    console.warn('⭐ Google textSearch HTTP error:', res.status, await res.text())
-    return null
-  }
+  if (!res.ok) return null
 
   const data = await res.json()
-  console.log('⭐ Google textSearch status:', data.status, '| results:', data.results?.length ?? 0, '| error:', data.error_message ?? 'none')
   if (data.status === 'REQUEST_DENIED') {
-    console.error('⭐ Google Places API avvist – sjekk at Places API er aktivert og fakturering er satt opp:', data.error_message)
+    console.error('Google Places API avvist:', data.error_message)
     return null
   }
   if (data.status !== 'OK' || !data.results?.length) return null
@@ -54,13 +49,9 @@ async function placeDetails(placeId: string, apiKey: string): Promise<PlaceResul
   url.searchParams.set('key', apiKey)
 
   const res = await fetch(url.toString(), { cache: 'no-store' })
-  if (!res.ok) {
-    console.warn('⭐ Google placeDetails HTTP error:', res.status)
-    return null
-  }
+  if (!res.ok) return null
 
   const data = await res.json()
-  console.log('⭐ Google placeDetails status:', data.status, '| rating:', data.result?.rating, '| reviews:', data.result?.reviews?.length ?? 0, '| error:', data.error_message ?? 'none')
   if (data.status !== 'OK' || !data.result) return null
 
   const r = data.result
@@ -82,39 +73,61 @@ async function placeDetails(placeId: string, apiKey: string): Promise<PlaceResul
   }
 }
 
-// Modulnivå-cache: hotelId → PlaceResult (lever så lenge prosessen kjører)
-const cache = new Map<string, PlaceResult | null>()
-
 export async function getHotelReviews(
   hotelId: string,
   hotelName: string,
   address: string,
 ): Promise<PlaceResult | null> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY
-  if (!apiKey) {
-    console.warn('⭐ GOOGLE_PLACES_API_KEY er ikke satt')
-    return null
+  if (!apiKey) return null
+
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - CACHE_TTL_DAYS)
+
+  const cached = await prisma.googlePlacesCache.findUnique({
+    where: { hotelId },
+  })
+
+  if (cached && cached.fetchedAt > cutoff) {
+    return {
+      placeId: cached.placeId ?? '',
+      rating: cached.rating,
+      totalRatings: cached.totalRatings,
+      reviews: JSON.parse(cached.reviewsJson) as PlaceReview[],
+    }
   }
 
-  if (cache.has(hotelId)) {
-    console.log('⭐ Cache-treff for hotelId:', hotelId)
-    return cache.get(hotelId)!
-  }
-
-  // Bygg en spesifikk søkestreng: hotellnavn + adresse gir best treff
   const cleanAddress = address && address !== 'Address not available' ? address : ''
   const query = cleanAddress ? `${hotelName} ${cleanAddress}` : `hotel ${hotelName}`
-  console.log('⭐ Google Places søk:', query)
 
   const placeId = await textSearch(query, apiKey)
-  console.log('⭐ Google Places placeId:', placeId)
   if (!placeId) {
-    cache.set(hotelId, null)
+    await prisma.googlePlacesCache.upsert({
+      where: { hotelId },
+      create: { hotelId, placeId: null, rating: 0, totalRatings: 0, reviewsJson: '[]' },
+      update: { placeId: null, rating: 0, totalRatings: 0, reviewsJson: '[]', fetchedAt: new Date() },
+    })
     return null
   }
 
   const result = await placeDetails(placeId, apiKey)
-  console.log('⭐ Google Places resultat:', result ? `rating ${result.rating}, ${result.reviews.length} anmeldelser, totalt ${result.totalRatings}` : 'null')
-  cache.set(hotelId, result)
+  await prisma.googlePlacesCache.upsert({
+    where: { hotelId },
+    create: {
+      hotelId,
+      placeId: result?.placeId ?? placeId,
+      rating: result?.rating ?? 0,
+      totalRatings: result?.totalRatings ?? 0,
+      reviewsJson: JSON.stringify(result?.reviews ?? []),
+    },
+    update: {
+      placeId: result?.placeId ?? placeId,
+      rating: result?.rating ?? 0,
+      totalRatings: result?.totalRatings ?? 0,
+      reviewsJson: JSON.stringify(result?.reviews ?? []),
+      fetchedAt: new Date(),
+    },
+  })
+
   return result
 }

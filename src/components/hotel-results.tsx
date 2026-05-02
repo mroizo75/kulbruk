@@ -278,7 +278,8 @@ export default function HotelResults({ hotels, searchParams, isLoading, destinat
             adults: searchParams.rooms.reduce((s, r) => s + r.adults, 0),
             children: searchParams.rooms.flatMap(r => r.childAges),
             rooms: searchParams.rooms.length,
-            roomConfigs: searchParams.rooms
+            roomConfigs: searchParams.rooms,
+            residency: searchParams.residency
           }}
         />
       )}

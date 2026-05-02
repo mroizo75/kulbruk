@@ -82,6 +82,7 @@ interface HotelDetailsDialogProps {
     children: number[]
     rooms: number
     roomConfigs?: { adults: number; childAges: number[] }[]
+    residency?: string
   }
 }
 
@@ -107,6 +108,8 @@ export default function HotelDetailsDialog({
     reviews: { author: string; rating: number; text: string; time: number; relativeTime: string; authorPhotoUrl?: string }[]
   } | null>(null)
   const [reviewsLoading, setReviewsLoading] = useState(false)
+  // ECB exchange rates — fetched once when dialog opens, used for ~kr estimates on non-NOK taxes
+  const [fxRates, setFxRates] = useState<Record<string, number> | null>(null)
 
   const getRoomImageIndex = (roomIdx: number) => roomImageIndexes[roomIdx] ?? 0
   const setRoomImageIndex = (roomIdx: number, idx: number) =>
@@ -152,6 +155,16 @@ export default function HotelDetailsDialog({
 
     fetchHotelDetails()
   }, [open, hotelId, searchParams])
+
+  // Hent ECB valutakurser én gang når dialogen åpnes
+  useEffect(() => {
+    if (!open || fxRates) return
+    fetch('/api/utils/exchange-rates')
+      .then(r => r.json())
+      .then(d => { if (d.rates) setFxRates(d.rates) })
+      .catch(() => { /* valgfritt — vi viser bare ikke ~kr dersom henting feiler */ })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   // Hent Google Places-anmeldelser når hotellet er lastet
   useEffect(() => {
@@ -207,13 +220,33 @@ export default function HotelDetailsDialog({
   const getTaxName = (name: string) =>
     TAX_NAME_MAP[name?.toLowerCase()] ?? name?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
-  // Valutaer vi viser beløp for – alt annet vises som "betales i lokal valuta"
-  const DISPLAY_CURRENCIES = new Set(['NOK', 'EUR', 'USD', 'GBP', 'SEK', 'DKK'])
-  const formatTaxAmount = (amount: string, currency: string) => {
-    if (!DISPLAY_CURRENCIES.has(currency?.toUpperCase())) return 'Betales i lokal valuta'
-    return new Intl.NumberFormat('nb-NO', {
-      style: 'currency', currency, maximumFractionDigits: 2,
-    }).format(parseFloat(amount || '0'))
+  // Format tax amount with its original currency_code (required by RateHawk).
+  // When fxRates are available and the currency differs from NOK, also show a ~kr estimate.
+  const formatTaxAmount = (amount: string, currency: string): string => {
+    const parsed = parseFloat(amount || '0')
+    const cur = currency?.toUpperCase() || ''
+
+    let original: string
+    try {
+      original = new Intl.NumberFormat('nb-NO', {
+        style: 'currency', currency: cur, maximumFractionDigits: 2,
+      }).format(parsed)
+    } catch {
+      original = `${parsed.toFixed(2)} ${cur}`
+    }
+
+    if (!fxRates || cur === 'NOK' || !cur) return original
+
+    const fromRate = fxRates[cur]
+    const nokRate = fxRates['NOK']
+    if (!fromRate || !nokRate) return original
+
+    const nok = (parsed / fromRate) * nokRate
+    const approx = new Intl.NumberFormat('nb-NO', {
+      style: 'currency', currency: 'NOK', maximumFractionDigits: 0,
+    }).format(nok)
+
+    return `${original} (≈ ${approx})`
   }
 
   // Norsk oversettelse av ETG måltidstyper (basert på offisiell mapping)
@@ -228,7 +261,7 @@ export default function HotelDetailsDialog({
     'lunch': 'Lunsj inkludert',
     'nomeal': 'Kun rom',
     'room_only': 'Kun rom',
-    'some-meal': 'Måltid inkludert',
+    'some-meal': 'Some meal',
     'english-breakfast': 'Engelsk frokost',
     'american-breakfast': 'Amerikansk frokost',
     'asian-breakfast': 'Asiatisk frokost',
@@ -369,9 +402,23 @@ export default function HotelDetailsDialog({
     const penalties = room.cancellation_penalties
     if (!penalties) return null
 
-    const freeCancellation = penalties.free_cancellation_before || penalties.cancellation_deadline
     const policies = Array.isArray(penalties.policies) ? penalties.policies : []
     const isNonRefundable = penalties.is_non_refundable || (policies.length === 1 && policies[0]?.penalty_percent === 100)
+
+    // Prefer the explicit field; fall back to computing from the policies array.
+    // The last policy with penalty_percent === 0 indicates the free-cancellation window end.
+    let freeCancellation: string | null =
+      penalties.free_cancellation_before || penalties.cancellation_deadline || null
+
+    if (!freeCancellation && !isNonRefundable && policies.length > 0) {
+      const freePolicies = policies.filter((p: any) =>
+        p.penalty_percent === 0 || parseFloat(p.amount_charge || p.amount_show || '1') === 0
+      )
+      if (freePolicies.length > 0) {
+        const last = freePolicies[freePolicies.length - 1]
+        freeCancellation = last.end_at || null
+      }
+    }
 
     return { freeCancellation, policies, isNonRefundable }
   }
@@ -690,9 +737,6 @@ export default function HotelDetailsDialog({
                       const roomImgs = room.images || []
                       const showCancellation = expandedCancellation[index]
 
-                      // Del skatter i to grupper
-                      const knownCurrencyTaxes = nonIncludedTaxes.filter((t: any) => DISPLAY_CURRENCIES.has(t.currency_code?.toUpperCase()))
-                      const localCurrencyTaxes = nonIncludedTaxes.filter((t: any) => !DISPLAY_CURRENCIES.has(t.currency_code?.toUpperCase()))
 
                       return (
                       <Card key={index} className="hover:shadow-md transition-shadow overflow-hidden">
@@ -850,8 +894,8 @@ export default function HotelDetailsDialog({
                                 ) : null}
                               </div>
 
-                              {/* Avbestillingsregler – ekspanderbar */}
-                              {cancellationInfo && !cancellationInfo.isNonRefundable && (
+                              {/* Avbestillingsregler – ekspanderbar; vises alltid når policyer finnes */}
+                              {cancellationInfo && !cancellationInfo.isNonRefundable && cancellationInfo.policies.length > 0 && (
                                 <div className="mb-3">
                                   <button
                                     type="button"
@@ -963,25 +1007,18 @@ export default function HotelDetailsDialog({
                                       <span className="text-green-600 text-lg whitespace-nowrap">{fmt(totalAmount)}</span>
                                     </div>
 
-                                    {/* Avgifter betales ved innsjekk */}
+                                    {/* Ikke-inkluderte avgifter — betales ved innsjekk */}
                                     {nonIncludedTaxes.length > 0 && (
                                       <div className="mt-2 pt-2 border-t border-dashed border-gray-200">
                                         <p className="text-xs text-orange-700 font-medium mb-1">Betales ved innsjekk:</p>
-                                        {knownCurrencyTaxes.map((tax: any, i: number) => (
+                                        {nonIncludedTaxes.map((tax: any, i: number) => (
                                           <div key={i} className="flex justify-between gap-2 text-xs text-gray-600">
                                             <span>{getTaxName(tax.name)}</span>
                                             <span className="font-medium whitespace-nowrap">
-                                              {new Intl.NumberFormat('nb-NO', {
-                                                style: 'currency', currency: tax.currency_code, maximumFractionDigits: 2
-                                              }).format(parseFloat(tax.amount || '0'))}
+                                              {formatTaxAmount(tax.amount, tax.currency_code)}
                                             </span>
                                           </div>
                                         ))}
-                                        {localCurrencyTaxes.length > 0 && (
-                                          <p className="text-[10px] text-gray-400 mt-0.5">
-                                            {localCurrencyTaxes.map((t: any) => getTaxName(t.name)).join(', ')}: betales i lokal valuta
-                                          </p>
-                                        )}
                                         <p className="text-[10px] text-gray-400 mt-1">
                                           Kreves inn direkte av hotellet ved innsjekk.
                                         </p>

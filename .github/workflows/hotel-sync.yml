@@ -1,0 +1,57 @@
+name: Hotel Static Data Sync
+
+on:
+  schedule:
+    # Full dump: every Monday at 02:00 UTC
+    - cron: '0 2 * * 1'
+    # Incremental dump: every day except Monday at 02:30 UTC
+    - cron: '30 2 * * 2,3,4,5,6,0'
+
+  # Allow manual triggering with choice of sync type
+  workflow_dispatch:
+    inputs:
+      sync_type:
+        description: 'Type synkronisering'
+        required: true
+        default: 'incremental'
+        type: choice
+        options:
+          - 'full'
+          - 'incremental'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Determine sync type
+        id: type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "sync_type=${{ inputs.sync_type }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 2 * * 1" ]; then
+            echo "sync_type=full" >> $GITHUB_OUTPUT
+          else
+            echo "sync_type=incremental" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger hotel sync
+        run: |
+          SYNC_TYPE="${{ steps.type.outputs.sync_type }}"
+          echo "Starting ${SYNC_TYPE} hotel sync..."
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ secrets.APP_URL }}/api/admin/sync-hotels" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SYNC_SECRET }}" \
+            -d "{\"type\": \"${SYNC_TYPE}\"}")
+
+          echo "Response status: ${RESPONSE}"
+
+          if [ "${RESPONSE}" != "200" ] && [ "${RESPONSE}" != "202" ]; then
+            echo "Hotel sync trigger failed with status ${RESPONSE}"
+            exit 1
+          fi
+
+          echo "Hotel sync (${SYNC_TYPE}) triggered successfully"

@@ -10,9 +10,9 @@ export async function POST(request: NextRequest) {
     console.log('🏨 API: Hotel details request received')
 
     const body = await request.json()
-    const { hotelId, hid, checkIn, checkOut, adults, children, rooms, roomConfigs, currency } = body
+    const { hotelId, hid, checkIn, checkOut, adults, children, rooms, roomConfigs, currency, residency } = body
 
-    console.log('🏨 API: Request params:', { hotelId, hid, checkIn, checkOut, adults, children, rooms })
+    console.log('🏨 API: Request params:', { hotelId, hid, checkIn, checkOut, adults, children, rooms, residency })
 
     if ((!hotelId && !hid) || !checkIn || !checkOut || !adults) {
       return NextResponse.json({
@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
       children: Array.isArray(children) ? children : [],
       rooms: rooms || 1,
       roomConfigs: Array.isArray(roomConfigs) ? roomConfigs : undefined,
-      currency: currency || 'NOK'
+      currency: currency || 'NOK',
+      residency: residency || undefined
     })
 
     if (!result.success) {
