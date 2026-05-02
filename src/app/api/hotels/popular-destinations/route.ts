@@ -8,28 +8,32 @@ const DESTINATIONS = [
     name: 'Oslo',
     country: 'Norge',
     hotels: '500+ hoteller',
-    image: 'https://images.unsplash.com/photo-1513519245088-0e12902e35a5?w=800&h=450&fit=crop&auto=format&q=80',
+    // Modern buildings in Oslo – havn og skyline (verifisert Unsplash)
+    image: 'https://images.unsplash.com/photo-1664487235579-251b3541dd5d?w=800&h=450&fit=crop&auto=format&q=80',
   },
   {
     id: '1953',
     name: 'København',
     country: 'Danmark',
     hotels: '400+ hoteller',
-    image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=800&h=450&fit=crop&auto=format&q=80',
+    // Nyhavn-kanalen, København (verifisert Unsplash)
+    image: 'https://images.unsplash.com/photo-1526662075745-edd1c71a4cff?w=800&h=450&fit=crop&auto=format&q=80',
   },
   {
     id: '1775',
     name: 'Paris',
     country: 'Frankrike',
     hotels: '3000+ hoteller',
-    image: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=800&h=450&fit=crop&auto=format&q=80',
+    // Eiffeltårnet med bybilde, Paris (verifisert Unsplash)
+    image: 'https://images.unsplash.com/photo-1492136344046-866c85e0bf04?w=800&h=450&fit=crop&auto=format&q=80',
   },
   {
     id: '1869',
     name: 'London',
     country: 'Storbritannia',
     hotels: '2000+ hoteller',
-    image: 'https://images.unsplash.com/photo-1505761671935-60b3a7427bad?w=800&h=450&fit=crop&auto=format&q=80',
+    // Big Ben, London (verifisert Unsplash)
+    image: 'https://images.unsplash.com/photo-1454793147212-9e7e57e89a4f?w=800&h=450&fit=crop&auto=format&q=80',
   },
 ]
 
