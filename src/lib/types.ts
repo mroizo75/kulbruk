@@ -79,7 +79,8 @@ export interface RateHawkHotelSearchResponse {
 export interface RateHawkDestination {
   id: string
   name: string
-  type: 'city' | 'hotel' | 'landmark'
+  type: 'city' | 'hotel' | 'landmark' | string
+  country?: string
 }
 
 // Hotel Review Types
