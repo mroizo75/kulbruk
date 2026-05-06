@@ -102,6 +102,7 @@ export default function HotelDetailsDialog({
   const [roomImageIndexes, setRoomImageIndexes] = useState<Record<number, number>>({})
   const [expandedCancellation, setExpandedCancellation] = useState<Record<number, boolean>>({})
   const [expandedTax, setExpandedTax] = useState<Record<number, boolean>>({})
+  const [reviewsFetched, setReviewsFetched] = useState(false)
   const [googleReviews, setGoogleReviews] = useState<{
     rating: number
     totalRatings: number
@@ -122,6 +123,8 @@ export default function HotelDetailsDialog({
       try {
         setIsLoading(true)
         setError(null)
+        setGoogleReviews(null)
+        setReviewsFetched(false)
 
         console.log('🏨 Fetching hotel details:', { hotelId, ...searchParams })
 
@@ -166,33 +169,27 @@ export default function HotelDetailsDialog({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Hent Google Places-anmeldelser når hotellet er lastet
-  useEffect(() => {
-    if (!hotel) return
-    const fetchReviews = async () => {
-      setReviewsLoading(true)
-      try {
-        const params = new URLSearchParams({
-          hotelId: hotel.id,
-          name: hotel.name,
-          address: hotel.address,
-        })
-        console.log('⭐ Fetching reviews for:', hotel.name, hotel.address)
-        const res = await fetch(`/api/hotels/reviews?${params}`)
-        console.log('⭐ Reviews response status:', res.status)
-        if (res.ok) {
-          const data = await res.json()
-          console.log('⭐ Reviews data:', data)
-          setGoogleReviews(data)
-        }
-      } catch (err) {
-        console.warn('⭐ Reviews fetch failed:', err)
-      } finally {
-        setReviewsLoading(false)
+  const fetchGoogleReviews = async () => {
+    if (!hotel || reviewsFetched) return
+    setReviewsLoading(true)
+    setReviewsFetched(true)
+    try {
+      const params = new URLSearchParams({
+        hotelId: hotel.id,
+        name: hotel.name,
+        address: hotel.address,
+      })
+      const res = await fetch(`/api/hotels/reviews?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setGoogleReviews(data)
       }
+    } catch (err) {
+      console.warn('Reviews fetch failed:', err)
+    } finally {
+      setReviewsLoading(false)
     }
-    fetchReviews()
-  }, [hotel?.id])
+  }
 
   // Formater pris med valuta fra betalingsalternativer
   const formatPrice = (dailyPrices: any[], paymentOptions?: any) => {
@@ -1086,6 +1083,16 @@ export default function HotelDetailsDialog({
                         <CardContent className="py-12 text-center">
                           <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
                           <p className="text-gray-500 text-sm">Henter anmeldelser…</p>
+                        </CardContent>
+                      </Card>
+                    ) : !reviewsFetched ? (
+                      <Card>
+                        <CardContent className="py-12 text-center">
+                          <Star className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                          <p className="text-gray-600 mb-4">Hent anmeldelser fra Google for dette hotellet</p>
+                          <Button variant="outline" onClick={fetchGoogleReviews}>
+                            Vis Google-anmeldelser
+                          </Button>
                         </CardContent>
                       </Card>
                     ) : googleReviews && googleReviews.reviews.length > 0 ? (
